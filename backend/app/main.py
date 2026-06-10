@@ -22,6 +22,7 @@ app = FastAPI(
 )
 
 # Mount uploads directory as static files
+os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 # CORS configuration
