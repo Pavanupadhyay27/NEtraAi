@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: netraid-db
+    restart: always
+    environment:
+      POSTGRES_DB: netraid_db
+      POSTGRES_USER: netraid
+      POSTGRES_PASSWORD: netraid123
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netraid -d netraid_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: netraid-backend
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://netraid:netraid123@db:5432/netraid_db
+      - JWT_SECRET_KEY=c01c0be1b621e25e985b96ea6e88e2cbdfcbce52ff6ea96be220f8623eb0b21a
+      - JWT_ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=60
+      - REFRESH_TOKEN_EXPIRE_DAYS=7
+      - INITIAL_ADMIN_EMAIL=admin@netraid.ai
+      - INITIAL_ADMIN_PASSWORD=Admin@NetraID2026
+      - KIOSK_FACE_THRESHOLD=0.60
+      - KIOSK_LIVENESS_THRESHOLD=0.75
+      - UPLOAD_DIR=/workspace/uploads
+      - MODELS_DIR=/workspace/models
+      - ALLOWED_HOSTS=*
+    ports:
+      - "8000:8000"
+    volumes:
+      - uploads:/workspace/uploads
+      - models:/workspace/models
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: netraid-frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+  nginx:
+    image: nginx:alpine
+    container_name: netraid-nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - backend
+
+volumes:
+  pgdata:
+    driver: local
+  uploads:
+    driver: local
+  models:
+    driver: local
