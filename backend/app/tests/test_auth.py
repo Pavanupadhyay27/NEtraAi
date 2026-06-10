@@ -88,13 +88,19 @@ def test_live_stream_auth_failure(client):
     assert response.status_code == 401
 
 @patch("app.core.security.crud.get_user_by_email")
-def test_live_stream_auth_success(mock_get_user, client):
+@patch("app.api.v1.analytics.event_bus.subscribe")
+def test_live_stream_auth_success(mock_subscribe, mock_get_user, client):
     mock_role = models.Role(id=1, name="Super Admin")
     mock_user = models.User(id=1, email="admin@netraid.ai", is_active=True, role=mock_role)
     mock_get_user.return_value = mock_user
     
+    # Pre-populate queue to prevent TestClient from hanging waiting for the first yield
+    import asyncio
+    q = asyncio.Queue()
+    q.put_nowait({"type": "test"})
+    mock_subscribe.return_value = q
+    
     token = create_access_token(subject="admin@netraid.ai", role="Super Admin")
     
-    # We can connect to the streaming endpoint using client.stream
     with client.stream("GET", f"/api/v1/analytics/live-stream?token={token}") as response:
         assert response.status_code == 200
