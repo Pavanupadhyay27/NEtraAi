@@ -10,6 +10,35 @@ class Settings(BaseSettings):
     # Database Configuration
     DATABASE_URL: str
     
+    @validator("DATABASE_URL", pre=True)
+    def normalize_database_url(cls, v):
+        import urllib.parse
+        if not isinstance(v, str):
+            return v
+        
+        if v.startswith("postgresql://") or v.startswith("postgres://"):
+            prefix = "postgresql://" if v.startswith("postgresql://") else "postgres://"
+            rest = v[len(prefix):]
+            if "@" in rest:
+                creds, host_info = rest.rsplit("@", 1)
+                if ":" in creds:
+                    user, password = creds.split(":", 1)
+                else:
+                    user = creds
+                    password = ""
+                
+                # Auto-append project ref for Supabase pooler if missing
+                if "pooler.supabase.com" in host_info:
+                    if user == "postgres":
+                        user = "postgres.erzowqgbpeobbzpjkmtt"
+                
+                # Auto-encode password safely
+                decoded_password = urllib.parse.unquote(password)
+                encoded_password = urllib.parse.quote_plus(decoded_password)
+                
+                v = f"postgresql://{user}:{encoded_password}@{host_info}"
+        return v
+
     # JWT & Security
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"

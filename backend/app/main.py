@@ -56,7 +56,15 @@ def startup_event():
     finally:
         db.close()
 
-# Health check
+# Health check and root route
+@app.get("/")
+def read_root():
+    return {
+        "status": "healthy",
+        "message": "NetraID Backend API is running",
+        "docs": "/docs"
+    }
+
 @app.get("/health", tags=["Status"])
 def health_check():
     return {
@@ -64,6 +72,7 @@ def health_check():
         "project": settings.PROJECT_NAME,
         "version": "1.0.0"
     }
+
 
 # Include API Routers
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])
