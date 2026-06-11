@@ -201,7 +201,8 @@ def scan_face(
     
     if face_engine.mock_mode:
         # Override match similarity in mock mode to allow functional kiosk scans during demos
-        similarity = 0.85
+        import random
+        similarity = random.uniform(0.81, 0.94)
     
     if similarity < face_threshold:
         # Low confidence match -> Unknown

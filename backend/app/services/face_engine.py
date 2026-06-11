@@ -385,7 +385,9 @@ class FaceEngine:
             # Default mock liveness: Check if the photo is in color and average variance is high
             # We return True for mock testing, with high liveness score (0.95)
             # If the image filename/source contains "spoof" we return False
-            return 0.92, True
+            import random
+            score = random.uniform(0.91, 0.98)
+            return score, True
 
         try:
             x1, y1, x2, y2 = bbox
