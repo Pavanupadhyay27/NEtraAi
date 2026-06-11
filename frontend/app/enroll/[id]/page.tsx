@@ -4,24 +4,83 @@ import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import SidebarLayout from "@/components/SidebarLayout";
-import { fetchApi } from "@/app/utils/api";
+import { fetchApi, getBackendUrl } from "@/app/utils/api";
 import {
   Camera, Upload, CheckCircle2, ChevronLeft, XCircle, Video,
-  RefreshCw, AlertCircle, Trash2
+  RefreshCw, AlertCircle, Trash2, Play, Pause, Save, RotateCcw, Shield, Activity, Sparkles
 } from "lucide-react";
 
-const POSES: Record<string, { label: string; hint: string; icon: string }> = {
-  front:   { label: "Front",    hint: "Look straight into the camera with neutral expression.", icon: "🧑" },
-  left:    { label: "Left",     hint: "Turn head slowly to the left (profile view).", icon: "👈" },
-  right:   { label: "Right",    hint: "Turn head slowly to the right (profile view).", icon: "👉" },
-  up:      { label: "Up",       hint: "Tilt your chin upwards slightly.", icon: "⬆️" },
-  down:    { label: "Down",     hint: "Tilt your chin downwards slightly.", icon: "⬇️" },
-  smile:   { label: "Smile",    hint: "Give a natural, relaxed smile.", icon: "😊" },
-  neutral: { label: "Neutral",  hint: "Keep a relaxed, standard neutral expression.", icon: "😐" },
-  indoor:  { label: "Indoor",   hint: "Enroll with typical indoor room lighting conditions.", icon: "💡" },
-  outdoor: { label: "Outdoor",  hint: "Enroll with natural outdoor or bright lighting.", icon: "☀️" },
-  glasses: { label: "Glasses",  hint: "Wear glasses if applicable. Optional – skip if not wearing.", icon: "🕶️" },
+interface PoseInfo {
+  label: string;
+  hint: string;
+  speech: string;
+  icon: string;
+}
+
+const POSES: Record<string, PoseInfo> = {
+  front: {
+    label: "Front Profile",
+    hint: "Look straight into the camera with a neutral expression.",
+    speech: "Please look straight into the camera.",
+    icon: "🧑"
+  },
+  left: {
+    label: "Left Profile",
+    hint: "Turn your head slowly to the left.",
+    speech: "Please turn your head to the left.",
+    icon: "👈"
+  },
+  right: {
+    label: "Right Profile",
+    hint: "Turn your head slowly to the right.",
+    speech: "Please turn your head to the right.",
+    icon: "👉"
+  },
+  up: {
+    label: "Looking Up",
+    hint: "Tilt your chin upwards slightly.",
+    speech: "Please tilt your head upwards.",
+    icon: "⬆️"
+  },
+  down: {
+    label: "Looking Down",
+    hint: "Tilt your chin downwards slightly.",
+    speech: "Please tilt your head downwards.",
+    icon: "⬇️"
+  },
+  smile: {
+    label: "Smiling Face",
+    hint: "Give a natural, relaxed smile.",
+    speech: "Now, smile naturally.",
+    icon: "😊"
+  },
+  neutral: {
+    label: "Neutral Face",
+    hint: "Keep a relaxed, standard neutral expression.",
+    speech: "Relax your face, show a neutral expression.",
+    icon: "😐"
+  },
+  indoor: {
+    label: "Indoor Light",
+    hint: "Look straight with standard indoor room lighting.",
+    speech: "Look straight for typical indoor lighting.",
+    icon: "💡"
+  },
+  outdoor: {
+    label: "Outdoor Light",
+    hint: "Look straight with bright/outdoor lighting.",
+    speech: "Look straight for bright light capture.",
+    icon: "☀️"
+  },
+  glasses: {
+    label: "Glasses Option",
+    hint: "Put on glasses if you wear them, otherwise look straight.",
+    speech: "If you wear glasses, put them on. Otherwise, look straight.",
+    icon: "🕶️"
+  }
 };
+
+const POSE_KEYS = Object.keys(POSES);
 
 export default function EnrollPage() {
   const params = useParams();
@@ -29,17 +88,35 @@ export default function EnrollPage() {
   const queryClient = useQueryClient();
   const employeeId = params.id;
 
-  const [selectedPose, setSelectedPose] = useState("front");
-  const [uploading, setUploading] = useState(false);
+  // State Machine for biometric scanner:
+  // "idle": Pre-start screen
+  // "capturing": Active auto-capture loop
+  // "review": Review grid of all 10 captured poses
+  // "saving": Uploading to server/indexing vectors
+  // "success": Completed successfully screen
+  const [captureState, setCaptureState] = useState<"idle" | "capturing" | "review" | "saving" | "success">("idle");
+  const [currentPoseIndex, setCurrentPoseIndex] = useState(0);
+  const [countdown, setCountdown] = useState(3);
+  const [isPaused, setIsPaused] = useState(false);
+  
+  // Store local previews: { [poseKey]: base64DataUrl }
+  const [capturedImages, setCapturedImages] = useState<Record<string, string>>({});
+  
+  // Upload status
+  const [uploadIndex, setUploadIndex] = useState(0);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [capturedPreview, setCapturedPreview] = useState<string | null>(null);
   const [webcamActive, setWebcamActive] = useState(false);
+  const [singleRetakePose, setSingleRetakePose] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Queries
   const { data: employee } = useQuery({
     queryKey: ["employee", employeeId],
     queryFn: () => fetchApi(`/employees/${employeeId}`)
@@ -53,323 +130,698 @@ export default function EnrollPage() {
 
   const clearMutation = useMutation({
     mutationFn: () => fetchApi(`/enrollment/${employeeId}`, { method: "DELETE" }),
-    onSuccess: () => { refetchStatus(); setSuccessMsg("All facial data cleared."); setErrorMsg(null); }
+    onSuccess: () => {
+      refetchStatus();
+      setCapturedImages({});
+      setSuccessMsg("All registered facial profiles cleared from database.");
+      setErrorMsg(null);
+    }
   });
 
-  const startWebcam = async () => {
-    setErrorMsg(null); setSuccessMsg(null);
+  // Offline Web Audio API Sound Generator (synthesized camera click & alert beeps)
+  const playSound = (type: "beep" | "click") => {
+    if (typeof window === "undefined") return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: "user" } });
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      if (type === "beep") {
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.13);
+      } else if (type === "click") {
+        // Shutter click noise synthesis
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1000, audioCtx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.12);
+      }
+    } catch (e) {
+      console.warn("Failed to generate audio feedback:", e);
+    }
+  };
+
+  // Browser offline speech engine
+  const speakDirection = (text: string) => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.92;
+      utterance.pitch = 1.05;
+      
+      const voices = window.speechSynthesis.getVoices();
+      const eng = voices.find(v => v.lang.startsWith("en"));
+      if (eng) utterance.voice = eng;
+      
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  // Webcam controls
+  const startWebcam = async () => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 1280, height: 720, facingMode: "user" }
+      });
       streamRef.current = stream;
-      if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
+      }
       setWebcamActive(true);
     } catch {
-      setErrorMsg("Unable to access webcam. Check browser permissions.");
+      setErrorMsg("Webcam permission denied. Check your browser settings.");
     }
   };
 
   const stopWebcam = () => {
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     setWebcamActive(false);
-    setCapturedPreview(null);
   };
 
-  useEffect(() => () => { stopWebcam(); }, []);
+  useEffect(() => {
+    return () => stopWebcam();
+  }, []);
 
-  const handleCapture = async () => {
-    if (!videoRef.current || !canvasRef.current || !webcamActive) return;
+  // Trigger auto capture session
+  const startAutoCapture = async () => {
+    setCapturedImages({});
+    setCurrentPoseIndex(0);
+    setCountdown(3);
+    setIsPaused(false);
+    setSingleRetakePose(null);
+    setCaptureState("capturing");
+    await startWebcam();
+  };
+
+  // Automated capture timer loop
+  useEffect(() => {
+    if (captureState !== "capturing" || isPaused || !webcamActive) return;
+
+    const currentKey = POSE_KEYS[currentPoseIndex];
+    if (!currentKey) {
+      // Completed all poses
+      stopWebcam();
+      setCaptureState("review");
+      return;
+    }
+
+    // Speak pose directions on start of each pose countdown
+    if (countdown === 3) {
+      speakDirection(POSES[currentKey].speech);
+    }
+
+    countdownIntervalRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(countdownIntervalRef.current!);
+          captureFrame(currentKey);
+          return 3;
+        }
+        playSound("beep");
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    };
+  }, [captureState, currentPoseIndex, countdown, isPaused, webcamActive]);
+
+  // Capture current frame from HTML5 Video
+  const captureFrame = (poseKey: string) => {
+    if (!videoRef.current || !canvasRef.current) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx || video.readyState < 2) return;
 
-    const vw = video.videoWidth, vh = video.videoHeight;
-    if (!vw || !vh) { setErrorMsg("Camera not ready yet. Please wait a moment."); return; }
+    canvas.width = 640;
+    canvas.height = 480;
+    
+    // Draw mirrored video frame
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-    setUploading(true); setErrorMsg(null); setSuccessMsg(null); setCapturedPreview(null);
+    const base64 = canvas.toDataURL("image/jpeg", 0.90);
+    playSound("click");
 
-    canvas.width = vw; canvas.height = vh;
-    ctx.drawImage(video, 0, 0, vw, vh);
+    setCapturedImages((prev) => ({ ...prev, [poseKey]: base64 }));
 
-    // Black frame detection
-    const data = ctx.getImageData(0, 0, vw, vh).data;
-    let sum = 0;
-    for (let i = 0; i < data.length; i += 4) sum += (data[i] + data[i+1] + data[i+2]) / 3;
-    if (sum / (data.length / 4) < 5) {
-      setErrorMsg("Frame appears black. Ensure webcam is working and retry.");
-      setUploading(false); return;
+    if (singleRetakePose) {
+      // Re-taking a single pose from review screen
+      stopWebcam();
+      setSingleRetakePose(null);
+      setCaptureState("review");
+    } else {
+      // Auto sequence: Move to next pose
+      setCurrentPoseIndex((prev) => prev + 1);
+      setCountdown(3);
     }
-
-    setCapturedPreview(canvas.toDataURL("image/jpeg", 0.85));
-    canvas.toBlob(async (blob) => {
-      if (!blob) { setErrorMsg("Capture failed."); setUploading(false); return; }
-      await uploadFile(blob);
-    }, "image/jpeg", 0.95);
   };
 
+  // Perform single re-take for a specific pose
+  const handleRetakeSingle = async (poseKey: string) => {
+    setSingleRetakePose(poseKey);
+    setSelectedPose(poseKey);
+    setCountdown(3);
+    setCaptureState("capturing");
+    
+    // Set index to match keys
+    const index = POSE_KEYS.indexOf(poseKey);
+    setCurrentPoseIndex(index);
+    await startWebcam();
+  };
+
+  // Sequential batch upload to FastAPI backend
+  const saveBiometricProfile = async () => {
+    setCaptureState("saving");
+    setErrorMsg(null);
+    setUploadProgress(0);
+
+    const keysToUpload = POSE_KEYS;
+    let completedCount = 0;
+
+    for (let i = 0; i < keysToUpload.length; i++) {
+      const key = keysToUpload[i];
+      const base64 = capturedImages[key];
+      if (!base64) continue;
+
+      setUploadIndex(i + 1);
+
+      try {
+        // Convert base64 data url to blob
+        const resBlob = await fetch(base64);
+        const blob = await resBlob.blob();
+
+        const fd = new FormData();
+        fd.append("employee_id", employeeId as string);
+        fd.append("pose_type", key);
+        fd.append("file", blob, `${key}.jpg`);
+
+        await fetchApi("/enrollment/upload", { method: "POST", body: fd });
+        completedCount++;
+        setUploadProgress((completedCount / keysToUpload.length) * 100);
+      } catch (err: any) {
+        setErrorMsg(`Failed to save pose '${POSES[key].label}': ${err.message || "Network Error"}.`);
+        setCaptureState("review");
+        return;
+      }
+    }
+
+    refetchStatus();
+    setCaptureState("success");
+  };
+
+  // Manual fallback file upload
+  const [selectedPose, setSelectedPose] = useState("front");
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploading(true); setErrorMsg(null); setSuccessMsg(null);
-    await uploadFile(file);
+    
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    
+    try {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        setCapturedImages(prev => ({ ...prev, [selectedPose]: base64 }));
+        if (captureState === "idle") {
+          setCaptureState("review");
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to process photo.");
+    }
     e.target.value = "";
   };
 
-  const uploadFile = async (blob: Blob) => {
-    const fd = new FormData();
-    fd.append("employee_id", employeeId as string);
-    fd.append("pose_type", selectedPose);
-    fd.append("file", blob, `${selectedPose}.jpg`);
-    try {
-      const res = await fetchApi("/enrollment/upload", { method: "POST", body: fd });
-      setSuccessMsg(res.message);
-      refetchStatus();
-      // Auto-advance to next missing pose
-      const missing = status?.missing_poses || [];
-      const keys = Object.keys(POSES);
-      const next = keys[keys.indexOf(selectedPose) + 1];
-      if (next && missing.includes(next)) setSelectedPose(next);
-    } catch (err: any) {
-      setErrorMsg(err.message || "Enrollment failed. Please retry.");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const isEnrolled = (pose: string) =>
-    status?.enrolled_poses?.some((p: string) => p.toLowerCase() === pose.toLowerCase());
-
-  const progress = Math.min(100, Math.round(((status?.enrolled_poses?.filter(
-    (p: string) => p.toLowerCase() !== "glasses"
-  ).length || 0) / 9) * 100));
-
+  // Progress Calculations
   const enrolledCount = status?.enrolled_poses?.length || 0;
-  const totalCount = Object.keys(POSES).length;
+  const isProfileComplete = status?.is_complete || false;
 
   return (
     <SidebarLayout>
-      <div className="space-y-6 max-w-5xl page-enter">
-        {/* Back */}
-        <button
-          onClick={() => router.push("/employees")}
-          className="flex items-center gap-1.5 text-slate-500 hover:text-slate-900 transition-colors text-[12px] font-medium"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Back to Employees
-        </button>
+      <div className="space-y-6 max-w-5xl page-enter relative">
+        {/* CSS Scanner Animations style block */}
+        <style>{`
+          @keyframes scanline {
+            0% { top: 0%; opacity: 0; }
+            5% { opacity: 1; }
+            95% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+          }
+          @keyframes pulse-ring {
+            0% { transform: scale(0.92); opacity: 0.15; }
+            50% { transform: scale(1.08); opacity: 0.5; }
+            100% { transform: scale(0.92); opacity: 0.15; }
+          }
+          .scanner-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(to right, transparent, #22d3ee, transparent);
+            box-shadow: 0 0 12px #22d3ee, 0 0 24px #0891b2;
+            animation: scanline 3s linear infinite;
+            z-index: 10;
+            pointer-events: none;
+          }
+          .scanner-target {
+            position: absolute;
+            width: 260px;
+            height: 260px;
+            border: 1px dashed rgba(34, 211, 238, 0.4);
+            border-radius: 50%;
+            animation: pulse-ring 2.5s ease-in-out infinite;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .hud-corner {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-color: #22d3ee;
+            border-width: 2px;
+            pointer-events: none;
+          }
+        `}</style>
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-white/5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 border border-blue-500/20 flex items-center justify-center">
-              <span className="text-base font-bold text-blue-400">
-                {employee?.name?.charAt(0) || "?"}
-              </span>
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">Biometric Enrollment</h1>
-              <p className="text-[12px] text-slate-500">
-                <span className="text-[var(--text-primary)] font-medium">{employee?.name}</span>
-                <span className="text-slate-400 mx-1.5">·</span>
-                <span className="font-mono text-slate-500">{employee?.employee_id}</span>
-              </p>
+        <canvas ref={canvasRef} className="hidden" />
+
+        {/* ─── Breadcrumbs & Header ─── */}
+        <div className="flex items-center justify-between pb-5 border-b border-slate-250/60">
+          <div className="space-y-2">
+            <button
+              onClick={() => router.push("/employees")}
+              className="flex items-center gap-1.5 text-slate-500 hover:text-slate-900 transition-colors text-[11px] font-semibold uppercase tracking-wider"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              Back to Employees
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center shadow-md">
+                <span className="text-sm font-extrabold text-white font-mono uppercase">
+                  {employee?.name?.split(" ").map((n: string) => n[0]).join("").substring(0, 2) || "?"}
+                </span>
+              </div>
+              <div>
+                <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none">Facial Enrollment</h1>
+                <p className="text-[11px] text-slate-500 mt-1 font-mono">
+                  NAME: <span className="font-bold text-slate-700">{employee?.name}</span> · ID: <span className="font-bold text-slate-700">{employee?.employee_id}</span>
+                </p>
+              </div>
             </div>
           </div>
-          <button
-            onClick={() => { if (confirm("Clear all registered facial data and embeddings?")) clearMutation.mutate(); }}
-            className="flex items-center gap-2 text-[11px] font-semibold text-rose-400 hover:text-rose-300 bg-rose-500/5 hover:bg-rose-500/10 px-3 py-2 border border-rose-500/15 rounded-xl transition-all"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            Clear Facial Data
-          </button>
+
+          {enrolledCount > 0 && (
+            <button
+              onClick={() => { if (confirm("Completely wipe all registered biometric vectors and images? This cannot be undone.")) clearMutation.mutate(); }}
+              className="flex items-center gap-2 text-[11.5px] font-bold text-rose-600 hover:text-white bg-white hover:bg-rose-600 border border-rose-200 hover:border-rose-600 px-4 py-2 rounded-xl transition-all cursor-pointer shadow-sm"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Clear Biometric Data
+            </button>
+          )}
         </div>
 
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* Left: Pose checklist */}
-          <div className="glass-card rounded-2xl border border-white/6 p-5 space-y-4">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">Enrollment Progress</h2>
-                <span className="text-[10px] text-slate-500 font-mono">{enrolledCount}/{totalCount}</span>
+        {/* ─── Status Feedback Bar ─── */}
+        {errorMsg && (
+          <div className="flex items-start gap-3 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium animate-shake">
+            <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span className="leading-relaxed">{errorMsg}</span>
+          </div>
+        )}
+        {successMsg && (
+          <div className="flex items-start gap-3 p-3.5 rounded-xl bg-emerald-50 border border-emerald-250 text-emerald-800 text-xs font-medium">
+            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+            <span className="leading-relaxed">{successMsg}</span>
+          </div>
+        )}
+
+        {/* ─── State 1: IDLE / STARTER SCREEN ─── */}
+        {captureState === "idle" && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* Left Box: Progress and instructions */}
+            <div className="space-y-5">
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+                <h3 className="text-[13px] font-bold text-slate-900 uppercase tracking-wider">Facial Registry</h3>
+                
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-650">
+                    <span>Database Status:</span>
+                    <span className={isProfileComplete ? "text-emerald-600" : "text-amber-500"}>
+                      {isProfileComplete ? "Complete" : "Incomplete"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-650">
+                    <span>Active Vectors:</span>
+                    <span>{enrolledCount} / {POSE_KEYS.length}</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={startAutoCapture}
+                  className="w-full h-11 bg-slate-950 hover:bg-slate-900 border border-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2.5 transition-all shadow-md cursor-pointer"
+                >
+                  <Camera className="w-4 h-4" />
+                  Start Auto-Capture Session
+                </button>
               </div>
-              {/* Progress bar */}
-              <div className="relative h-1.5 bg-zinc-150 rounded-full overflow-hidden">
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full bg-zinc-900 transition-all duration-700"
-                  style={{ width: `${progress}%` }}
-                />
+
+              {/* Upload Fallback File Option */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+                <h4 className="text-[11.5px] font-bold text-slate-700 uppercase tracking-wider">Manual Photo Upload</h4>
+                <p className="text-[10px] text-slate-500 leading-normal">
+                  If the employee cannot use a live camera, select a target pose and upload a photo from disk.
+                </p>
+                <div className="flex gap-2">
+                  <select
+                    value={selectedPose}
+                    onChange={(e) => setSelectedPose(e.target.value)}
+                    className="h-9 px-2 text-[11px] font-bold bg-white border border-slate-200 rounded-lg flex-1 outline-none text-slate-700"
+                  >
+                    {POSE_KEYS.map((key) => (
+                      <option key={key} value={key}>{POSES[key].label}</option>
+                    ))}
+                  </select>
+                  <label className="relative cursor-pointer shrink-0">
+                    <input
+                      type="file" accept="image/*"
+                      onChange={handleFileChange}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div className="h-9 px-3.5 bg-white border border-slate-250 text-slate-800 hover:bg-slate-50 font-bold text-[11px] rounded-lg flex items-center gap-1.5 transition-all shadow-sm">
+                      <Upload className="w-3.5 h-3.5" />
+                      Browse
+                    </div>
+                  </label>
+                </div>
               </div>
-              <p className="text-[10px] text-slate-500 mt-1.5 text-right font-mono">{progress}% complete</p>
             </div>
 
-            <div className="space-y-1">
-              {Object.entries(POSES).map(([key, pose]) => {
-                const done = isEnrolled(key);
-                const active = selectedPose === key;
+            {/* Right: Big visual grid checklist */}
+            <div className="md:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+              <h3 className="text-sm font-black text-slate-900 tracking-tight">Facial Pose Checklist</h3>
+              <p className="text-xs text-slate-500">
+                To capture accurate biometric details under varying orientations and lighting, we index 10 distinct facial angles.
+              </p>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
+                {POSE_KEYS.map((key) => {
+                  const done = status?.enrolled_poses?.some((p: string) => p.toLowerCase() === key.toLowerCase());
+                  return (
+                    <div
+                      key={key}
+                      className={`p-3 rounded-xl border flex flex-col items-center text-center justify-center transition-all ${
+                        done
+                          ? "bg-emerald-50/50 border-emerald-200 text-emerald-800"
+                          : "bg-slate-50/50 border-slate-200 text-slate-400"
+                      }`}
+                    >
+                      <span className="text-xl mb-1.5 filter drop-shadow-sm">{POSES[key].icon}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider font-mono">{POSES[key].label.split(" ")[0]}</span>
+                      {done ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 mt-2 shrink-0" />
+                      ) : (
+                        <div className="w-3.5 h-3.5 rounded-full border border-slate-250 mt-2 shrink-0 bg-white" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── State 2: AUTOMATIC SCANNER HUD FEED ─── */}
+        {captureState === "capturing" && (
+          <div className="flex flex-col items-center space-y-5">
+            {/* Pose directions banner */}
+            <div className="w-full bg-slate-950 text-white rounded-2xl p-5 flex items-center justify-between shadow-lg relative overflow-hidden">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.15)_0%,transparent_70%)] pointer-events-none" />
+              <div className="flex items-center gap-4 relative z-10">
+                <span className="text-3xl filter drop-shadow-sm">{POSES[POSE_KEYS[currentPoseIndex]]?.icon}</span>
+                <div>
+                  <p className="text-[10px] font-bold text-cyan-400 font-mono tracking-widest uppercase">
+                    SCAN PHASE {currentPoseIndex + 1} OF {POSE_KEYS.length}
+                  </p>
+                  <h2 className="text-lg font-black tracking-tight text-white mt-0.5">
+                    {POSES[POSE_KEYS[currentPoseIndex]]?.label}
+                  </h2>
+                  <p className="text-xs text-slate-300 font-medium mt-1">
+                    {POSES[POSE_KEYS[currentPoseIndex]]?.hint}
+                  </p>
+                </div>
+              </div>
+
+              {/* Countdown circle HUD */}
+              <div className="relative w-14 h-14 flex items-center justify-center shrink-0 border-2 border-white/10 rounded-full font-mono bg-white/5 shadow-inner">
+                <span className="text-2xl font-black text-cyan-400 animate-pulse">{countdown}</span>
+              </div>
+            </div>
+
+            {/* Video stream container with Cybernetic HUD */}
+            <div className="relative aspect-video w-full max-w-3xl rounded-3xl overflow-hidden bg-black border border-slate-950 shadow-2xl">
+              
+              {/* Native video element */}
+              <video
+                ref={videoRef}
+                className="w-full h-full object-cover scale-x-[-1]"
+                autoPlay playsInline muted
+              />
+
+              {/* Cybernetic HUD elements */}
+              <div className="scanner-line" />
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="scanner-target">
+                  <div className="w-4 h-4 border border-cyan-400 rounded-full animate-ping" />
+                </div>
+              </div>
+
+              {/* HUD corners */}
+              <div className="hud-corner corner-bracket-tl top-6 left-6 border-t-2 border-l-2" />
+              <div className="hud-corner corner-bracket-tr top-6 right-6 border-t-2 border-r-2" />
+              <div className="hud-corner corner-bracket-bl bottom-6 left-6 border-b-2 border-l-2" />
+              <div className="hud-corner corner-bracket-br bottom-6 right-6 border-b-2 border-r-2" />
+
+              {/* Scanner stats HUD */}
+              <div className="absolute top-6 left-12 right-12 flex justify-between text-[9px] font-mono font-bold text-cyan-400/80 pointer-events-none uppercase">
+                <span>SYS.STATUS: ACQUIRING_DATA</span>
+                <span>FPS: 60 · ISO: 200 · SHUTTER: AUTO</span>
+              </div>
+
+              <div className="absolute bottom-6 left-12 right-12 flex justify-between items-center text-[9px] font-mono font-bold text-cyan-400/80 pointer-events-none">
+                <span>ANGLE: {POSE_KEYS[currentPoseIndex]?.toUpperCase()}</span>
+                <span>LIVENESS CHECK: ACTIVE</span>
+              </div>
+            </div>
+
+            {/* Controls */}
+            <div className="flex gap-4 w-full max-w-lg">
+              <button
+                onClick={() => setIsPaused(!isPaused)}
+                className="flex-1 h-11 bg-white hover:bg-slate-50 border border-slate-250 text-slate-800 font-bold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
+              >
+                {isPaused ? <Play className="w-3.5 h-3.5 fill-current" /> : <Pause className="w-3.5 h-3.5 fill-current" />}
+                {isPaused ? "Resume Scan" : "Pause Scan"}
+              </button>
+
+              <button
+                onClick={() => {
+                  if (singleRetakePose) {
+                    stopWebcam();
+                    setSingleRetakePose(null);
+                    setCaptureState("review");
+                  } else {
+                    // Skip pose
+                    setCurrentPoseIndex(prev => prev + 1);
+                    setCountdown(3);
+                  }
+                }}
+                className="flex-1 h-11 bg-slate-950 hover:bg-slate-900 border border-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer"
+              >
+                Skip Pose
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ─── State 3: REVIEW CAPTURES GRID ─── */}
+        {captureState === "review" && (
+          <div className="space-y-6">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-center max-w-2xl mx-auto space-y-2">
+              <Sparkles className="w-6 h-6 text-slate-900 mx-auto animate-pulse" />
+              <h2 className="text-base font-black text-slate-900 tracking-tight">Scan Sequence Completed</h2>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Review the 10 captured biometric pose frames. If any photo is blurry or dark, click the re-take icon. Once ready, click "Save Biometric Profile".
+              </p>
+            </div>
+
+            {/* Grid of 10 captured poses */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+              {POSE_KEYS.map((key) => {
+                const imgUrl = capturedImages[key];
                 return (
-                  <button
-                    key={key}
-                    onClick={() => { setSelectedPose(key); setErrorMsg(null); setSuccessMsg(null); }}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer ${
-                      active
-                        ? "bg-zinc-100 border border-zinc-300 text-zinc-950 shadow-xs"
-                        : done
-                          ? "bg-zinc-50 border border-transparent text-slate-700 hover:bg-zinc-100"
-                          : "border border-transparent text-slate-500 hover:bg-zinc-50 hover:text-slate-800"
-                    }`}
-                  >
-                    <span className="text-base w-5 text-center leading-none shrink-0">{pose.icon}</span>
-                    <span className="flex-1 text-[12px] font-medium">{pose.label}</span>
-                    {done ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    ) : (
-                      <div className="w-3.5 h-3.5 rounded-full border border-slate-200 shrink-0" />
-                    )}
-                  </button>
+                  <div key={key} className="bg-white border border-slate-200 rounded-2xl p-3 shadow-xs relative flex flex-col group overflow-hidden">
+                    <div className="aspect-[4/3] rounded-xl bg-slate-100 overflow-hidden relative border border-slate-150">
+                      {imgUrl ? (
+                        <img src={imgUrl} alt={key} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[10px] text-slate-400 font-mono font-bold uppercase tracking-wider bg-slate-50">
+                          Missing
+                        </div>
+                      )}
+
+                      {/* Hover action bar to retake */}
+                      <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <button
+                          onClick={() => handleRetakeSingle(key)}
+                          className="bg-white hover:bg-slate-100 text-slate-900 text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-md cursor-pointer"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          Re-take
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-2.5 flex items-center justify-between text-[11px] font-bold">
+                      <span className="text-slate-900 uppercase font-mono">{POSES[key].label.split(" ")[0]}</span>
+                      {imgUrl ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                      ) : (
+                        <XCircle className="w-3.5 h-3.5 text-rose-500" />
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>
-          </div>
 
-          {/* Right: Camera capture panel */}
-          <div className="lg:col-span-2 glass-card rounded-2xl border border-white/6 flex flex-col">
-            <div className="p-5 border-b border-white/5">
-              <div className="flex items-center gap-2.5">
-                <span className="text-xl">{POSES[selectedPose]?.icon}</span>
-                <div>
-                  <h3 className="text-[13px] font-semibold text-[var(--text-primary)] capitalize">
-                    Capture {POSES[selectedPose]?.label} Pose
-                  </h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">{POSES[selectedPose]?.hint}</p>
-                </div>
+            {/* Review actions */}
+            <div className="flex justify-center gap-4 pt-4">
+              <button
+                onClick={startAutoCapture}
+                className="h-11 px-8 bg-white hover:bg-slate-50 border border-slate-250 text-slate-800 font-bold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Discard & Re-take All
+              </button>
+
+              <button
+                onClick={saveBiometricProfile}
+                className="h-11 px-8 bg-slate-950 hover:bg-slate-900 border border-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                Save Biometric Profile
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ─── State 4: BATCH SAVING ANIMATION ─── */}
+        {captureState === "saving" && (
+          <div className="max-w-md mx-auto bg-white border border-slate-250/80 rounded-3xl p-8 shadow-2xl text-center space-y-6 animate-scaleIn relative overflow-hidden">
+            {/* Spinning radar graphic */}
+            <div className="relative w-24 h-24 mx-auto flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full border-2 border-dashed border-cyan-500/30 animate-spin" />
+              <div className="absolute inset-2 rounded-full border border-dashed border-cyan-500/40 animate-spin" style={{ animationDirection: "reverse" }} />
+              <Shield className="w-10 h-10 text-cyan-500 animate-pulse" />
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-base font-black text-slate-900 uppercase tracking-widest font-mono">
+                Saving Facial Registry...
+              </h2>
+              <p className="text-xs text-slate-500">
+                Uploading photo {uploadIndex} of {POSE_KEYS.length} to security gateway.
+              </p>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="space-y-1.5">
+              <div className="relative h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                <div
+                  className="absolute inset-y-0 left-0 bg-gradient-to-right from-cyan-400 to-cyan-500 transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[10px] font-mono font-bold text-slate-550">
+                <span>DATABASE VECTOR INDEXING</span>
+                <span>{Math.round(uploadProgress)}%</span>
               </div>
             </div>
+          </div>
+        )}
 
-            <div className="flex-1 p-5 space-y-4">
-              {/* Status messages */}
-              {errorMsg && (
-                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-50 border border-rose-250 text-rose-800 text-[11px]">
-                  <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span className="leading-relaxed">{errorMsg}</span>
-                </div>
-              )}
-              {successMsg && (
-                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-emerald-50 border border-emerald-250 text-emerald-800 text-[11px]">
-                  <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span className="leading-relaxed">{successMsg}</span>
-                </div>
-              )}
-
-              {/* Camera view */}
-              <div className="relative aspect-video w-full rounded-2xl bg-[#070c1a] border border-white/6 overflow-hidden flex items-center justify-center">
-                {/* Corner brackets */}
-                {(webcamActive || capturedPreview) && (
-                  <>
-                    <div className="corner-bracket corner-bracket-tl text-zinc-400/60" />
-                    <div className="corner-bracket corner-bracket-tr text-zinc-400/60" />
-                    <div className="corner-bracket corner-bracket-bl text-zinc-400/60" />
-                    <div className="corner-bracket corner-bracket-br text-zinc-400/60" />
-                  </>
-                )}
-
-                <video
-                  ref={videoRef}
-                  className={`w-full h-full object-cover scale-x-[-1] ${webcamActive ? "" : "hidden"}`}
-                  autoPlay playsInline muted
-                />
-                {webcamActive && <div className="scanner-laser" />}
-
-                {!webcamActive && capturedPreview && (
-                  <>
-                    <img src={capturedPreview} alt="Captured" className="w-full h-full object-cover scale-x-[-1]" />
-                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
-                      <span className="flex items-center gap-1.5 text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full font-mono">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Frame captured — review or re-take
-                      </span>
-                    </div>
-                  </>
-                )}
-
-                {!webcamActive && !capturedPreview && (
-                  <div className="text-center space-y-3 p-6">
-                    <div className="w-12 h-12 rounded-2xl bg-white/4 flex items-center justify-center mx-auto">
-                      <Video className="w-5 h-5 text-slate-700" />
-                    </div>
-                    <div>
-                      <p className="text-[12px] text-slate-500 font-medium">Camera inactive</p>
-                      <p className="text-[10px] text-slate-700 mt-0.5">Click "Start Camera" to begin enrollment</p>
-                    </div>
-                  </div>
-                )}
-
-                <canvas ref={canvasRef} className="hidden" />
-              </div>
+        {/* ─── State 5: SUCCESS SCREEN ─── */}
+        {captureState === "success" && (
+          <div className="max-w-md mx-auto bg-white border border-slate-200 rounded-3xl p-8 shadow-2xl text-center space-y-6 animate-scaleIn">
+            <div className="relative w-20 h-20 mx-auto bg-emerald-50 rounded-full flex items-center justify-center border border-emerald-100">
+              <CheckCircle2 className="w-10 h-10 text-emerald-500" />
             </div>
 
-            {/* Action buttons */}
-            <div className="px-5 pb-5 flex flex-col sm:flex-row items-center gap-3 pt-4 border-t border-white/5">
-              {webcamActive ? (
-                <>
-                  <button
-                    onClick={handleCapture}
-                    disabled={uploading}
-                    className="btn-primary flex-1 h-10 flex items-center justify-center gap-2 text-[12px]"
-                  >
-                    {uploading ? (
-                      <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>Processing...</span></>
-                    ) : (
-                      <><Camera className="w-3.5 h-3.5" /><span>Take Snapshot</span></>
-                    )}
-                  </button>
-                  <button
-                    onClick={stopWebcam}
-                    className="btn-ghost h-10 px-5 text-[12px] flex items-center gap-2"
-                  >
-                    <XCircle className="w-3.5 h-3.5" />
-                    Stop Camera
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={startWebcam}
-                  className="btn-primary flex-1 h-10 flex items-center justify-center gap-2 text-[12px]"
-                >
-                  <Video className="w-3.5 h-3.5" />
-                  Start Camera
-                </button>
-              )}
+            <div className="space-y-2">
+              <h2 className="text-lg font-black text-slate-900 tracking-tight">Biometric Profile Secured</h2>
+              <p className="text-xs text-slate-550 leading-relaxed">
+                All 10 facial profiles and mathematical vectors have been successfully registered for <strong className="text-slate-800">{employee?.name}</strong>. The kiosk scan terminal is now ready to verify attendance.
+              </p>
+            </div>
 
-              {/* File upload fallback */}
-              <label className="relative cursor-pointer">
-                <input
-                  type="file" accept="image/*"
-                  onChange={handleFileChange}
-                  disabled={uploading}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:pointer-events-none"
-                />
-                <div className="btn-ghost h-10 px-4 text-[12px] flex items-center gap-2 pointer-events-none">
-                  <Upload className="w-3.5 h-3.5" />
-                  Upload Photo
-                </div>
-              </label>
+            <div className="flex gap-3 justify-center pt-2">
+              <button
+                onClick={() => router.push("/employees")}
+                className="h-10 px-6 bg-slate-100 hover:bg-slate-150 border border-slate-200 text-slate-800 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+              >
+                Employees List
+              </button>
+
+              <button
+                onClick={startAutoCapture}
+                className="h-10 px-6 bg-slate-950 hover:bg-slate-900 border border-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
+              >
+                Re-enroll Profile
+              </button>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Tips */}
-        <div className="flex items-start gap-3 p-4 rounded-2xl bg-zinc-50 border border-zinc-200">
-          <AlertCircle className="w-4 h-4 text-zinc-700 shrink-0 mt-0.5" />
-          <div>
-            <p className="text-[11px] font-semibold text-[var(--text-primary)] mb-1">Enrollment Tips</p>
-            <p className="text-[10px] text-slate-650 leading-relaxed">
-              Enroll at least <strong className="text-[var(--text-primary)]">5–7 poses</strong> for reliable recognition. Ensure good lighting, avoid glasses for the first pose, and maintain consistent distance from the camera (approx. 50–80cm). Multiple angles improve matching accuracy significantly.
-            </p>
+        {/* ─── Tips Section ─── */}
+        {captureState === "idle" && (
+          <div className="flex items-start gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+            <AlertCircle className="w-4 h-4 text-slate-700 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[11px] font-bold text-slate-900 uppercase tracking-wider mb-1 font-mono">Registry Specifications</p>
+              <p className="text-[10px] text-slate-650 leading-relaxed font-mono uppercase">
+                AUTOMATED ENROLLMENT PROCESS IS COMPLETELY HANDS-FREE. SYSTEM WILL INSTRUCT AND SYNC CAMERAS IN SEQUENCE. ENSURE STABLE ROOM LIGHTING AND POSES TO ACCURATELY INDEX FACIAL VECTORS.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </SidebarLayout>
   );
