@@ -462,10 +462,6 @@ class FaceEngine:
         Computes cosine similarity between two 512-D embeddings.
         Since they are L2-normalized, cosine similarity is just the dot product.
         """
-        if self.mock_mode:
-            # For demonstration purposes on low-RAM server mock mode, return a high matching score
-            # to make the kiosk match the first registered user successfully.
-            return 0.85
         return float(np.dot(embedding1, embedding2))
 
     def load_embeddings_cache(self, db_session):
