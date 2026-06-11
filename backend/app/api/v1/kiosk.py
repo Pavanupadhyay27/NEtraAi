@@ -149,10 +149,12 @@ def scan_face(
     
     dialect_name = db.bind.dialect.name
     if dialect_name == "postgresql":
+        from pgvector.sqlalchemy import Vector
+        from sqlalchemy import cast
         # We query face_embeddings sorting by distance (cosine_distance operator: <=> in SQL, using .op('<=>') in SQLAlchemy)
         # Note: pgvector cosine distance returns (1.0 - cosine_similarity). Closer matches have lower distance.
         match_query = (
-            db.query(models.FaceEmbedding, models.FaceEmbedding.embedding.op('<=>')(embedding_list).label("distance"))
+            db.query(models.FaceEmbedding, models.FaceEmbedding.embedding.op('<=>')(cast(embedding_list, Vector)).label("distance"))
             .order_by("distance")
             .limit(1)
         )
