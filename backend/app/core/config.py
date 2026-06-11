@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     # Face recognition & liveness detection parameters
     KIOSK_FACE_THRESHOLD: float = 0.60
     KIOSK_LIVENESS_THRESHOLD: float = 0.75
+    FORCE_MOCK_MODE: bool = False
     
     # Paths
     UPLOAD_DIR: str = "./uploads"
