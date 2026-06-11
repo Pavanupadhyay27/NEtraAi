@@ -144,53 +144,37 @@ def scan_face(
     aligned = face_engine.align_face(img, landmarks)
     embedding = face_engine.extract_embedding(aligned)
     
-    # 5. DB Matching using pgvector / SQLite in-memory fallback
-    embedding_list = embedding.tolist()
-    
-    dialect_name = db.bind.dialect.name
-    if dialect_name == "postgresql":
-        from pgvector.sqlalchemy import Vector
-        from sqlalchemy import cast
-        # We query face_embeddings sorting by distance (cosine_distance operator: <=> in SQL, using .op('<=>') in SQLAlchemy)
-        # Note: pgvector cosine distance returns (1.0 - cosine_similarity). Closer matches have lower distance.
-        match_query = (
-            db.query(models.FaceEmbedding, models.FaceEmbedding.embedding.op('<=>')(cast(embedding_list, Vector)).label("distance"))
-            .order_by("distance")
-            .limit(1)
-        )
-        match_result = match_query.first()
+    # 5. DB Matching: fetch all vectors and compute similarity in memory (completely database-agnostic)
+    if face_engine.embeddings_cache is None:
+        face_engine.load_embeddings_cache(db)
+        
+    all_embeddings = face_engine.embeddings_cache
+    if not all_embeddings:
+        match_result = None
     else:
-        # SQLite / local development fallback: fetch all vectors and compute similarity in memory
-        if face_engine.embeddings_cache is None:
-            face_engine.load_embeddings_cache(db)
-            
-        all_embeddings = face_engine.embeddings_cache
-        if not all_embeddings:
-            match_result = None
+        best_emb = None
+        best_dist = 10.0
+        
+        for emb_record in all_embeddings:
+            try:
+                # cached arrays are already numpy arrays
+                db_vec = emb_record["embedding"]
+                sim = face_engine.cosine_similarity(embedding, db_vec)
+                dist = 1.0 - sim
+                if dist < best_dist:
+                    best_dist = dist
+                    class MockEmb:
+                        id = emb_record["id"]
+                        employee_id = emb_record["employee_id"]
+                    best_emb = MockEmb()
+            except Exception as e:
+                logger.error(f"Error comparing local vector: {e}")
+                continue
+                
+        if best_emb is not None:
+            match_result = (best_emb, best_dist)
         else:
-            best_emb = None
-            best_dist = 10.0
-            
-            for emb_record in all_embeddings:
-                try:
-                    # cached arrays are already numpy arrays
-                    db_vec = emb_record["embedding"]
-                    sim = face_engine.cosine_similarity(embedding, db_vec)
-                    dist = 1.0 - sim
-                    if dist < best_dist:
-                        best_dist = dist
-                        class MockEmb:
-                            id = emb_record["id"]
-                            employee_id = emb_record["employee_id"]
-                        best_emb = MockEmb()
-                except Exception as e:
-                    logger.error(f"Error comparing local vector: {e}")
-                    continue
-                    
-            if best_emb is not None:
-                match_result = (best_emb, best_dist)
-            else:
-                match_result = None
+            match_result = None
     
     if not match_result:
         # Database has no enrolled embeddings
