@@ -34,9 +34,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+db_error = None
+
 # Create folders on startup
 @app.on_event("startup")
 def startup_event():
+    global db_error
     logger.info("Starting NetraID Backend...")
     
     # Create upload directory
@@ -51,7 +54,10 @@ def startup_event():
     db = SessionLocal()
     try:
         init_db(db)
+        db_error = "Success"
     except Exception as e:
+        import traceback
+        db_error = f"{e}\n{traceback.format_exc()}"
         logger.error(f"Error seeding database: {e}")
     finally:
         db.close()
@@ -63,6 +69,28 @@ def read_root():
         "status": "healthy",
         "message": "NetraID Backend API is running",
         "docs": "/docs"
+    }
+
+@app.get("/debug-db")
+def debug_db():
+    masked_url = None
+    if settings.DATABASE_URL:
+        # Mask password for security
+        parts = settings.DATABASE_URL.split("@")
+        if len(parts) >= 2:
+            creds = parts[0]
+            host_info = "@".join(parts[1:])
+            if ":" in creds:
+                scheme_user, _ = creds.rsplit(":", 1)
+                masked_url = f"{scheme_user}:****@{host_info}"
+            else:
+                masked_url = f"{creds}:****@{host_info}"
+        else:
+            masked_url = settings.DATABASE_URL
+            
+    return {
+        "db_error": db_error,
+        "database_url": masked_url
     }
 
 @app.get("/health", tags=["Status"])
