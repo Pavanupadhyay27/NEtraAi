@@ -1,3 +1,13 @@
+---
+title: NetraID Backend
+emoji: 🧑‍💼
+colorFrom: cyan
+colorTo: blue
+sdk: docker
+app_port: 8000
+pinned: false
+---
+
 # NetraID - Production-Grade AI Face Authentication Attendance System
 
 NetraID is an enterprise-grade, 100% free, and self-hosted face-authentication attendance platform. Using advanced facial biometrics, liveness classifiers, and high-performance vector indexes, it provides an offline, secure, and production-ready system suitable for digital kiosks, schools, colleges, and startups.
