@@ -110,11 +110,8 @@ export default function KioskPage() {
     const base64 = canvas.toDataURL("image/jpeg", 0.82);
     setScanning(true);
     try {
-      const host = window.location.hostname;
-      const port = window.location.port ? `:${window.location.port}` : "";
-      
-      // Connect to the backend running at port 8000
-      const url = `http://${host}:8000/api/v1/kiosk/scan`;
+      // Connect to the backend running at the configured URL
+      const url = `${getBackendUrl()}/kiosk/scan`;
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -146,8 +143,8 @@ export default function KioskPage() {
       setMatchTime(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }));
       triggerCooldown(4500);
       if (voiceEnabled && data.tts_url) {
-        const host = window.location.hostname;
-        new Audio(`http://${host}:8000${data.tts_url}`).play().catch((err) => {
+        const backendBaseUrl = getBackendUrl().replace("/api/v1", "");
+        new Audio(`${backendBaseUrl}${data.tts_url}`).play().catch((err) => {
           console.error("Autoplay voice greeting failed:", err);
         });
       }

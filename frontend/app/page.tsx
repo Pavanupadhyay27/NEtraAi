@@ -201,13 +201,6 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-
-          {/* Default credentials hint */}
-          <div className="mt-5 pt-5 border-t border-slate-100">
-            <p className="text-[10px] text-slate-500 text-center font-mono">
-              Default: admin@netraid.ai / Admin@NetraID2026
-            </p>
-          </div>
         </div>
 
         {/* Kiosk link */}
