@@ -66,25 +66,37 @@ class FaceEngine:
 
     def _init_sessions(self):
         try:
-            # Initialize ONNX Runtime Inference Sessions
-            # CPU Execution Provider is used by default for cross-platform compatibility
+            import gc
+            # Initialize ONNX Runtime Inference Sessions with memory-optimized settings
+            # to prevent OOM crashes on low-resource servers (like Render's 512MB Free Tier)
             opts = ort.SessionOptions()
-            opts.intra_op_num_threads = 4
+            opts.intra_op_num_threads = 1
+            opts.inter_op_num_threads = 1
+            opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
+            opts.enable_cpu_mem_arena = False
+            opts.add_session_config_entry("memory.enable_memory_arena_shrinkage", "cpu:0")
             
             providers = ['CPUExecutionProvider']
             # If GPU is available (optional setup)
             if 'CUDAExecutionProvider' in ort.get_available_providers():
                 providers = ['CUDAExecutionProvider'] + providers
                 
-            logger.info(f"Initializing ONNX sessions with providers: {providers}")
+            logger.info(f"Initializing ONNX sessions with memory optimization and providers: {providers}")
             
             self.det_session = ort.InferenceSession(self.det_model_path, opts, providers=providers)
+            gc.collect()
+            
             self.rec_session = ort.InferenceSession(self.rec_model_path, opts, providers=providers)
+            gc.collect()
+            
             self.live_session_27 = ort.InferenceSession(self.liveness_model_27, opts, providers=providers)
+            gc.collect()
             
             # Optional 1.8 liveness model
             if os.path.exists(self.liveness_model_18):
                 self.live_session_18 = ort.InferenceSession(self.liveness_model_18, opts, providers=providers)
+                gc.collect()
             else:
                 self.live_session_18 = None
             

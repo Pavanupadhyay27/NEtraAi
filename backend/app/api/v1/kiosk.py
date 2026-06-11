@@ -199,11 +199,6 @@ def scan_face(
     # Similarity = 1 - Distance
     similarity = 1.0 - float(distance)
     
-    if face_engine.mock_mode:
-        # Override match similarity in mock mode to allow functional kiosk scans during demos
-        import random
-        similarity = random.uniform(0.81, 0.94)
-    
     if similarity < face_threshold:
         # Low confidence match -> Unknown
         log_entry = crud.create_attendance_log(
