@@ -30,17 +30,35 @@ class FaceEngine:
             self.mock_mode = True
             return
 
-        # Check if all models are present
         # Check if all models are present (1.8 liveness is optional)
         required_models = [self.det_model_path, self.rec_model_path, self.liveness_model_27]
         missing = [m for m in required_models if not os.path.exists(m)]
         
         if missing:
-            logger.warning(f"The following models are missing: {missing}. Running in MOCK MODE.")
-            logger.warning("To run in production mode, please execute the download_models.py script.")
+            logger.warning(f"The following models are missing: {missing}. Starting background downloader...")
             self.mock_mode = True
-            return
+            import threading
+            threading.Thread(target=self._download_and_init_async, daemon=True).start()
+        else:
+            self._init_sessions()
+
+    def _download_and_init_async(self):
+        try:
+            from app.core.download_models import download_all_models
+            download_all_models(self.models_dir)
             
+            # Verify if they exist now
+            required_models = [self.det_model_path, self.rec_model_path, self.liveness_model_27]
+            missing = [m for m in required_models if not os.path.exists(m)]
+            if not missing:
+                logger.info("Models downloaded successfully in background. Initializing real ONNX sessions...")
+                self._init_sessions()
+            else:
+                logger.error(f"Models background download finished but some required models are still missing: {missing}")
+        except Exception as e:
+            logger.error(f"Error in background model download and initialization: {e}")
+
+    def _init_sessions(self):
         try:
             # Initialize ONNX Runtime Inference Sessions
             # CPU Execution Provider is used by default for cross-platform compatibility
@@ -64,9 +82,10 @@ class FaceEngine:
             else:
                 self.live_session_18 = None
             
-            logger.info("FaceEngine initialized successfully with all required AI models.")
+            self.mock_mode = False
+            logger.info("FaceEngine initialized successfully with all required AI models. Switched out of MOCK MODE.")
         except Exception as e:
-            logger.error(f"Error initializing ONNX sessions: {e}. Falling back to MOCK MODE.")
+            logger.error(f"Error initializing ONNX sessions: {e}. Falling back to/remaining in MOCK MODE.")
             self.mock_mode = True
 
     def detect_faces(self, image_np, conf_threshold=0.5):

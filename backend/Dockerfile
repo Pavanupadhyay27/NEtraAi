@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend code
 COPY . .
 
+# Download ONNX model weights during container build
+RUN python app/core/download_models.py
+
 # Expose FastAPI port
 EXPOSE 8000
 

@@ -32,18 +32,20 @@ def download_file(url: str, dest_path: str):
         # or we throw an exception. For production resilience, we log it.
         raise e
 
-def download_all_models():
-    os.makedirs(MODELS_DIR, exist_ok=True)
+def download_all_models(models_dir=None):
+    if models_dir is None:
+        models_dir = MODELS_DIR
+    os.makedirs(models_dir, exist_ok=True)
     
     for filename, url in MODEL_URLS.items():
-        dest_path = os.path.join(MODELS_DIR, filename)
+        dest_path = os.path.join(models_dir, filename)
         if os.path.exists(dest_path) and os.path.getsize(dest_path) > 1024 * 1024:
             logger.info(f"{filename} already exists and is valid. Skipping download.")
         else:
             try:
                 download_file(url, dest_path)
             except Exception as e:
-                logger.warning(f"Could not download {filename} from remote. Ensure you place it in {MODELS_DIR} manually. Error: {e}")
+                logger.warning(f"Could not download {filename} from remote. Ensure you place it in {models_dir} manually. Error: {e}")
 
 if __name__ == "__main__":
     download_all_models()
