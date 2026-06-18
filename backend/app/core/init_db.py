@@ -26,7 +26,7 @@ def init_db(db: Session):
     except Exception:
         db.rollback()
         logger.info("Adding emergency_allowed column to attendance table...")
-        db.execute(text("ALTER TABLE attendance ADD COLUMN emergency_allowed BOOLEAN DEFAULT 0"))
+        db.execute(text("ALTER TABLE attendance ADD COLUMN emergency_allowed BOOLEAN DEFAULT FALSE"))
         db.commit()
     
     # Ensure image_path column exists in attendance_logs table
