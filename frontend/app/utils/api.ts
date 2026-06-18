@@ -3,7 +3,14 @@ const DEFAULT_BACKEND_URL = "http://localhost:8000/api/v1";
 export function getBackendUrl(): string {
   // Check for environment variable configuration (e.g. on Vercel)
   if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
+    let url = process.env.NEXT_PUBLIC_API_URL.trim();
+    if (url.endsWith("/")) {
+      url = url.slice(0, -1);
+    }
+    if (!url.endsWith("/api/v1")) {
+      url = `${url}/api/v1`;
+    }
+    return url;
   }
   if (typeof window !== "undefined") {
     const host = window.location.hostname;
