@@ -19,6 +19,24 @@ def init_db(db: Session):
     # Create all tables if they don't exist
     logger.info("Creating all database tables if they do not exist...")
     Base.metadata.create_all(bind=engine)
+
+    # Ensure emergency_allowed column exists
+    try:
+        db.execute(text("SELECT emergency_allowed FROM attendance LIMIT 1"))
+    except Exception:
+        db.rollback()
+        logger.info("Adding emergency_allowed column to attendance table...")
+        db.execute(text("ALTER TABLE attendance ADD COLUMN emergency_allowed BOOLEAN DEFAULT 0"))
+        db.commit()
+    
+    # Ensure image_path column exists in attendance_logs table
+    try:
+        db.execute(text("SELECT image_path FROM attendance_logs LIMIT 1"))
+    except Exception:
+        db.rollback()
+        logger.info("Adding image_path column to attendance_logs table...")
+        db.execute(text("ALTER TABLE attendance_logs ADD COLUMN image_path VARCHAR(255) DEFAULT NULL"))
+        db.commit()
     
     # 1. Seed Roles
     roles = [
@@ -57,6 +75,8 @@ def init_db(db: Session):
         {"key": "GRACE_PERIOD_MINUTES", "value": "0", "description": "Grace period for check-ins in minutes"},
         {"key": "KIOSK_FACE_THRESHOLD", "value": str(settings.KIOSK_FACE_THRESHOLD), "description": "Cosine similarity threshold for face match"},
         {"key": "KIOSK_LIVENESS_THRESHOLD", "value": str(settings.KIOSK_LIVENESS_THRESHOLD), "description": "Softmax probability threshold for face liveness"},
+        {"key": "ENROLLMENT_LIVENESS_CHECK", "value": "true", "description": "Enforce liveness check during employee facial enrollment"},
+        {"key": "ENROLLMENT_LIVENESS_THRESHOLD", "value": "0.70", "description": "Liveness probability threshold specifically for employee facial enrollment"},
         {"key": "VOICE_GREETING_ENABLED", "value": "true", "description": "Enable voice greeting on successful attendance"},
         {"key": "SYSTEM_MAINTENANCE_MODE", "value": "false", "description": "Toggle maintenance mode to suspend active check-ins"},
         {"key": "MAX_ENROLLMENT_IMAGES", "value": "5", "description": "Maximum face images captured during registration"},
@@ -81,6 +101,8 @@ def init_db(db: Session):
         )
         crud.create_user(db, admin_create)
     else:
-        logger.info(f"Super Admin user {admin_email} already exists.")
+        logger.info(f"Super Admin user {admin_email} already exists. Syncing password with configuration...")
+        admin_user.hashed_password = crud.get_password_hash(settings.INITIAL_ADMIN_PASSWORD)
+        db.commit()
         
     logger.info("Database initialization and seeding completed successfully.")

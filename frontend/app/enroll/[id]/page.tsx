@@ -7,14 +7,15 @@ import SidebarLayout from "@/components/SidebarLayout";
 import { fetchApi, getBackendUrl } from "@/app/utils/api";
 import {
   Camera, Upload, CheckCircle2, ChevronLeft, XCircle, Video,
-  RefreshCw, AlertCircle, Trash2, Play, Pause, Save, RotateCcw, Shield, Activity, Sparkles
+  RefreshCw, AlertCircle, Trash2, Play, Pause, Save, RotateCcw, Shield, Activity, Sparkles,
+  User, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Smile, Meh, Lightbulb, Sun, Glasses
 } from "lucide-react";
 
 interface PoseInfo {
   label: string;
   hint: string;
   speech: string;
-  icon: string;
+  icon: any;
 }
 
 const POSES: Record<string, PoseInfo> = {
@@ -22,61 +23,61 @@ const POSES: Record<string, PoseInfo> = {
     label: "Front Profile",
     hint: "Look straight into the camera with a neutral expression.",
     speech: "Please look straight into the camera.",
-    icon: "🧑"
+    icon: User
   },
   left: {
     label: "Left Profile",
     hint: "Turn your head slowly to the left.",
     speech: "Please turn your head to the left.",
-    icon: "👈"
+    icon: ArrowLeft
   },
   right: {
     label: "Right Profile",
     hint: "Turn your head slowly to the right.",
     speech: "Please turn your head to the right.",
-    icon: "👉"
+    icon: ArrowRight
   },
   up: {
     label: "Looking Up",
     hint: "Tilt your chin upwards slightly.",
     speech: "Please tilt your head upwards.",
-    icon: "⬆️"
+    icon: ArrowUp
   },
   down: {
     label: "Looking Down",
     hint: "Tilt your chin downwards slightly.",
     speech: "Please tilt your head downwards.",
-    icon: "⬇️"
+    icon: ArrowDown
   },
   smile: {
     label: "Smiling Face",
     hint: "Give a natural, relaxed smile.",
     speech: "Now, smile naturally.",
-    icon: "😊"
+    icon: Smile
   },
   neutral: {
     label: "Neutral Face",
     hint: "Keep a relaxed, standard neutral expression.",
     speech: "Relax your face, show a neutral expression.",
-    icon: "😐"
+    icon: Meh
   },
   indoor: {
     label: "Indoor Light",
     hint: "Look straight with standard indoor room lighting.",
     speech: "Look straight for typical indoor lighting.",
-    icon: "💡"
+    icon: Lightbulb
   },
   outdoor: {
     label: "Outdoor Light",
     hint: "Look straight with bright/outdoor lighting.",
     speech: "Look straight for bright light capture.",
-    icon: "☀️"
+    icon: Sun
   },
   glasses: {
     label: "Glasses Option",
     hint: "Put on glasses if you wear them, otherwise look straight.",
     speech: "If you wear glasses, put them on. Otherwise, look straight.",
-    icon: "🕶️"
+    icon: Glasses
   }
 };
 
@@ -110,6 +111,7 @@ export default function EnrollPage() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [webcamActive, setWebcamActive] = useState(false);
   const [singleRetakePose, setSingleRetakePose] = useState<string | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -249,15 +251,16 @@ export default function EnrollPage() {
     }
 
     countdownIntervalRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(countdownIntervalRef.current!);
-          captureFrame(currentKey);
-          return 3;
+      if (countdown <= 1) {
+        if (countdownIntervalRef.current) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
         }
+        captureFrame(currentKey);
+      } else {
         playSound("beep");
-        return prev - 1;
-      });
+        setCountdown(countdown - 1);
+      }
     }, 1000);
 
     return () => {
@@ -304,6 +307,7 @@ export default function EnrollPage() {
     setSingleRetakePose(poseKey);
     setSelectedPose(poseKey);
     setCountdown(3);
+    setIsPaused(false);
     setCaptureState("capturing");
     
     // Set index to match keys
@@ -428,6 +432,27 @@ export default function EnrollPage() {
             border-width: 2px;
             pointer-events: none;
           }
+          @keyframes draw-check {
+            0% { stroke-dashoffset: 48; }
+            100% { stroke-dashoffset: 0; }
+          }
+          @keyframes scale-up {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+          }
+          @keyframes success-glowing {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            70% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+          }
+          .success-circle {
+            animation: scale-up 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, success-glowing 2s infinite;
+          }
+          .success-check {
+            stroke-dasharray: 48;
+            stroke-dashoffset: 48;
+            animation: draw-check 0.6s cubic-bezier(0.65, 0, 0.45, 1) 0.3s forwards;
+          }
         `}</style>
 
         <canvas ref={canvasRef} className="hidden" />
@@ -459,7 +484,7 @@ export default function EnrollPage() {
 
           {enrolledCount > 0 && (
             <button
-              onClick={() => { if (confirm("Completely wipe all registered biometric vectors and images? This cannot be undone.")) clearMutation.mutate(); }}
+              onClick={() => setShowClearConfirm(true)}
               className="flex items-center gap-2 text-[11.5px] font-bold text-rose-600 hover:text-white bg-white hover:bg-rose-600 border border-rose-200 hover:border-rose-600 px-4 py-2 rounded-xl transition-all cursor-pointer shadow-sm"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -551,24 +576,33 @@ export default function EnrollPage() {
                 To capture accurate biometric details under varying orientations and lighting, we index 10 distinct facial angles.
               </p>
               
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5 pt-2">
                 {POSE_KEYS.map((key) => {
                   const done = status?.enrolled_poses?.some((p: string) => p.toLowerCase() === key.toLowerCase());
+                  const Icon = POSES[key].icon;
                   return (
                     <div
                       key={key}
-                      className={`p-3 rounded-xl border flex flex-col items-center text-center justify-center transition-all ${
+                      className={`p-4 rounded-2xl border flex flex-col items-center text-center justify-center transition-all hover:scale-[1.03] duration-200 select-none ${
                         done
-                          ? "bg-emerald-50/50 border-emerald-200 text-emerald-800"
-                          : "bg-slate-50/50 border-slate-200 text-slate-400"
+                          ? "bg-emerald-500/[0.03] border-emerald-500/20 text-emerald-800 shadow-[0_2px_12px_rgba(16,185,129,0.02)]"
+                          : "bg-slate-50/50 border-slate-200/80 hover:border-slate-350"
                       }`}
                     >
-                      <span className="text-xl mb-1.5 filter drop-shadow-sm">{POSES[key].icon}</span>
-                      <span className="text-[10px] font-bold uppercase tracking-wider font-mono">{POSES[key].label.split(" ")[0]}</span>
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 transition-all ${
+                        done
+                          ? "bg-emerald-500/10 text-emerald-600"
+                          : "bg-slate-100 text-slate-400"
+                      }`}>
+                        <Icon className="w-4.5 h-4.5" />
+                      </div>
+                      <span className={`text-[10px] font-bold uppercase tracking-wider font-mono ${done ? "text-emerald-800" : "text-slate-505"}`}>
+                        {POSES[key].label.replace(" Profile", "").replace(" Face", "").replace(" Option", "").replace(" Light", "")}
+                      </span>
                       {done ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 mt-2 shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-3 shrink-0" />
                       ) : (
-                        <div className="w-3.5 h-3.5 rounded-full border border-slate-250 mt-2 shrink-0 bg-white" />
+                        <div className="w-4 h-4 rounded-full border-2 border-slate-200 mt-3 shrink-0 bg-white" />
                       )}
                     </div>
                   );
@@ -585,7 +619,14 @@ export default function EnrollPage() {
             <div className="w-full bg-slate-950 text-white rounded-2xl p-5 flex items-center justify-between shadow-lg relative overflow-hidden">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.15)_0%,transparent_70%)] pointer-events-none" />
               <div className="flex items-center gap-4 relative z-10">
-                <span className="text-3xl filter drop-shadow-sm">{POSES[POSE_KEYS[currentPoseIndex]]?.icon}</span>
+                {(() => {
+                  const Icon = POSES[POSE_KEYS[currentPoseIndex]]?.icon;
+                  return (
+                    <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center shrink-0 border border-white/10 text-cyan-400">
+                      {Icon && <Icon className="w-6 h-6" />}
+                    </div>
+                  );
+                })()}
                 <div>
                   <p className="text-[10px] font-bold text-cyan-400 font-mono tracking-widest uppercase">
                     SCAN PHASE {currentPoseIndex + 1} OF {POSE_KEYS.length}
@@ -611,17 +652,34 @@ export default function EnrollPage() {
               {/* Native video element */}
               <video
                 ref={videoRef}
-                className="w-full h-full object-cover scale-x-[-1]"
+                className={`w-full h-full object-cover scale-x-[-1] transition-opacity duration-300 ${isPaused ? "opacity-20" : "opacity-100"}`}
                 autoPlay playsInline muted
               />
 
-              {/* Cybernetic HUD elements */}
-              <div className="scanner-line" />
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="scanner-target">
-                  <div className="w-4 h-4 border border-cyan-400 rounded-full animate-ping" />
+              {/* Paused Overlay */}
+              {isPaused && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm z-20 transition-all duration-300">
+                  <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shadow-lg text-white mb-3 animate-pulse">
+                    <Pause className="w-8 h-8 fill-current text-cyan-400" />
+                  </div>
+                  <p className="text-[11px] font-bold text-cyan-400 font-mono tracking-widest uppercase">
+                    SYS.STATUS: SCAN_PAUSED
+                  </p>
+                  <p className="text-xs text-slate-300 font-medium mt-1">
+                    Camera turned off to preserve resources & privacy.
+                  </p>
                 </div>
-              </div>
+              )}
+
+              {/* Cybernetic HUD elements */}
+              {!isPaused && <div className="scanner-line" />}
+              {!isPaused && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="scanner-target">
+                    <div className="w-4 h-4 border border-cyan-400 rounded-full animate-ping" />
+                  </div>
+                </div>
+              )}
 
               {/* HUD corners */}
               <div className="hud-corner corner-bracket-tl top-6 left-6 border-t-2 border-l-2" />
@@ -631,20 +689,28 @@ export default function EnrollPage() {
 
               {/* Scanner stats HUD */}
               <div className="absolute top-6 left-12 right-12 flex justify-between text-[9px] font-mono font-bold text-cyan-400/80 pointer-events-none uppercase">
-                <span>SYS.STATUS: ACQUIRING_DATA</span>
-                <span>FPS: 60 · ISO: 200 · SHUTTER: AUTO</span>
+                <span>SYS.STATUS: {isPaused ? "SCAN_PAUSED" : "ACQUIRING_DATA"}</span>
+                <span>FPS: {isPaused ? "0" : "60"} · ISO: 200 · SHUTTER: AUTO</span>
               </div>
 
               <div className="absolute bottom-6 left-12 right-12 flex justify-between items-center text-[9px] font-mono font-bold text-cyan-400/80 pointer-events-none">
                 <span>ANGLE: {POSE_KEYS[currentPoseIndex]?.toUpperCase()}</span>
-                <span>LIVENESS CHECK: ACTIVE</span>
+                <span>LIVENESS CHECK: {isPaused ? "INACTIVE" : "ACTIVE"}</span>
               </div>
             </div>
 
             {/* Controls */}
             <div className="flex gap-4 w-full max-w-lg">
               <button
-                onClick={() => setIsPaused(!isPaused)}
+                onClick={async () => {
+                  if (isPaused) {
+                    setIsPaused(false);
+                    await startWebcam();
+                  } else {
+                    setIsPaused(true);
+                    stopWebcam();
+                  }
+                }}
                 className="flex-1 h-11 bg-white hover:bg-slate-50 border border-slate-250 text-slate-800 font-bold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
               >
                 {isPaused ? <Play className="w-3.5 h-3.5 fill-current" /> : <Pause className="w-3.5 h-3.5 fill-current" />}
@@ -652,7 +718,7 @@ export default function EnrollPage() {
               </button>
 
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (singleRetakePose) {
                     stopWebcam();
                     setSingleRetakePose(null);
@@ -661,6 +727,10 @@ export default function EnrollPage() {
                     // Skip pose
                     setCurrentPoseIndex(prev => prev + 1);
                     setCountdown(3);
+                    if (isPaused) {
+                      setIsPaused(false);
+                      await startWebcam();
+                    }
                   }
                 }}
                 className="flex-1 h-11 bg-slate-950 hover:bg-slate-900 border border-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer"
@@ -710,7 +780,7 @@ export default function EnrollPage() {
                     </div>
 
                     <div className="mt-2.5 flex items-center justify-between text-[11px] font-bold">
-                      <span className="text-slate-900 uppercase font-mono">{POSES[key].label.split(" ")[0]}</span>
+                      <span className="text-slate-900 uppercase font-mono">{POSES[key].label.replace(" Profile", "").replace(" Face", "").replace(" Option", "").replace(" Light", "")}</span>
                       {imgUrl ? (
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                       ) : (
@@ -766,7 +836,7 @@ export default function EnrollPage() {
             <div className="space-y-1.5">
               <div className="relative h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                 <div
-                  className="absolute inset-y-0 left-0 bg-gradient-to-right from-cyan-400 to-cyan-500 transition-all duration-300"
+                  className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-400 to-cyan-500 transition-all duration-300"
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
@@ -781,8 +851,10 @@ export default function EnrollPage() {
         {/* ─── State 5: SUCCESS SCREEN ─── */}
         {captureState === "success" && (
           <div className="max-w-md mx-auto bg-white border border-slate-200 rounded-3xl p-8 shadow-2xl text-center space-y-6 animate-scaleIn">
-            <div className="relative w-20 h-20 mx-auto bg-emerald-50 rounded-full flex items-center justify-center border border-emerald-100">
-              <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+            <div className="relative w-20 h-20 mx-auto bg-emerald-50 rounded-full flex items-center justify-center border border-emerald-100 success-circle">
+              <svg className="w-10 h-10 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" className="success-check" />
+              </svg>
             </div>
 
             <div className="space-y-2">
@@ -795,14 +867,14 @@ export default function EnrollPage() {
             <div className="flex gap-3 justify-center pt-2">
               <button
                 onClick={() => router.push("/employees")}
-                className="h-10 px-6 bg-slate-100 hover:bg-slate-150 border border-slate-200 text-slate-800 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+                className="h-10 px-6 bg-slate-950 hover:bg-slate-900 border border-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
               >
                 Employees List
               </button>
 
               <button
                 onClick={startAutoCapture}
-                className="h-10 px-6 bg-slate-950 hover:bg-slate-900 border border-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
+                className="h-10 px-6 bg-slate-100 hover:bg-slate-150 border border-slate-200 text-slate-800 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
               >
                 Re-enroll Profile
               </button>
@@ -823,6 +895,52 @@ export default function EnrollPage() {
           </div>
         )}
       </div>
+
+      {/* Clear Biometric Confirmation Modal */}
+      {showClearConfirm && (
+        <div className="modal-backdrop z-50">
+          <div className="modal-content max-w-sm border border-red-500/10 shadow-[0_12px_40px_rgba(239,68,68,0.12)]">
+            <div className="flex flex-col items-center text-center p-2 space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/15 flex items-center justify-center text-rose-500 shadow-inner">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">Clear Biometric Data</h3>
+                <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                  Wipe all registered biometric vectors and images for <span className="font-semibold text-[var(--text-primary)]">{employee?.name}</span>?
+                </p>
+                <p className="text-[10.5px] text-rose-500 font-medium bg-rose-500/5 border border-rose-500/10 rounded-xl p-2.5 mt-3 leading-normal">
+                  Warning: This cannot be undone and the user will not be able to log in or register attendance at the kiosk until re-enrolled.
+                </p>
+              </div>
+              <div className="flex gap-2.5 w-full pt-2 border-t border-white/5">
+                <button 
+                  type="button" 
+                  onClick={() => setShowClearConfirm(false)} 
+                  className="flex-1 btn-ghost h-9.5 text-[12px] rounded-xl cursor-pointer hover:bg-white/[0.04]"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    clearMutation.mutate();
+                    setShowClearConfirm(false);
+                  }}
+                  disabled={clearMutation.isPending}
+                  className="flex-1 bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-bold text-[12px] rounded-xl cursor-pointer h-9.5 flex items-center justify-center gap-2 shadow-md shadow-rose-950/20 border border-rose-500/20"
+                >
+                  {clearMutation.isPending ? (
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    "Wipe Data"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </SidebarLayout>
   );
 }

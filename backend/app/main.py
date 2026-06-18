@@ -95,10 +95,12 @@ def debug_db():
 
 @app.get("/health", tags=["Status"])
 def health_check():
+    from app.services.singletons import face_engine
     return {
         "status": "healthy",
         "project": settings.PROJECT_NAME,
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "mock_mode": face_engine.mock_mode
     }
 
 

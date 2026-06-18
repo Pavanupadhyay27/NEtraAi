@@ -9,6 +9,7 @@ import {
   X, Users, CheckCircle2, XCircle, ChevronDown, UserCheck, ShieldAlert,
   Download, Mail, Phone, Calendar, Briefcase, Clock, TrendingUp
 } from "lucide-react";
+import { useToast } from "@/app/utils/toast";
 import Link from "next/link";
 
 // Avatar gradient styles
@@ -64,6 +65,7 @@ function InputField({ label, required, children }: { label: string; required?: b
 
 export default function EmployeesPage() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -74,11 +76,15 @@ export default function EmployeesPage() {
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState<string>("");
 
   const [empId, setEmpId] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [designation, setDesignation] = useState("");
   const [joiningDate, setJoiningDate] = useState(getLocalDateString());
   const [statusVal, setStatusVal] = useState("Active");
@@ -120,7 +126,9 @@ export default function EmployeesPage() {
       resetForm();
       setShowAddDialog(false);
     },
-    onError: (err: any) => alert(err.message || "Failed to create employee.")
+    onError: (err: any) => {
+      setSubmissionError(err.message || "Failed to create employee.");
+    }
   });
 
   const deleteMutation = useMutation({
@@ -128,18 +136,62 @@ export default function EmployeesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      toast.success("Employee record deleted successfully.");
     },
-    onError: (err: any) => alert(err.message || "Failed to delete employee.")
+    onError: (err: any) => toast.error(err.message || "Failed to delete employee.")
   });
 
   const resetForm = () => {
     setEmpId(""); setName(""); setEmail(""); setPhone(""); setDesignation("");
     setJoiningDate(getLocalDateString()); setStatusVal("Active");
     setDeptId(""); setCreateUserLogin(false); setPassword("");
+    setPhoneError(null);
+    setSubmissionError(null);
   };
+
+  // Live duplicate checking against loaded employees
+  const getDuplicateWarning = () => {
+    if (!employees) return null;
+    
+    if (empId.trim()) {
+      const match = employees.find((e: any) => e.employee_id.toLowerCase() === empId.trim().toLowerCase());
+      if (match) return `Employee ID "${empId}" is already assigned to ${match.name}.`;
+    }
+    
+    if (name.trim()) {
+      const match = employees.find((e: any) => e.name.toLowerCase() === name.trim().toLowerCase());
+      if (match) return `An employee named "${name}" is already registered.`;
+    }
+    
+    if (phone.trim()) {
+      const cleanedInput = phone.replace(/[\s\-()]/g, "");
+      if (cleanedInput) {
+        const match = employees.find((e: any) => {
+          if (!e.phone) return false;
+          const cleanedExisting = e.phone.replace(/[\s\-()]/g, "");
+          return cleanedExisting === cleanedInput;
+        });
+        if (match) return `Phone number is already registered to ${match.name}.`;
+      }
+    }
+    
+    return null;
+  };
+
+  const duplicateWarning = getDuplicateWarning();
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (phone) {
+      const cleaned = phone.replace(/[\s\-()]/g, "");
+      if (!/^(?:\+91|91|0)?[6-9]\d{9}$/.test(cleaned)) {
+        setPhoneError("Invalid Indian mobile number. Must be a 10-digit number starting with 6-9, optionally prefixed with +91, 91, or 0.");
+        return;
+      }
+    }
+    setPhoneError(null);
+
     const payload: any = {
       employee_id: empId, name, email, phone: phone || null,
       designation: designation || null, joining_date: joiningDate,
@@ -151,8 +203,16 @@ export default function EmployeesPage() {
   };
 
   const handleDelete = (id: number, name: string) => {
-    if (confirm(`Are you absolutely sure you want to delete ${name}? All facial biometric profile records and logs will be permanently deleted.`))
-      deleteMutation.mutate(id);
+    setDeleteConfirmId(id);
+    setDeleteConfirmName(name);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmId !== null) {
+      deleteMutation.mutate(deleteConfirmId);
+      setDeleteConfirmId(null);
+      setDeleteConfirmName("");
+    }
   };
 
   const handleImportSubmit = async (e: React.FormEvent) => {
@@ -185,8 +245,9 @@ export default function EmployeesPage() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+      toast.success("Employee ledger exported successfully.");
     } catch (err: any) {
-      alert(err.message || "Failed to export CSV.");
+      toast.error(err.message || "Failed to export CSV.");
     }
   };
 
@@ -203,7 +264,6 @@ export default function EmployeesPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-white/5">
           <div>
             <h1 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">Staff Management</h1>
-            <p className="text-xs text-slate-500 mt-0.5">Register staff, manage details, and initiate camera enrollment.</p>
           </div>
           <div className="flex items-center gap-2.5 shrink-0">
             <button
@@ -367,10 +427,9 @@ export default function EmployeesPage() {
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/5">
               <div>
                 <h3 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">Register Employee</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Fill in the fields to create a new profile.</p>
               </div>
               <button 
-                onClick={() => setShowAddDialog(false)} 
+                onClick={() => { setShowAddDialog(false); resetForm(); }} 
                 className="p-2 rounded-xl hover:bg-white/6 text-slate-500 hover:text-slate-300 transition-all cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -378,6 +437,26 @@ export default function EmployeesPage() {
             </div>
 
             <form onSubmit={handleAddSubmit} className="space-y-4">
+              {duplicateWarning && (
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs animate-fadeInUp">
+                  <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
+                  <div className="flex-1 space-y-1">
+                    <p className="font-bold uppercase tracking-wider text-[9px] font-mono leading-none">Duplicate Detected</p>
+                    <p className="leading-relaxed font-medium mt-1">{duplicateWarning}</p>
+                  </div>
+                </div>
+              )}
+
+              {submissionError && (
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-600 dark:text-rose-400 text-xs animate-fadeInUp">
+                  <XCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-500" />
+                  <div className="flex-1 space-y-1">
+                    <p className="font-bold uppercase tracking-wider text-[9px] font-mono leading-none">Registration Failed</p>
+                    <p className="leading-relaxed font-medium mt-1">{submissionError}</p>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3.5">
                 <InputField label="Employee ID" required>
                   <input type="text" required placeholder="EMP001" value={empId}
@@ -395,8 +474,21 @@ export default function EmployeesPage() {
                     onChange={(e) => setEmail(e.target.value)} className={inputCls} />
                 </InputField>
                 <InputField label="Phone Number">
-                  <input type="text" placeholder="+1 555-0199" value={phone}
-                    onChange={(e) => setPhone(e.target.value)} className={inputCls} />
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      placeholder="+91 98765 43210" 
+                      value={phone}
+                      onChange={(e) => {
+                        setPhone(e.target.value);
+                        if (phoneError) setPhoneError(null);
+                      }} 
+                      className={`${inputCls} ${phoneError ? "border-rose-500 focus:border-rose-500" : ""}`} 
+                    />
+                    {phoneError && (
+                      <p className="text-[10px] text-rose-500 mt-1 font-medium leading-tight">{phoneError}</p>
+                    )}
+                  </div>
                 </InputField>
               </div>
 
@@ -454,15 +546,15 @@ export default function EmployeesPage() {
               <div className="flex justify-end gap-2.5 pt-3 border-t border-white/5">
                 <button 
                   type="button" 
-                  onClick={() => setShowAddDialog(false)} 
+                  onClick={() => { setShowAddDialog(false); resetForm(); }} 
                   className="btn-ghost h-9.5 px-4 text-[12px] rounded-xl cursor-pointer hover:bg-white/[0.04]"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit" 
-                  disabled={createMutation.isPending} 
-                  className="btn-primary h-9.5 px-5 text-[12px] flex items-center gap-2 rounded-xl cursor-pointer"
+                  disabled={createMutation.isPending || !!duplicateWarning} 
+                  className="btn-primary h-9.5 px-5 text-[12px] flex items-center gap-2 rounded-xl cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {createMutation.isPending ? (
                     <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>Saving...</span></>
@@ -483,7 +575,6 @@ export default function EmployeesPage() {
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/5">
               <div>
                 <h3 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">Bulk Import via CSV</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Register multiple staff via CSV upload.</p>
               </div>
               <button 
                 onClick={() => { setShowImportDialog(false); setSelectedFile(null); setImportMessage(null); setImportErrors([]); }}
@@ -700,6 +791,49 @@ export default function EmployeesPage() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId !== null && (
+        <div className="modal-backdrop z-50">
+          <div className="modal-content max-w-sm border border-red-500/10 shadow-[0_12px_40px_rgba(239,68,68,0.12)]">
+            <div className="flex flex-col items-center text-center p-2 space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/15 flex items-center justify-center text-rose-500 shadow-inner">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">Confirm Deletion</h3>
+                <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                  Are you absolutely sure you want to delete <span className="font-semibold text-[var(--text-primary)]">{deleteConfirmName}</span>?
+                </p>
+                <p className="text-[10.5px] text-rose-500 font-medium bg-rose-500/5 border border-rose-500/10 rounded-xl p-2.5 mt-3 leading-normal">
+                  Warning: All facial biometric profile records and logs will be permanently deleted. This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex gap-2.5 w-full pt-2 border-t border-white/5">
+                <button 
+                  type="button" 
+                  onClick={() => { setDeleteConfirmId(null); setDeleteConfirmName(""); }} 
+                  className="flex-1 btn-ghost h-9.5 text-[12px] rounded-xl cursor-pointer hover:bg-white/[0.04]"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  onClick={confirmDelete}
+                  disabled={deleteMutation.isPending}
+                  className="flex-1 bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-bold text-[12px] rounded-xl cursor-pointer h-9.5 flex items-center justify-center gap-2 shadow-md shadow-rose-950/20 border border-rose-500/20"
+                >
+                  {deleteMutation.isPending ? (
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    "Delete Record"
+                  )}
+                </button>
               </div>
             </div>
           </div>

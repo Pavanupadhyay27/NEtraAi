@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import SidebarLayout from "@/components/SidebarLayout";
 import { fetchApi } from "@/app/utils/api";
+import { useToast } from "@/app/utils/toast";
 import { 
   Check, Loader2, CheckCircle2, AlertCircle, Sliders, Info,
   Fingerprint, Clock, Volume2
@@ -13,6 +14,7 @@ type SettingsTab = "biometrics" | "shift" | "voice" | "advanced";
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<SettingsTab>("biometrics");
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const [successKey, setSuccessKey] = useState<string | null>(null);
@@ -40,7 +42,7 @@ export default function SettingsPage() {
     },
     onError: (err: any, vars) => {
       setUpdatingKey(null);
-      alert(err.message || `Failed to save ${vars.key}`);
+      toast.error(err.message || `Failed to save ${vars.key}`);
     }
   });
 
@@ -209,9 +211,6 @@ export default function SettingsPage() {
         {/* Header */}
         <div className="pb-5 border-b border-slate-200">
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">System Configuration</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Optimize biometric accuracy rates, manage shift schedule rules, and toggle voice assistant audio.
-          </p>
         </div>
 
         {/* Outer container */}
@@ -252,9 +251,6 @@ export default function SettingsPage() {
                 <h2 className="text-sm font-bold text-slate-900">
                   {getTabLabel(activeTab)}
                 </h2>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  {getTabDesc(activeTab)}
-                </p>
               </div>
 
               {isLoading ? (

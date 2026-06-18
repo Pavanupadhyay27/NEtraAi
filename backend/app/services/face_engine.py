@@ -67,15 +67,22 @@ class FaceEngine:
     def _init_sessions(self):
         try:
             import gc
-            # Initialize ONNX Runtime Inference Sessions with memory-optimized settings
-            # to prevent OOM crashes on low-resource servers (like Render's 512MB Free Tier)
             opts = ort.SessionOptions()
-            opts.intra_op_num_threads = 1
-            opts.inter_op_num_threads = 1
-            opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-            opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
-            opts.enable_cpu_mem_arena = False
-            opts.add_session_config_entry("memory.enable_memory_arena_shrinkage", "cpu:0")
+            low_mem = getattr(settings, "LOW_MEMORY_MODE", True)
+            if low_mem:
+                opts.intra_op_num_threads = 1
+                opts.inter_op_num_threads = 1
+                opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+                opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
+                opts.enable_cpu_mem_arena = False
+                opts.add_session_config_entry("memory.enable_memory_arena_shrinkage", "cpu:0")
+                logger.info("ONNX Runtime running in LOW MEMORY MODE (optimized for <= 512MB RAM instances).")
+            else:
+                # High-performance multi-threaded settings for production (VPS/Dedicated)
+                threads = getattr(settings, "ORT_INTRA_OP_NUM_THREADS", 0)
+                opts.intra_op_num_threads = threads
+                opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+                logger.info(f"ONNX Runtime running in HIGH PERFORMANCE MODE (intra_op_threads={threads if threads > 0 else 'auto'}, all optimizations enabled).")
             
             providers = ['CPUExecutionProvider']
             # If GPU is available (optional setup)
@@ -387,7 +394,7 @@ class FaceEngine:
             vec = np.random.randn(512).astype(np.float32)
             return vec / np.linalg.norm(vec)
 
-    def check_liveness(self, image_np, bbox):
+    def check_liveness(self, image_np, bbox, threshold=None):
         """
         Silent Face Anti-Spoofing MiniFASNet model.
         Crops face, resizes, runs liveness model.
@@ -464,7 +471,8 @@ class FaceEngine:
             else:
                 avg_score = score_27
             
-            is_live = avg_score >= settings.KIOSK_LIVENESS_THRESHOLD
+            liveness_threshold = threshold if threshold is not None else settings.KIOSK_LIVENESS_THRESHOLD
+            is_live = avg_score >= liveness_threshold
             return avg_score, is_live
 
         except Exception as e:

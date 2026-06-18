@@ -68,6 +68,17 @@ def create_employee(
     existing_email = crud.get_employee_by_email(db, email=emp.email)
     if existing_email:
         raise HTTPException(status_code=400, detail="Employee email already exists")
+
+    # Check duplicate name (case-insensitive)
+    existing_name = crud.get_employee_by_name(db, name=emp.name)
+    if existing_name:
+        raise HTTPException(status_code=400, detail="An employee with this name is already registered")
+
+    # Check duplicate phone
+    if emp.phone:
+        existing_phone = crud.get_employee_by_phone(db, phone=emp.phone)
+        if existing_phone:
+            raise HTTPException(status_code=400, detail="This phone number is already registered to another employee")
         
     user_id = None
     if emp.create_user_login:

@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     KIOSK_LIVENESS_THRESHOLD: float = 0.75
     FORCE_MOCK_MODE: bool = False
     
+    # Performance Optimizations
+    LOW_MEMORY_MODE: bool = True  # Set to False on VPS/Dedicated servers to run faster
+    ORT_INTRA_OP_NUM_THREADS: int = 0  # 0 = automatic core detection (faster)
+    
     # Paths
     UPLOAD_DIR: str = "./uploads"
     MODELS_DIR: str = "./models"

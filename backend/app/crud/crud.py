@@ -100,6 +100,18 @@ def get_employee_by_uuid(db: Session, employee_id: str):
 def get_employee_by_email(db: Session, email: str):
     return db.execute(select(models.Employee).where(models.Employee.email == email)).scalar_one_or_none()
 
+def get_employee_by_name(db: Session, name: str):
+    return db.execute(select(models.Employee).where(func.lower(models.Employee.name) == func.lower(name))).scalars().first()
+
+def get_employee_by_phone(db: Session, phone: str):
+    import re
+    cleaned = re.sub(r'[\s\-()]', '', phone)
+    all_emps = db.execute(select(models.Employee).where(models.Employee.phone.isnot(None))).scalars().all()
+    for emp in all_emps:
+        if re.sub(r'[\s\-()]', '', emp.phone) == cleaned:
+            return emp
+    return None
+
 def get_employees(
     db: Session,
     skip: int = 0,
@@ -259,7 +271,7 @@ def set_setting(db: Session, key: str, value: str, description: str = None):
     return db_setting
 
 # --- Attendance Logs CRUD ---
-def create_attendance_log(db: Session, employee_id: int, camera: str, confidence: float, liveness_score: float, is_spoof: bool, status: str, timestamp: datetime = None):
+def create_attendance_log(db: Session, employee_id: int, camera: str, confidence: float, liveness_score: float, is_spoof: bool, status: str, timestamp: datetime = None, image_path: str = None):
     if not timestamp:
         timestamp = datetime.now()
     log = models.AttendanceLog(
@@ -269,7 +281,8 @@ def create_attendance_log(db: Session, employee_id: int, camera: str, confidence
         liveness_score=liveness_score,
         is_spoof=is_spoof,
         status=status,
-        timestamp=timestamp
+        timestamp=timestamp,
+        image_path=image_path
     )
     db.add(log)
     db.commit()

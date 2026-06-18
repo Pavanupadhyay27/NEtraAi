@@ -47,22 +47,18 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen relative bg-[var(--bg-base)] flex items-center justify-center overflow-hidden px-4">
       {/* Grid Mesh background */}
-      <div className="absolute inset-0 mesh-bg opacity-30 pointer-events-none" />
-
-      {/* Ambient background glows */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-slate-100/50 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-zinc-100/50 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute inset-0 mesh-bg pointer-events-none" />
 
       <div className="w-full max-w-sm relative z-10 animate-fadeInUp">
         
         {/* Logo block */}
-        <div className="text-center mb-8">
-          <div className="relative inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-950 border border-slate-800/80 shadow-[0_0_20px_rgba(6,182,212,0.25)] mb-4 overflow-hidden group">
+        <div className="text-center mb-6">
+          <div className="relative inline-flex items-center justify-center w-18 h-18 rounded-2xl bg-slate-950 border border-slate-800/80 shadow-[0_0_20px_rgba(6,182,212,0.25)] mb-4 overflow-hidden group">
             {/* Ambient glowing background inside the container */}
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.15)_0%,transparent_70%)] animate-pulse" />
             
             {/* Robotic eye SVG */}
-            <svg viewBox="0 0 100 100" className="w-10 h-10 relative z-10" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg viewBox="0 0 100 100" className="w-11 h-11 relative z-10" fill="none" xmlns="http://www.w3.org/2000/svg">
               {/* Outer technical rotating rings */}
               <circle cx="50" cy="50" r="45" stroke="#1e293b" strokeWidth="1.5" strokeDasharray="6 12" className="animate-rotate-ring" />
               <circle cx="50" cy="50" r="40" stroke="#0891b2" strokeWidth="1" strokeDasharray="40 10 15 5" className="animate-rotate-ring-reverse" style={{ opacity: 0.6 }} />
@@ -88,7 +84,6 @@ export default function LoginPage() {
               
               {/* Futuristic crosshairs / HUD markers */}
               <path d="M50 5 L50 12 M50 88 L50 95 M5 50 L12 50 M88 50 L95 50" stroke="#475569" strokeWidth="1.5" />
-              <path d="M30 30 L35 35 M65 65 L70 70 M65 30 L60 35 M35 65 L30 70" stroke="#0891b2" strokeWidth="1" opacity="0.5" />
               
               {/* Scanning laser beam overlay */}
               <line x1="15" y1="50" x2="85" y2="50" stroke="#22d3ee" strokeWidth="1.5" className="animate-laser" filter="url(#glow-logo)" />
@@ -102,41 +97,38 @@ export default function LoginPage() {
               </defs>
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
             NetraID
           </h1>
-          <p className="text-slate-500 text-[12.5px] mt-1">
-            AI Biometric Attendance Platform
+          <p className="text-slate-400 text-[11px] mt-0.5">
+            AI Biometric Attendance
           </p>
         </div>
 
         {/* Login card */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-lg shadow-slate-100">
-          <div className="mb-6">
-            <h2 className="text-base font-bold text-slate-800">
-              Sign in to dashboard
+        <div className="glass-overlay rounded-2xl p-6 shadow-[0_4px_30px_rgba(0,0,0,0.03)]">
+          <div className="mb-5 text-center">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              Admin Credentials
             </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Use your administrator credentials to continue
-            </p>
           </div>
 
           {/* Error state */}
           {error && (
-            <div className="flex items-start gap-2.5 bg-rose-500/5 border border-rose-500/15 text-rose-600 p-3 rounded-xl mb-5 text-xs animate-fadeInUp">
-              <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2 bg-rose-500/5 border border-rose-500/15 text-rose-600 p-2.5 rounded-lg mb-4 text-[11.5px] animate-fadeInUp">
+              <ShieldAlert className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span className="leading-relaxed">{error}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3.5">
             {/* Email */}
             <div className="space-y-1.5">
-              <label className="block text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">
+              <label className="block text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                 <input
                   id="login-email"
                   type="email"
@@ -144,7 +136,7 @@ export default function LoginPage() {
                   placeholder="admin@netraid.ai"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="input-field pl-icon h-11 bg-white border-slate-200 text-slate-900 rounded-xl focus:border-slate-800"
+                  className="input-field pl-icon"
                   autoComplete="email"
                   suppressHydrationWarning
                 />
@@ -153,11 +145,11 @@ export default function LoginPage() {
 
             {/* Password */}
             <div className="space-y-1.5">
-              <label className="block text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">
+              <label className="block text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                 <input
                   id="login-password"
                   type={showPass ? "text" : "password"}
@@ -165,17 +157,17 @@ export default function LoginPage() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="input-field pl-icon pr-icon h-11 bg-white border-slate-200 text-slate-900 rounded-xl focus:border-slate-800"
+                  className="input-field pl-icon pr-icon"
                   autoComplete="current-password"
                   suppressHydrationWarning
                 />
                 <button
                   type="button"
                   onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                   suppressHydrationWarning
                 >
-                  {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </button>
               </div>
             </div>
@@ -185,18 +177,18 @@ export default function LoginPage() {
               id="login-submit"
               type="submit"
               disabled={loading}
-              className="btn-primary w-full h-11 flex items-center justify-center gap-2 mt-2 rounded-xl bg-slate-900 text-white border-slate-900 hover:bg-slate-800 cursor-pointer shadow-sm"
+              className="btn-primary w-full flex items-center justify-center gap-1.5 mt-2 h-9"
               suppressHydrationWarning
             >
               {loading ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   <span>Authenticating...</span>
                 </>
               ) : (
                 <>
                   <span>Sign In</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </>
               )}
             </button>
@@ -204,21 +196,21 @@ export default function LoginPage() {
         </div>
 
         {/* Kiosk link */}
-        <div className="mt-5 text-center">
+        <div className="mt-4 text-center">
           <a
             href="/kiosk"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-[12px] text-slate-500 hover:text-slate-800 transition-colors"
+            className="inline-flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-slate-800 transition-colors"
           >
-            <ExternalLink className="w-3.5 h-3.5" />
+            <ExternalLink className="w-3 h-3" />
             <span>Open Kiosk Terminal</span>
           </a>
         </div>
 
         {/* Footer */}
-        <p className="text-center text-[10px] text-slate-400 mt-6 font-mono">
-          NetraID v1.0.0 · Open Source · MIT License
+        <p className="text-center text-[9px] text-slate-400 mt-6 font-mono">
+          NetraID v1.0.0
         </p>
       </div>
     </div>

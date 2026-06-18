@@ -134,6 +134,7 @@ class Attendance(Base):
     early_departure = Column(Boolean, default=False)
     overtime = Column(Float, default=0.0)  # Calculated in hours
     status = Column(String(20), default="Absent")  # Present, Absent, Late, Half Day, Leave, Holiday, WFH
+    emergency_allowed = Column(Boolean, default=False)
 
     employee = relationship("Employee", back_populates="attendance_records")
 
@@ -148,6 +149,7 @@ class AttendanceLog(Base):
     liveness_score = Column(Float, nullable=True)
     is_spoof = Column(Boolean, default=False)
     status = Column(String(50), nullable=False)  # Match Success, Spoof Rejected, Unknown Person, Low Confidence
+    image_path = Column(String(255), nullable=True)
 
     employee = relationship("Employee", back_populates="attendance_logs")
 

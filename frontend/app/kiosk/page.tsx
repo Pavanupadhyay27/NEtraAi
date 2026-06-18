@@ -6,20 +6,42 @@ import {
   Volume2, VolumeX, Clock as ClockIcon, Play, Wifi, Fingerprint, Shield
 } from "lucide-react";
 import { getBackendUrl } from "@/app/utils/api";
+import { useToast } from "@/app/utils/toast";
+
+function formatTime12h(timeStr: string | null | undefined): string {
+  if (!timeStr) return "";
+  if (timeStr.includes("AM") || timeStr.includes("PM")) return timeStr;
+  
+  const parts = timeStr.split(":");
+  if (parts.length < 2) return timeStr;
+  
+  const hr = parseInt(parts[0], 10);
+  const mn = parseInt(parts[1], 10);
+  const sc = parts[2] ? parseInt(parts[2], 10) : 0;
+  
+  const suffix = hr >= 12 ? "PM" : "AM";
+  const hour12 = hr % 12 || 12;
+  const pad = (num: number) => String(num).padStart(2, "0");
+  
+  return `${pad(hour12)}:${pad(mn)}:${pad(sc)} ${suffix}`;
+}
 
 export default function KioskPage() {
+  const { toast } = useToast();
   const [kioskActive, setKioskActive] = useState(false);
   const [currentTime, setCurrentTime] = useState("");
   const [currentDate, setCurrentDate] = useState("");
   const [matchTime, setMatchTime] = useState("");
   const [scanning, setScanning] = useState(false);
-  const [scanStatus, setScanStatus] = useState<"idle" | "success" | "spoof" | "unknown" | "maintenance" | "no_employees">("idle");
+  const [scanStatus, setScanStatus] = useState<"idle" | "success" | "spoof" | "unknown" | "maintenance" | "no_employees" | "ask_checkout" | "locked">("idle");
   const [scanResult, setScanResult] = useState<any>(null);
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
   const [cameraLabel] = useState("Main Entrance");
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [profileImageError, setProfileImageError] = useState(false);
+  const [lastImage, setLastImage] = useState<string | null>(null);
+  const [engineMode, setEngineMode] = useState<string>("LOADING ENGINE...");
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -31,12 +53,37 @@ export default function KioskPage() {
   useEffect(() => {
     const tick = () => {
       const now = new Date();
-      setCurrentTime(now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }));
+      setCurrentTime(now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }));
       setCurrentDate(now.toLocaleDateString([], { weekday: "long", year: "numeric", month: "long", day: "numeric" }));
     };
     tick();
     const t = setInterval(tick, 1000);
     return () => clearInterval(t);
+  }, []);
+
+  // Fetch engine state dynamically on mount
+  useEffect(() => {
+    const checkEngine = async () => {
+      try {
+        const url = `${getBackendUrl().replace("/api/v1", "")}/health`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.mock_mode) {
+            setEngineMode("MOCKED OFFLINE ENGINE");
+          } else {
+            setEngineMode("REAL BIOMETRIC ENGINE");
+          }
+        } else {
+          setEngineMode("REAL BIOMETRIC ENGINE");
+        }
+      } catch (err) {
+        setEngineMode("REAL BIOMETRIC ENGINE");
+      }
+    };
+    checkEngine();
+    const interval = setInterval(checkEngine, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const toggleFullscreen = () => {
@@ -68,7 +115,7 @@ export default function KioskPage() {
       intervalRef.current = setInterval(captureAndScan, 1000);
     } catch (err) {
       console.error(err);
-      alert("Unable to access camera. Please check browser permissions and ensure no other application is using it.");
+      toast.error("Unable to access camera. Please check browser permissions and ensure no other application is using it.");
     }
   };
 
@@ -108,6 +155,7 @@ export default function KioskPage() {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     const base64 = canvas.toDataURL("image/jpeg", 0.82);
+    setLastImage(base64);
     setScanning(true);
     try {
       // Connect to the backend running at the configured URL
@@ -136,6 +184,27 @@ export default function KioskPage() {
     }
   };
 
+  const confirmCheckout = async () => {
+    if (!lastImage) return;
+    setScanning(true);
+    try {
+      const url = `${getBackendUrl()}/kiosk/scan`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: lastImage, camera: cameraLabel, confirm_checkout: true })
+      });
+      if (!res.ok) throw new Error("Checkout confirmation failed");
+      const data = await res.json();
+      handleResult(data);
+    } catch (err) {
+      console.error("Checkout confirmation error:", err);
+      setScanFeedback("Confirmation error");
+    } finally {
+      setScanning(false);
+    }
+  };
+
   const handleResult = (data: any) => {
     if (data.status === "success") {
       setProfileImageError(false);
@@ -148,6 +217,18 @@ export default function KioskPage() {
           console.error("Autoplay voice greeting failed:", err);
         });
       }
+    } else if (data.status === "ask_checkout") {
+      setProfileImageError(false);
+      setScanStatus("ask_checkout"); setScanResult(data);
+      if (voiceEnabled && data.tts_url) {
+        const backendBaseUrl = getBackendUrl().replace("/api/v1", "");
+        new Audio(`${backendBaseUrl}${data.tts_url}`).play().catch((err) => {
+          console.error("Autoplay voice greeting failed:", err);
+        });
+      }
+    } else if (data.status === "locked") {
+      setScanStatus("locked"); setScanResult(data);
+      triggerCooldown(4000);
     } else if (data.status === "spoof_detected") {
       setScanStatus("spoof"); setScanResult(data);
       triggerCooldown(3000);
@@ -175,43 +256,37 @@ export default function KioskPage() {
   return (
     <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] flex flex-col relative select-none overflow-hidden font-sans">
       {/* Background Grid Mesh */}
-      <div className="absolute inset-0 mesh-bg opacity-30 pointer-events-none" />
+      <div className="absolute inset-0 mesh-bg pointer-events-none" />
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-slate-500/5 blur-[120px] pointer-events-none rounded-full" />
 
       {/* ─── Top HUD Bar ─── */}
-      <header className="relative z-30 h-16 border-b border-[var(--border-medium)] px-8 flex items-center justify-between bg-white/95 backdrop-blur-xl shadow-sm">
+      <header className="relative z-30 h-14 border-b border-[var(--border-medium)] px-6 flex items-center justify-between kiosk-header">
         {/* Brand info */}
-        <div className="flex items-center gap-3">
-          <div className="relative inline-flex items-center justify-center w-8.5 h-8.5 rounded-xl bg-slate-950 border border-slate-800/80 shadow-[0_0_10px_rgba(6,182,212,0.15)] overflow-hidden shrink-0">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.15)_0%,transparent_70%)]" />
-            <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-white z-20" />
-            <svg viewBox="0 0 100 100" className="w-5.5 h-5.5 relative z-10 animate-fade-in" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="50" cy="50" r="45" stroke="#1e293b" strokeWidth="2" strokeDasharray="8 12" className="animate-rotate-ring" />
-              <circle cx="50" cy="50" r="40" stroke="#0891b2" strokeWidth="1.5" strokeDasharray="30 15" className="animate-rotate-ring-reverse" style={{ opacity: 0.6 }} />
-              <path d="M15 50 C 30 25, 70 25, 85 50 C 70 75, 30 75, 15 50 Z" stroke="#475569" strokeWidth="2.5" />
+        <div className="flex items-center gap-2.5 animate-fadeInUp">
+          <div className="relative inline-flex items-center justify-center w-9 h-9 rounded-lg bg-slate-900 border border-slate-700/80 shadow-[0_0_12px_rgba(6,182,212,0.2)] overflow-hidden shrink-0">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.15)_0%,transparent_70%)] animate-pulse" />
+            <div className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 border border-white z-20" />
+            <svg viewBox="0 0 100 100" className="w-6 h-6 relative z-10 animate-fade-in" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="50" cy="50" r="45" stroke="#334155" strokeWidth="2" strokeDasharray="8 12" className="animate-rotate-ring" />
+              <circle cx="50" cy="50" r="40" stroke="#06b6d4" strokeWidth="1.5" strokeDasharray="30 15" className="animate-rotate-ring-reverse" style={{ opacity: 0.8 }} />
+              <path d="M15 50 C 30 25, 70 25, 85 50 C 70 75, 30 75, 15 50 Z" stroke="#64748b" strokeWidth="2.5" />
               <g className="animate-eye-lid">
-                <circle cx="50" cy="50" r="22" fill="#0f172a" stroke="#0891b2" strokeWidth="2" />
+                <circle cx="50" cy="50" r="22" fill="#1e293b" stroke="#06b6d4" strokeWidth="2" />
                 <circle cx="50" cy="50" r="7" fill="#22d3ee" className="animate-pupil" />
               </g>
               <line x1="15" y1="50" x2="85" y2="50" stroke="#22d3ee" strokeWidth="2" className="animate-laser" />
             </svg>
           </div>
           <div>
-            <h1 className="font-bold text-[13.5px] tracking-tight text-slate-800 leading-none">NetraID Kiosk</h1>
-            <div className="flex items-center gap-1.5 mt-1">
-              <Wifi className="w-2.5 h-2.5 text-emerald-500" />
-              <p className="text-[9.5px] text-slate-500 font-mono uppercase tracking-wider">{cameraLabel}</p>
-            </div>
+            <h1 className="font-bold text-[15px] tracking-tight text-[var(--text-primary)] leading-none">NetraID Kiosk</h1>
+            <p className="text-[9px] text-[var(--text-muted)] font-mono mt-0.5 uppercase tracking-wider">{cameraLabel}</p>
           </div>
         </div>
 
         {/* Clock */}
-        <div className="text-center absolute left-1/2 -translate-x-1/2">
-          <p className="text-lg font-bold font-mono tracking-tight text-slate-800 leading-none tabular-nums">
+        <div className="text-center absolute left-1/2 -translate-y-1/2">
+          <p className="text-base font-bold font-mono tracking-tight text-[var(--text-primary)] leading-none tabular-nums">
             {currentTime || "00:00:00"}
-          </p>
-          <p className="text-[9.5px] text-slate-500 mt-1 uppercase tracking-wider font-mono">
-            {currentDate}
           </p>
         </div>
 
@@ -220,10 +295,10 @@ export default function KioskPage() {
           <button
             onClick={() => setVoiceEnabled(!voiceEnabled)}
             title={voiceEnabled ? "Mute audio assistance" : "Enable audio assistance"}
-            className={`p-2 rounded-xl border transition-all cursor-pointer ${
+            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
               voiceEnabled
                 ? "bg-zinc-950 border-zinc-950 text-white"
-                : "bg-slate-100 border-slate-200 text-slate-400"
+                : "bg-slate-55 border-slate-200 text-slate-400"
             }`}
           >
             {voiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
@@ -231,36 +306,41 @@ export default function KioskPage() {
           <button
             onClick={toggleFullscreen}
             title="Fullscreen toggle"
-            className="p-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-800 transition-all cursor-pointer"
+            className="p-1.5 rounded-lg bg-slate-55 border border-slate-200 text-slate-500 hover:text-slate-800 transition-all cursor-pointer"
           >
             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
           </button>
         </div>
       </header>
 
-      {/* ─── Main Area ─── */}
       <main className="flex-1 flex flex-col items-center justify-center p-6 relative z-10">
         <canvas ref={canvasRef} className="hidden" />
 
-        {/* Video / Camera frame (Always mounted to prevent null refs) */}
-        <div className="w-full max-w-3xl space-y-4 relative">
+        {/* Video / Camera frame container */}
+        <div className="w-full max-w-3xl relative">
           
-          {/* Pre-start overlay */}
+          {/* Pre-start offline glass card */}
           {!kioskActive && (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[var(--bg-base)] text-center p-8 space-y-7 animate-fadeInUp">
-              <div className="relative">
+            <div className="w-full max-w-2xl mx-auto glass-overlay border border-[var(--border-medium)] rounded-3xl text-center p-12 aspect-video flex flex-col items-center justify-center space-y-6 animate-fadeInUp shadow-[0_8px_32px_rgba(0,0,0,0.03)] relative overflow-hidden">
+              <div className="relative flex flex-col items-center">
+                {/* Status Badge */}
+                <div className="mb-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-600 font-mono text-[9px] font-bold uppercase tracking-wider">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                  Terminal Offline
+                </div>
+
                 {/* Subtle outer breathing ring */}
-                <div className="absolute inset-[-12px] rounded-full bg-zinc-100 border border-zinc-200/60 animate-pulse animate-fade-in" />
+                <div className="absolute inset-[-6px] rounded-full bg-cyan-500/5 border border-cyan-500/10 animate-pulse" />
                 
                 {/* Cybernetic blinking/glowing robot eye logo */}
-                <div className="relative inline-flex items-center justify-center w-22 h-22 rounded-full bg-slate-950 border border-slate-800/80 shadow-[0_0_20px_rgba(6,182,212,0.25)] overflow-hidden shrink-0">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.25)_0%,transparent_70%)]" />
-                  <svg viewBox="0 0 100 100" className="w-12 h-12 relative z-10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="50" cy="50" r="45" stroke="#1e293b" strokeWidth="2" strokeDasharray="8 12" className="animate-rotate-ring" />
-                    <circle cx="50" cy="50" r="40" stroke="#0891b2" strokeWidth="1.5" strokeDasharray="30 15" className="animate-rotate-ring-reverse" style={{ opacity: 0.6 }} />
-                    <path d="M15 50 C 30 25, 70 25, 85 50 C 70 75, 30 75, 15 50 Z" stroke="#475569" strokeWidth="2.5" />
+                <div className="relative inline-flex items-center justify-center w-20 h-20 rounded-full bg-[var(--bg-surface)] border border-cyan-500/30 dark:border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.15)] overflow-hidden shrink-0">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.1)_0%,transparent_70%)]" />
+                  <svg viewBox="0 0 100 100" className="w-11 h-11 relative z-10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="45" stroke="#334155" strokeWidth="2" strokeDasharray="8 12" className="animate-rotate-ring" />
+                    <circle cx="50" cy="50" r="40" stroke="#06b6d4" strokeWidth="1.5" strokeDasharray="30 15" className="animate-rotate-ring-reverse" style={{ opacity: 0.8 }} />
+                    <path d="M15 50 C 30 25, 70 25, 85 50 C 70 75, 30 75, 15 50 Z" stroke="#64748b" strokeWidth="2.5" />
                     <g className="animate-eye-lid">
-                      <circle cx="50" cy="50" r="22" fill="#0f172a" stroke="#0891b2" strokeWidth="2" />
+                      <circle cx="50" cy="50" r="22" fill="#1e293b" stroke="#06b6d4" strokeWidth="2" />
                       <circle cx="50" cy="50" r="7" fill="#22d3ee" className="animate-pupil" />
                     </g>
                     <line x1="15" y1="50" x2="85" y2="50" stroke="#22d3ee" strokeWidth="2" className="animate-laser" />
@@ -268,25 +348,25 @@ export default function KioskPage() {
                 </div>
               </div>
 
-              <div className="space-y-2 max-w-sm">
-                <h2 className="text-2xl font-black text-[var(--text-primary)] tracking-tight">Kiosk Scanner Offline</h2>
-                <p className="text-sm text-[var(--text-secondary)] font-medium leading-relaxed">
-                  Initialize the secure terminal to start the live camera feed and begin biometric attendance recording.
+              <div className="space-y-1 max-w-sm mx-auto">
+                <h2 className="text-xl font-extrabold text-[var(--text-primary)] tracking-tight">Kiosk Offline</h2>
+                <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                  Start the camera terminal to begin face biometric logging.
                 </p>
               </div>
 
               <button
                 onClick={startKiosk}
-                className="btn-primary h-11 px-8 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-md shadow-zinc-950/10 cursor-pointer"
+                className="btn-primary h-10 px-8 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
-                <Play className="w-3.5 h-3.5 fill-current" />
-                Start Scanner Terminal
+                <Play className="w-4 h-4 fill-current" />
+                Start Scanner
               </button>
             </div>
           )}
 
           {/* Camera Frame Frame */}
-          <div className="relative aspect-video rounded-3xl overflow-hidden bg-black border border-[var(--border-strong)] shadow-lg shadow-slate-200">
+          <div className={`relative aspect-video rounded-2xl overflow-hidden bg-black border border-zinc-100 shadow-sm ${kioskActive ? "block" : "hidden"}`}>
             
             {/* Native Video player (Centrally mounted) */}
             <video
@@ -300,14 +380,14 @@ export default function KioskPage() {
               <>
                 <div className="scanner-laser" />
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="relative w-60 h-60">
-                    <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-zinc-950 rounded-tl-2xl" />
-                    <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-zinc-950 rounded-tr-2xl" />
-                    <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-zinc-950 rounded-bl-2xl" />
-                    <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-zinc-950 rounded-br-2xl" />
+                  <div className="relative w-48 h-48">
+                    <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-zinc-950 rounded-tl-xl" />
+                    <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-zinc-950 rounded-tr-xl" />
+                    <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-zinc-950 rounded-bl-xl" />
+                    <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-zinc-950 rounded-br-xl" />
                     
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-[10px] text-zinc-950 font-mono font-bold tracking-wider uppercase bg-white/95 px-4 py-2 rounded-full border border-zinc-200/80 shadow-sm">
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <span className="text-[9px] text-[var(--text-primary)] font-mono font-bold tracking-wider uppercase bg-[var(--bg-surface)] px-3 py-1.5 rounded border border-[var(--border-medium)] shadow-2xs">
                         {scanFeedback || (scanning ? "Processing..." : "Center Face")}
                       </span>
                     </div>
@@ -318,61 +398,55 @@ export default function KioskPage() {
 
             {/* SUCCESS screen */}
             {kioskActive && scanStatus === "success" && (
-              <div className="absolute inset-0 bg-white flex flex-col items-center justify-center p-8 text-center animate-fadeInUp">
-                <div className="space-y-6 max-w-sm w-full animate-fade-in">
-                  {/* Initials Circle */}
-                  <div className="relative mx-auto w-24 h-24">
-                    {/* Ring animation */}
-                    <div className="absolute inset-[-6px] rounded-full border border-emerald-500/30 animate-ping" />
+              <div className="absolute inset-0 glass-overlay flex flex-col items-center justify-center p-6 text-center animate-fadeInUp">
+                <div className="space-y-4 max-w-xs w-full animate-fade-in">
+                  {/* Profile Image / Initials */}
+                  <div className="mx-auto w-20 h-20 rounded-full overflow-hidden border border-zinc-150 shadow-sm bg-zinc-55 flex items-center justify-center">
                     {scanResult?.employee?.employee_id && !profileImageError ? (
                       <img
                         src={`${getBackendUrl().replace("/api/v1", "")}/uploads/${scanResult.employee.employee_id}/front.jpg`}
                         alt={scanResult.employee.name}
-                        className="w-24 h-24 rounded-full object-cover border border-zinc-200 shadow-lg shadow-zinc-950/20"
+                        className="w-full h-full object-cover"
                         onError={() => setProfileImageError(true)}
                       />
                     ) : (
-                      <div className="w-24 h-24 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center text-white font-mono text-3xl font-extrabold shadow-lg shadow-zinc-950/20">
+                      <span className="text-zinc-700 font-bold text-2xl">
                         {scanResult?.employee?.name
                           ? scanResult.employee.name.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase()
                           : "PK"}
-                      </div>
+                      </span>
                     )}
                   </div>
 
-                  {/* Name and Location info */}
-                  <div className="space-y-2">
-                    <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+                  {/* Name and Designation */}
+                  <div className="space-y-0.5">
+                    <h2 className="text-lg font-bold text-zinc-900 tracking-tight">
                       {scanResult?.employee?.name || "Employee"}
                     </h2>
-                    
-                    <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 font-mono uppercase font-semibold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <span>{cameraLabel}</span>
-                    </div>
-
-                    <p className="text-sm text-slate-700 font-semibold">
-                      {scanResult?.employee?.designation || "SDE-1"} ({scanResult?.employee?.employee_id || "int01"})
+                    <p className="text-[11px] text-zinc-400 font-medium">
+                      {scanResult?.employee?.designation || "Employee"} ({scanResult?.employee?.employee_id})
                     </p>
                   </div>
 
-                  {/* Divider */}
-                  <div className="w-12 h-px bg-slate-200 mx-auto" />
-
-                  {/* Real-time Clock & Matched Status */}
-                  <div className="space-y-4">
-                    <p className="text-2xl font-black font-mono text-slate-900 tracking-tight tabular-nums">
-                      {matchTime || "00:00:00 AM"}
+                  {/* Clock & Status */}
+                  <div className="space-y-2.5 pt-2">
+                    <p className="text-xl font-bold font-mono text-[var(--text-primary)] tracking-tight tabular-nums">
+                      {matchTime}
                     </p>
                     
-                    <div className="flex flex-col items-center gap-1.5 mt-1">
-                      <span className="inline-flex items-center gap-1.5 px-4.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-mono text-xs font-bold uppercase tracking-wider shadow-sm">
-                        <UserCheck className="w-3.5 h-3.5" />
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 font-mono text-[9px] font-bold uppercase tracking-wider">
                         Matched
                       </span>
+                      {scanResult?.attendance?.working_hours > 0 && (
+                        <div className="mt-1 px-3 py-1 bg-zinc-50 border border-zinc-200 rounded-lg">
+                          <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider">Time Worked Today</p>
+                          <p className="text-xs font-bold text-zinc-755 font-mono mt-0.5">{scanResult.attendance.working_hours.toFixed(2)} hours</p>
+                        </div>
+                      )}
                       {scanResult?.confidence && (
-                        <p className="text-[10px] text-slate-400 font-mono">
-                          Match: <span className="font-bold text-slate-600">{(scanResult.confidence * 100).toFixed(1)}%</span> · Liveness: <span className="font-bold text-emerald-600">{(scanResult.liveness_score * 100).toFixed(1)}% Real</span>
+                        <p className="text-[8.5px] text-zinc-400 font-mono mt-1">
+                          Confidence: {(scanResult.confidence * 100).toFixed(0)}% · {(scanResult.liveness_score * 100).toFixed(0)}% Real
                         </p>
                       )}
                     </div>
@@ -381,83 +455,153 @@ export default function KioskPage() {
               </div>
             )}
 
-            {/* SPOOF screen */}
-            {kioskActive && scanStatus === "spoof" && (
-              <div className="absolute inset-0 bg-red-50/98 flex flex-col items-center justify-center p-8 text-center animate-fadeInUp">
-                <div className="relative mb-5">
-                  <div className="w-18 h-18 rounded-full bg-rose-500/10 border border-rose-500 flex items-center justify-center">
-                    <ShieldAlert className="w-8 h-8 text-rose-600" />
+            {/* ASK_CHECKOUT screen */}
+            {kioskActive && scanStatus === "ask_checkout" && (
+              <div className="absolute inset-0 glass-overlay flex flex-col items-center justify-center p-6 text-center animate-fadeInUp z-30">
+                <div className="space-y-4 max-w-sm w-full animate-fade-in">
+                  <div className="mx-auto w-20 h-20 rounded-full overflow-hidden border border-zinc-150 shadow-sm bg-zinc-55 flex items-center justify-center">
+                    {scanResult?.employee?.employee_id && !profileImageError ? (
+                      <img
+                        src={`${getBackendUrl().replace("/api/v1", "")}/uploads/${scanResult.employee.employee_id}/front.jpg`}
+                        alt={scanResult.employee.name}
+                        className="w-full h-full object-cover"
+                        onError={() => setProfileImageError(true)}
+                      />
+                    ) : (
+                      <span className="text-zinc-700 font-bold text-2xl">
+                        {scanResult?.employee?.name
+                          ? scanResult.employee.name.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase()
+                          : "PK"}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    <h2 className="text-lg font-bold text-zinc-900 tracking-tight">
+                      {scanResult?.employee?.name || "Employee"}
+                    </h2>
+                    <p className="text-[11.5px] text-zinc-500 font-medium">
+                      Already checked in at <span className="font-mono font-bold text-zinc-750">{formatTime12h(scanResult?.attendance?.check_in)}</span>
+                    </p>
+                  </div>
+
+                  <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-2.5 max-w-[200px] mx-auto">
+                    <p className="text-[9px] text-zinc-450 font-bold uppercase tracking-wider">Working Hours So Far</p>
+                    <p className="text-sm font-extrabold text-zinc-850 font-mono mt-0.5">
+                      {scanResult?.working_hours_so_far?.toFixed(2)} hours
+                    </p>
+                  </div>
+
+                  <div className="space-y-2.5 pt-1.5">
+                    <p className="text-[12px] font-bold text-[var(--text-primary)]">Do you want to Check Out?</p>
+                    <div className="flex items-center justify-center gap-2.5">
+                      <button
+                        onClick={confirmCheckout}
+                        disabled={scanning}
+                        className="px-5 py-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white text-[12px] font-bold shadow-sm cursor-pointer transition-all disabled:opacity-50"
+                      >
+                        Yes, Check Out
+                      </button>
+                      <button
+                        onClick={() => {
+                          setScanStatus("idle");
+                          setScanResult(null);
+                        }}
+                        disabled={scanning}
+                        className="px-5 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-[12px] font-bold border border-zinc-200 cursor-pointer transition-all disabled:opacity-50"
+                      >
+                        No
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Security Check Failed</h2>
-                <p className="text-sm text-rose-600 mt-1 font-semibold">{scanResult?.message}</p>
-                <p className="text-[10px] text-slate-400 font-mono mt-4">
-                  Liveness Prob: {scanResult?.liveness_score?.toFixed(3)} · Lockout applied
-                </p>
+              </div>
+            )}
+
+            {/* LOCKED screen */}
+            {kioskActive && scanStatus === "locked" && (
+              <div className="absolute inset-0 glass-overlay flex flex-col items-center justify-center p-6 text-center animate-fadeInUp z-30">
+                <div className="space-y-3.5 max-w-xs animate-fade-in">
+                  <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mx-auto text-rose-600">
+                    <ShieldAlert className="w-5 h-5" />
+                  </div>
+                  <h2 className="text-base font-bold text-zinc-900 tracking-tight">Attendance Locked</h2>
+                  <p className="text-xs text-zinc-500 leading-relaxed font-medium">
+                    {scanResult?.message || "Your attendance is locked for today. Emergency re-entry must be approved by an Admin."}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* SPOOF screen */}
+            {kioskActive && scanStatus === "spoof" && (
+              <div className="absolute inset-0 glass-overlay flex flex-col items-center justify-center p-6 text-center animate-fadeInUp">
+                <div className="space-y-3 max-w-xs animate-fade-in">
+                  <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mx-auto text-rose-600">
+                    <ShieldAlert className="w-5 h-5" />
+                  </div>
+                  <h2 className="text-base font-bold text-zinc-900 tracking-tight">Verification Denied</h2>
+                  <p className="text-xs text-rose-600 font-medium leading-relaxed">{scanResult?.message}</p>
+                  <p className="text-[8.5px] text-zinc-450 font-mono">
+                    Liveness score: {scanResult?.liveness_score?.toFixed(3)}
+                  </p>
+                </div>
               </div>
             )}
 
             {/* UNKNOWN screen */}
             {kioskActive && scanStatus === "unknown" && (
-              <div className="absolute inset-0 bg-amber-50/98 flex flex-col items-center justify-center p-8 text-center animate-fadeInUp">
-                <div className="relative mb-5">
-                  <div className="w-18 h-18 rounded-full bg-amber-500/10 border border-amber-500 flex items-center justify-center">
-                    <HelpCircle className="w-8 h-8 text-amber-600" />
+              <div className="absolute inset-0 glass-overlay flex flex-col items-center justify-center p-6 text-center animate-fadeInUp">
+                <div className="space-y-3 max-w-xs animate-fade-in">
+                  <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto text-amber-600">
+                    <HelpCircle className="w-5 h-5" />
                   </div>
+                  <h2 className="text-base font-bold text-zinc-900 tracking-tight">Not Recognized</h2>
+                  <p className="text-xs text-zinc-500 leading-relaxed">{scanResult?.message || "Face not registered on system database."}</p>
                 </div>
-                <h2 className="text-xl font-bold text-slate-800 tracking-tight">Unknown Identity</h2>
-                <p className="text-xs text-amber-700 mt-1.5 font-medium">{scanResult?.message || "Face not registered on company database."}</p>
-                <p className="text-[10px] text-slate-400 font-mono mt-3">
-                  Match Score: {scanResult?.confidence?.toFixed(3)}
-                </p>
               </div>
             )}
 
             {/* MAINTENANCE screen */}
             {kioskActive && scanStatus === "maintenance" && (
-              <div className="absolute inset-0 bg-zinc-50/98 flex flex-col items-center justify-center p-8 text-center animate-fadeInUp">
-                <div className="relative mb-5">
-                  <div className="w-18 h-18 rounded-full bg-zinc-950/10 border border-zinc-950 flex items-center justify-center animate-pulse">
-                    <ShieldAlert className="w-8 h-8 text-zinc-900" />
+              <div className="absolute inset-0 glass-overlay flex flex-col items-center justify-center p-6 text-center animate-fadeInUp">
+                <div className="space-y-3 max-w-xs animate-fade-in">
+                  <div className="w-12 h-12 rounded-full bg-zinc-100 border border-zinc-200/50 flex items-center justify-center mx-auto text-zinc-800">
+                    <ShieldAlert className="w-5 h-5" />
                   </div>
-                </div>
-                <h2 className="text-2xl font-bold text-slate-800 tracking-tight">System Under Maintenance</h2>
-                <p className="text-xs text-zinc-650 mt-1.5 font-semibold max-w-xs leading-relaxed">
-                  {scanResult?.message || "Biometric logs and active attendance scans are temporarily suspended."}
-                </p>
-                <div className="mt-4">
-                  <span className="inline-flex items-center gap-1.5 px-4.5 py-1.5 rounded-full bg-zinc-100 border border-zinc-200 text-zinc-800 font-mono text-xs font-bold uppercase tracking-wider shadow-sm">
-                    Offline Standby
-                  </span>
+                  <h2 className="text-base font-bold text-zinc-900 tracking-tight">Kiosk Offline</h2>
+                  <p className="text-xs text-zinc-500 leading-relaxed">
+                    {scanResult?.message || "Biometric scans are temporarily suspended."}
+                  </p>
                 </div>
               </div>
             )}
 
             {/* NO_EMPLOYEES screen */}
             {kioskActive && scanStatus === "no_employees" && (
-              <div className="absolute inset-0 bg-amber-50/98 flex flex-col items-center justify-center p-8 text-center animate-fadeInUp">
-                <div className="relative mb-5">
-                  <div className="w-18 h-18 rounded-full bg-amber-500/10 border border-amber-500 flex items-center justify-center">
-                    <UserCheck className="w-8 h-8 text-amber-600" />
+              <div className="absolute inset-0 glass-overlay flex flex-col items-center justify-center p-6 text-center animate-fadeInUp">
+                <div className="space-y-3 max-w-xs animate-fade-in">
+                  <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto text-amber-600">
+                    <UserCheck className="w-5 h-5" />
                   </div>
+                  <h2 className="text-base font-bold text-zinc-900 tracking-tight">Setup Required</h2>
+                  <p className="text-xs text-zinc-555 leading-relaxed">
+                    {scanResult?.message || "Please add employees to the system first."}
+                  </p>
                 </div>
-                <h2 className="text-2xl font-bold text-slate-800 tracking-tight">No Registered Employees</h2>
-                <p className="text-sm text-amber-700 mt-2.5 font-semibold max-w-xs leading-relaxed">
-                  {scanResult?.message || "Please add the employee"}
-                </p>
               </div>
             )}
 
             {/* Frame Info HUD Overlay */}
             {kioskActive && (
               <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between pointer-events-none z-10">
-                <div className="flex items-center gap-1.5 text-[9px] font-mono font-bold text-slate-500 bg-white/90 border border-slate-200 shadow-sm px-3 py-1.5 rounded-xl">
+                <div className="flex items-center gap-1.5 text-[9px] font-mono font-bold text-[var(--text-muted)] bg-[var(--bg-surface)] border border-[var(--border-medium)] shadow-2xs px-3 py-1.5 rounded-lg">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   ONLINE · {cameraLabel.toUpperCase()}
                 </div>
                 <button
                   onClick={(e) => { e.stopPropagation(); stopKiosk(); }}
-                  className="pointer-events-auto text-[10px] font-bold text-rose-600 bg-white border border-rose-200 hover:bg-rose-50 shadow-sm px-3.5 py-1.5 rounded-xl transition-all cursor-pointer"
+                  className="pointer-events-auto text-[9.5px] font-semibold text-rose-500 bg-[var(--bg-surface)] border border-rose-500/20 hover:bg-rose-500/10 shadow-2xs px-3 py-1 rounded-lg transition-all cursor-pointer"
                 >
                   Disable Camera
                 </button>
@@ -467,17 +611,17 @@ export default function KioskPage() {
 
           {/* Active bottom status bar indicators */}
           {kioskActive && (
-            <div className="flex items-center justify-center gap-6 text-[10px] font-mono text-slate-500 font-semibold">
+            <div className="flex items-center justify-center gap-5 text-[9px] font-mono text-slate-400 font-bold uppercase tracking-wider">
               <div className="flex items-center gap-1.5">
-                <div className={`w-1.5 h-1.5 rounded-full ${scanning ? "bg-zinc-950 animate-pulse" : "bg-slate-400"}`} />
-                <span>{scanning ? "SCANNING..." : "ACTIVE STANDBY"}</span>
+                <div className={`w-1.5 h-1.5 rounded-full ${scanning ? "bg-zinc-950 animate-pulse" : "bg-zinc-350"}`} />
+                <span>{scanning ? "Scanning" : "Standby"}</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <Shield className="w-3.5 h-3.5 text-zinc-700" />
-                <span>Anti-Spoofing Protocol</span>
+              <span className="text-zinc-200">|</span>
+              <div className="flex items-center gap-1">
+                <span>Anti-Spoof Active</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <Camera className="w-3.5 h-3.5 text-zinc-700" />
+              <span className="text-zinc-200">|</span>
+              <div className="flex items-center gap-1">
                 <span>Auto-indexing</span>
               </div>
             </div>
@@ -486,9 +630,9 @@ export default function KioskPage() {
       </main>
 
       {/* ─── Footer ─── */}
-      <footer className="relative z-10 h-10 border-t border-[var(--border-medium)] flex items-center justify-center bg-white shadow-inner">
-        <p className="text-[9.5px] font-mono font-bold text-slate-400 tracking-wider">
-          NETRAID SECURE TERMINAL GATEWAY v1.0.0 · MOCKED OFFLINE ENGINE
+      <footer className="relative z-10 h-10 border-t border-[var(--border-medium)] flex items-center justify-center kiosk-footer">
+        <p className="text-[9.5px] font-mono font-bold text-[var(--text-muted)] tracking-wider">
+          NETRAID SECURE TERMINAL GATEWAY v1.0.0 · {engineMode}
         </p>
       </footer>
     </div>

@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import SidebarLayout from "@/components/SidebarLayout";
+import { useToast } from "@/app/utils/toast";
 import { fetchApi, parseDateTime, getLocalDateString, getBackendUrl } from "@/app/utils/api";
 import { Clock, Search, Edit3, Calendar, Activity, AlertTriangle, X, CheckCircle2, ChevronDown, Check } from "lucide-react";
 
@@ -34,7 +35,7 @@ function EmployeeAvatar({ emp, avatarColor, size = "md" }: { emp: any; avatarCol
   const [error, setError] = useState(false);
   const hasFrontImage = emp.images?.some((img: any) => img.pose_type.toLowerCase() === "front");
 
-  const sc = size === "sm" ? "w-7.5 h-7.5 text-[10px]" : "w-8 h-8 text-[11px]";
+  const sizeCls = size === "sm" ? "w-8 h-8 text-[10px]" : "w-10 h-10 text-[11px]";
 
   if (hasFrontImage && !error) {
     const baseUrl = getBackendUrl().replace("/api/v1", "");
@@ -42,14 +43,14 @@ function EmployeeAvatar({ emp, avatarColor, size = "md" }: { emp: any; avatarCol
       <img
         src={`${baseUrl}/uploads/${emp.employee_id}/front.jpg`}
         alt={emp.name}
-        className={`${sc.split(" ")[0]} ${sc.split(" ")[1]} rounded-lg object-cover border border-zinc-250 shadow-sm shrink-0`}
+        className={`${size === "sm" ? "w-8 h-8" : "w-10 h-10"} rounded-lg object-cover border border-zinc-250 shadow-sm shrink-0`}
         onError={() => setError(true)}
       />
     );
   }
 
   return (
-    <div className={`${sc} rounded-lg bg-gradient-to-br ${avatarColor} flex items-center justify-center shrink-0 border font-bold shadow-sm`}>
+    <div className={`${sizeCls} rounded-lg bg-gradient-to-br ${avatarColor} flex items-center justify-center shrink-0 border font-bold shadow-sm`}>
       {emp.name.charAt(0).toUpperCase()}
     </div>
   );
@@ -57,6 +58,7 @@ function EmployeeAvatar({ emp, avatarColor, size = "md" }: { emp: any; avatarCol
 
 export default function AttendancePage() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>("feed");
   const [selectedDate, setSelectedDate] = useState(getLocalDateString());
   const [search, setSearch] = useState("");
@@ -66,6 +68,7 @@ export default function AttendancePage() {
   const [checkInTime, setCheckInTime] = useState("");
   const [checkOutTime, setCheckOutTime] = useState("");
   const [statusVal, setStatusVal] = useState("Present");
+  const [emergencyAllowed, setEmergencyAllowed] = useState(false);
 
   const { data: departments } = useQuery({
     queryKey: ["departments"],
@@ -95,7 +98,7 @@ export default function AttendancePage() {
       setShowEditDialog(false);
       setEditingRecord(null);
     },
-    onError: (err: any) => alert(err.message || "Failed to update attendance.")
+    onError: (err: any) => toast.error(err.message || "Failed to update attendance.")
   });
 
   const handleEditClick = (record: any) => {
@@ -109,6 +112,7 @@ export default function AttendancePage() {
     setCheckInTime(fmt(record.check_in));
     setCheckOutTime(fmt(record.check_out));
     setStatusVal(record.status);
+    setEmergencyAllowed(record.emergency_allowed || false);
     setShowEditDialog(true);
   };
 
@@ -119,12 +123,17 @@ export default function AttendancePage() {
       if (!t) return null;
       const [yr, mo, dy] = selectedDate.split("-").map(Number);
       const [hr, mn] = t.split(":").map(Number);
-      const localDate = new Date(yr, mo - 1, dy, hr, mn, 0);
-      return localDate.toISOString();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${yr}-${pad(mo)}-${pad(dy)}T${pad(hr)}:${pad(mn)}:00`;
     };
     updateMutation.mutate({
       id: editingRecord.id,
-      payload: { status: statusVal, check_in: combine(checkInTime), check_out: combine(checkOutTime) }
+      payload: { 
+        status: statusVal, 
+        check_in: combine(checkInTime), 
+        check_out: combine(checkOutTime),
+        emergency_allowed: emergencyAllowed
+      }
     });
   };
 
@@ -152,7 +161,6 @@ export default function AttendancePage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-white/5">
           <div>
             <h1 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">Attendance Ledger</h1>
-            <p className="text-xs text-slate-500 mt-0.5">Audit daily presence ledger records and raw biometric authentication logs.</p>
           </div>
           
           {/* Tab switcher */}
@@ -310,12 +318,12 @@ export default function AttendancePage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th className="text-left py-3.5 px-5">Timestamp</th>
-                    <th className="text-left py-3.5 px-5">Identity Profile</th>
-                    <th className="text-left py-3.5 px-5">Terminal</th>
-                    <th className="text-left py-3.5 px-5">Confidence</th>
-                    <th className="text-left py-3.5 px-5">Liveness</th>
-                    <th className="text-left py-3.5 px-5">Result</th>
+                    <th className="text-left py-3.5 px-5 whitespace-nowrap">Timestamp</th>
+                    <th className="text-left py-3.5 px-5 whitespace-nowrap">Identity Profile</th>
+                    <th className="text-left py-3.5 px-5 whitespace-nowrap">Terminal</th>
+                    <th className="text-left py-3.5 px-5 whitespace-nowrap">Confidence</th>
+                    <th className="text-left py-3.5 px-5 whitespace-nowrap">Liveness</th>
+                    <th className="text-left py-3.5 px-5 whitespace-nowrap">Result</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -344,45 +352,93 @@ export default function AttendancePage() {
                       const avatarColor = log.employee ? avatarColors[log.employee.id % avatarColors.length] : "";
                       return (
                         <tr key={log.id}>
-                          <td className="py-3.5 px-5 font-mono text-[11px] text-zinc-500">
-                            {parseDateTime(log.timestamp)?.toLocaleDateString([], { month: "short", day: "numeric" })} {parseDateTime(log.timestamp)?.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"})}
+                          <td className="py-3.5 px-5 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                            <div className="font-semibold text-slate-700">
+                              {parseDateTime(log.timestamp)?.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}
+                            </div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">
+                              {parseDateTime(log.timestamp)?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                            </div>
                           </td>
-                          <td className="py-3.5 px-5">
+                          <td className="py-3.5 px-5 whitespace-nowrap">
                             {log.employee ? (
                               <div className="flex items-center gap-2.5">
                                 <EmployeeAvatar emp={log.employee} avatarColor={avatarColor} size="sm" />
                                 <div>
-                                  <p className="text-[12.5px] font-semibold text-[var(--text-primary)]">{log.employee.name}</p>
-                                  <p className="text-[10px] text-slate-500 font-mono mt-0.5">{log.employee.employee_id}</p>
+                                  <p className="text-[12.5px] font-semibold text-slate-900 leading-none">{log.employee.name}</p>
+                                  <p className="text-[10px] text-slate-400 font-mono mt-1 leading-none">{log.employee.employee_id}</p>
                                 </div>
                               </div>
                             ) : (
-                              <span className="text-slate-500 text-[12.5px] italic">Unknown Identity</span>
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center border border-dashed border-slate-200 shrink-0">
+                                  <AlertTriangle className="w-3.5 h-3.5 text-slate-400" />
+                                </div>
+                                <div>
+                                  <p className="text-[12.5px] font-medium text-slate-400 italic leading-none">Unknown Identity</p>
+                                  <p className="text-[10px] text-slate-350 font-mono mt-1 leading-none">External Scan</p>
+                                </div>
+                              </div>
                             )}
                           </td>
-                          <td className="py-3.5 px-5 text-[11px] text-slate-400 font-mono">{log.camera}</td>
-                          <td className="py-3.5 px-5 font-mono text-[11.5px]">
+                          <td className="py-3.5 px-5 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-50 border border-slate-100 rounded-lg text-[10px] font-mono text-slate-600 font-semibold uppercase tracking-wider">
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
+                              {log.camera}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-5 font-mono text-[11.5px] whitespace-nowrap">
                             {log.confidence ? (
-                              <span className={log.confidence >= 0.60 ? "text-[var(--text-primary)]" : "text-amber-500 font-semibold"}>
-                                {log.confidence.toFixed(3)}
-                              </span>
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${log.confidence >= 0.75 ? "bg-emerald-500" : log.confidence >= 0.60 ? "bg-amber-500" : "bg-rose-500"}`} />
+                                  <span className="font-semibold text-slate-700">
+                                    {(log.confidence * 100).toFixed(1)}%
+                                  </span>
+                                </div>
+                                <div className="w-16 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                  <div 
+                                    className={`h-full rounded-full ${log.confidence >= 0.75 ? "bg-emerald-500" : log.confidence >= 0.60 ? "bg-amber-500" : "bg-rose-500"}`}
+                                    style={{ width: `${log.confidence * 100}%` }}
+                                  />
+                                </div>
+                              </div>
                             ) : (
-                              <span className="text-slate-600">—</span>
+                              <span className="text-slate-400 italic">—</span>
                             )}
                           </td>
-                          <td className="py-3.5 px-5 font-mono text-[11.5px]">
+                          <td className="py-3.5 px-5 font-mono text-[11.5px] whitespace-nowrap">
                             {log.liveness_score ? (
-                              <span className={log.liveness_score < 0.80 ? "text-rose-400 font-semibold" : "text-emerald-400"}>
-                                {log.liveness_score.toFixed(3)}
-                              </span>
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${log.liveness_score >= 0.85 ? "bg-emerald-500" : log.liveness_score >= 0.70 ? "bg-amber-500" : "bg-rose-500"}`} />
+                                  <span className="font-semibold text-slate-700">
+                                    {(log.liveness_score * 100).toFixed(1)}%
+                                  </span>
+                                </div>
+                                <div className="w-16 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                  <div 
+                                    className={`h-full rounded-full ${log.liveness_score >= 0.85 ? "bg-emerald-500" : log.liveness_score >= 0.70 ? "bg-amber-500" : "bg-rose-500"}`}
+                                    style={{ width: `${log.liveness_score * 100}%` }}
+                                  />
+                                </div>
+                              </div>
                             ) : (
-                              <span className="text-slate-600">—</span>
+                              <span className="text-slate-400 italic">—</span>
                             )}
                           </td>
-                          <td className="py-3.5 px-5">
-                            <span className={`badge ${isSuccess ? "badge-emerald" : isSpoof ? "badge-rose animate-pulse" : "badge-amber"} flex items-center gap-1.5 w-fit`}>
-                              {isSpoof && <AlertTriangle className="w-3 h-3 text-rose-400" />}
-                              {isSuccess ? "Matched" : isSpoof ? "Spoof Block" : log.status}
+                          <td className="py-3.5 px-5 whitespace-nowrap">
+                            <span className={`badge ${
+                              isSuccess 
+                                ? "badge-emerald" 
+                                : isSpoof 
+                                  ? "badge-rose animate-pulse" 
+                                  : log.status.toLowerCase().includes("lock") 
+                                    ? "badge-rose" 
+                                    : "badge-amber"
+                            } flex items-center gap-1.5 w-fit font-bold`}>
+                              {isSpoof && <AlertTriangle className="w-3 h-3 text-rose-500" />}
+                              {isSuccess ? "Matched" : isSpoof ? "Liveness Failed" : log.status}
                             </span>
                           </td>
                         </tr>
@@ -437,6 +493,21 @@ export default function AttendancePage() {
                   </select>
                   <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
                 </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-zinc-55 border border-zinc-150 space-y-1 mt-2">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                  <input 
+                    type="checkbox"
+                    checked={emergencyAllowed}
+                    onChange={() => setEmergencyAllowed(!emergencyAllowed)}
+                    className="w-4 h-4 rounded border-slate-350 text-slate-950 bg-white focus:ring-slate-500/50 cursor-pointer"
+                  />
+                  <span className="text-[12px] font-bold text-slate-800">Allow Emergency Re-entry (Bypass Lock)</span>
+                </label>
+                <p className="text-[10px] text-slate-500 leading-normal pl-6.5">
+                  Allows employee to scan again at the kiosk today after check-out. The lock will automatically re-apply upon their next scan.
+                </p>
               </div>
               
               <div className="flex justify-end gap-2.5 pt-3 border-t border-white/5">

@@ -58,11 +58,26 @@ async def upload_face_image(
         raise HTTPException(status_code=400, detail=f"Face detection confidence too low ({confidence:.2f}). Please upload a clearer image.")
 
     # Optional liveness check on enrollment (preventing enroll spoofing)
-    liveness_score, is_live = face_engine.check_liveness(img, face["bbox"])
-    # In enrollment we want to warn or prevent spoofing. Let's allow it but log a warning if is_live is False,
-    # or block. For highest security, we enforce liveness on enrollment!
-    if not is_live and not face_engine.mock_mode:
-         raise HTTPException(status_code=400, detail=f"Liveness detection failed ({liveness_score:.2f}). Please upload a real, non-spoofed image.")
+    liveness_enabled_setting = crud.get_setting_by_key(db, "ENROLLMENT_LIVENESS_CHECK")
+    liveness_enabled = liveness_enabled_setting.value.lower() == "true" if liveness_enabled_setting else True
+
+    liveness_threshold_setting = crud.get_setting_by_key(db, "ENROLLMENT_LIVENESS_THRESHOLD")
+    liveness_threshold = float(liveness_threshold_setting.value) if liveness_threshold_setting else 0.70
+
+    liveness_score, is_live = face_engine.check_liveness(img, face["bbox"], threshold=liveness_threshold)
+    
+    # In enrollment we want to prevent spoofing. However, liveness models are calibrated for direct frontal views.
+    # Profile/tilted views (left, right, up, down) often yield lower liveness scores and cause false rejections.
+    # Therefore, we strictly enforce liveness on the "front" pose only, and bypass it for other poses.
+    if liveness_enabled and not is_live and not face_engine.mock_mode:
+        if pose_type.strip().lower() == "front":
+            raise HTTPException(status_code=400, detail=f"Liveness check failed ({liveness_score:.2f}). Please upload a real photo.")
+        else:
+            logger.warning(
+                f"Liveness check failed during enrollment for non-frontal pose '{pose_type}' "
+                f"(score: {liveness_score:.2f}, threshold: {liveness_threshold:.2f}). "
+                f"Bypassing check to prevent false rejection."
+            )
 
     # Align face (112x112)
     aligned_face = face_engine.align_face(img, face["landmarks"])

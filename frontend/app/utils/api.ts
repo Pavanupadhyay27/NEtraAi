@@ -124,9 +124,10 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}): Pro
 
 export function parseDateTime(dateStr: string | null | undefined): Date | null {
   if (!dateStr) return null;
-  // If no offset/timezone indicator, append 'Z' to treat as UTC from database
+  // If the date string has a timezone, parse it as-is.
+  // Otherwise, treat it as a local ISO string (do NOT append 'Z', as backend stores local time).
   const hasTimezone = dateStr.endsWith("Z") || dateStr.includes("+") || /-\d{2}:\d{2}$/.test(dateStr);
-  const formattedStr = hasTimezone ? dateStr : `${dateStr}Z`;
+  const formattedStr = hasTimezone ? dateStr : dateStr.replace(" ", "T");
   return new Date(formattedStr);
 }
 

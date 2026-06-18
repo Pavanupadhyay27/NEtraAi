@@ -35,6 +35,14 @@ def _publish_log(log_obj, employee=None):
                 "employee_id": employee.employee_id,
                 "designation": employee.designation,
                 "department": employee.department.name if employee.department else "General",
+                "images": [
+                    {
+                        "id": img.id,
+                        "file_path": img.file_path,
+                        "pose_type": img.pose_type,
+                        "created_at": img.created_at.isoformat() if img.created_at else None
+                    } for img in employee.images
+                ]
             }
         payload = {
             "id": log_obj.id,
@@ -44,6 +52,7 @@ def _publish_log(log_obj, employee=None):
             "liveness_score": log_obj.liveness_score,
             "is_spoof": log_obj.is_spoof,
             "status": log_obj.status,
+            "image_path": log_obj.image_path,
             "employee": emp_data,
         }
         event_bus.publish_scan_event(payload)
@@ -53,6 +62,7 @@ def _publish_log(log_obj, employee=None):
 class KioskScanRequest(BaseModel):
     image: str = Field(..., description="Base64 encoded image frame (JPEG/PNG data URL)")
     camera: str = Field("Main Kiosk", description="Identifier of the kiosk scanner device")
+    confirm_checkout: bool = Field(False, description="Whether the check-out is confirmed by the employee")
 
 @router.post("/scan")
 def scan_face(
@@ -118,7 +128,7 @@ def scan_face(
     landmarks = face["landmarks"]
     
     # 3. Liveness Check
-    liveness_score, is_live = face_engine.check_liveness(img, bbox)
+    liveness_score, is_live = face_engine.check_liveness(img, bbox, threshold=liveness_threshold)
     if not is_live and not face_engine.mock_mode:
         # Save spoof log
         log_entry = crud.create_attendance_log(
@@ -134,7 +144,7 @@ def scan_face(
         _publish_log(log_entry)
         return {
             "status": "spoof_detected",
-            "message": "Spoofing attack detected! Verification denied.",
+            "message": "Liveness check failed! Verification denied.",
             "confidence": float(confidence),
             "liveness_score": float(liveness_score),
             "should_retry": False
@@ -152,28 +162,24 @@ def scan_face(
     if not all_embeddings:
         match_result = None
     else:
-        best_emb = None
-        best_dist = 10.0
-        
-        for emb_record in all_embeddings:
-            try:
-                # cached arrays are already numpy arrays
-                db_vec = emb_record["embedding"]
-                sim = face_engine.cosine_similarity(embedding, db_vec)
-                dist = 1.0 - sim
-                if dist < best_dist:
-                    best_dist = dist
-                    class MockEmb:
-                        id = emb_record["id"]
-                        employee_id = emb_record["employee_id"]
-                    best_emb = MockEmb()
-            except Exception as e:
-                logger.error(f"Error comparing local vector: {e}")
-                continue
-                
-        if best_emb is not None:
-            match_result = (best_emb, best_dist)
-        else:
+        try:
+            # High-performance vectorized search using NumPy matrix multiplication.
+            # ArcFace embeddings are L2-normalized, so cosine similarity is just the dot product.
+            embeddings_matrix = np.stack([emb["embedding"] for emb in all_embeddings])  # shape (N, 512)
+            similarities = np.dot(embeddings_matrix, embedding)  # shape (N,)
+            best_idx = int(np.argmax(similarities))
+            best_similarity = float(similarities[best_idx])
+            
+            best_emb_record = all_embeddings[best_idx]
+            class MockEmb:
+                id = best_emb_record["id"]
+                employee_id = best_emb_record["employee_id"]
+            
+            # distance = 1 - similarity
+            best_dist = 1.0 - best_similarity
+            match_result = (MockEmb(), best_dist)
+        except Exception as e:
+            logger.error(f"Error in vectorized face matching: {e}")
             match_result = None
     
     if not match_result:
@@ -248,74 +254,300 @@ def scan_face(
     else:
         _last_greeted_employee_id = employee.id
 
-    # 6. Mark Attendance
-    attendance_record = crud.mark_kiosk_attendance(
-        db=db,
-        employee_id=employee.id,
-        timestamp=now,
-        camera=payload.camera,
-        confidence=similarity
-    )
-    
-    # Save log
-    log_entry = crud.create_attendance_log(
-        db=db,
-        employee_id=employee.id,
-        camera=payload.camera,
-        confidence=similarity,
-        liveness_score=liveness_score,
-        is_spoof=False,
-        status="Match Success",
-        timestamp=now
-    )
-    _publish_log(log_entry, employee)
-    
-    # 7. Generate Greeting Text
-    current_hour = now.hour
-    if 5 <= current_hour < 12:
-        salutation = "Good Morning"
-        icon = "☀️"
-    elif 12 <= current_hour < 17:
-        salutation = "Good Afternoon"
-        icon = "🌤️"
-    else:
-        salutation = "Good Evening"
-        icon = "🌙"
-        
-    is_checkout = attendance_record.check_out is not None
-    action_text = "Checkout Recorded Successfully" if is_checkout else "Attendance Recorded Successfully"
-    closing_text = "Have a Great Day" if not is_checkout else "Have a Relaxing Evening"
-    
-    greeting_text = f"Welcome {employee.name}. {salutation}. {action_text}. {closing_text}."
-    
-    # URL for speech audio download
-    tts_url = f"{settings.API_V1_STR}/kiosk/tts?text={urllib.parse.quote(greeting_text)}" if (voice_enabled and should_greet) else None
+    from sqlalchemy import select, and_
+    from datetime import time, timedelta
 
-    return {
-        "status": "success",
-        "employee": {
-            "id": employee.id,
-            "employee_id": employee.employee_id,
-            "name": employee.name,
-            "designation": employee.designation,
-            "department": employee.department.name if employee.department else "General"
-        },
-        "attendance": {
-            "date": str(attendance_record.date),
-            "check_in": str(attendance_record.check_in.time().strftime("%H:%M:%S")) if attendance_record.check_in else None,
-            "check_out": str(attendance_record.check_out.time().strftime("%H:%M:%S")) if attendance_record.check_out else None,
-            "status": attendance_record.status
-        },
-        "confidence": similarity,
-        "liveness_score": liveness_score,
-        "greeting": {
-            "title": f"Welcome, {employee.name}",
-            "subtitle": f"{salutation} {icon}",
-            "detail": action_text,
-            "closing": closing_text
-        },
-        "tts_url": tts_url
-    }
+    # 6. Check state of attendance
+    stmt = select(models.Attendance).where(
+        and_(
+            models.Attendance.employee_id == employee.id,
+            models.Attendance.date == now.date()
+        )
+    )
+    attendance_record = db.execute(stmt).scalar_one_or_none()
+
+    if not attendance_record:
+        # --- First scan of the day: Check-In ---
+        start_time_setting = crud.get_setting_by_key(db, "CHECK_IN_START")
+        grace_period_setting = crud.get_setting_by_key(db, "GRACE_PERIOD_MINUTES")
+        start_str = start_time_setting.value if start_time_setting else "09:00"
+        grace_mins = int(grace_period_setting.value) if grace_period_setting else 15
+        try:
+            hr, mn = map(int, start_str.split(":"))
+            check_in_deadline = datetime.combine(now.date(), time(hr, mn)) + timedelta(minutes=grace_mins)
+        except Exception:
+            check_in_deadline = datetime.combine(now.date(), time(9, 15))
+
+        is_late = now > check_in_deadline
+        status = "Late" if is_late else "Present"
+
+        attendance_record = models.Attendance(
+            employee_id=employee.id,
+            date=now.date(),
+            check_in=now,
+            late_arrival=is_late,
+            status=status
+        )
+        db.add(attendance_record)
+        db.commit()
+        db.refresh(attendance_record)
+
+        # Save log
+        log_entry = crud.create_attendance_log(
+            db=db,
+            employee_id=employee.id,
+            camera=payload.camera,
+            confidence=similarity,
+            liveness_score=liveness_score,
+            is_spoof=False,
+            status="Match Success",
+            timestamp=now
+        )
+        _publish_log(log_entry, employee)
+
+        # Generate check-in greeting based on timing
+        current_hour = now.hour
+        if 5 <= current_hour < 12:
+            salutation = "Good Morning"
+            icon = "☀️"
+        elif 12 <= current_hour < 17:
+            salutation = "Good Afternoon"
+            icon = "🌤️"
+        else:
+            salutation = "Good Evening"
+            icon = "🌙"
+
+        greeting_text = f"Welcome {employee.name}. {salutation}. Attendance Recorded Successfully. Have a Great Day."
+        tts_url = f"{settings.API_V1_STR}/kiosk/tts?text={urllib.parse.quote(greeting_text)}" if (voice_enabled and should_greet) else None
+
+        return {
+            "status": "success",
+            "employee": {
+                "id": employee.id,
+                "employee_id": employee.employee_id,
+                "name": employee.name,
+                "designation": employee.designation,
+                "department": employee.department.name if employee.department else "General"
+            },
+            "attendance": {
+                "date": str(attendance_record.date),
+                "check_in": str(attendance_record.check_in.time().strftime("%H:%M:%S")) if attendance_record.check_in else None,
+                "check_out": None,
+                "status": attendance_record.status,
+                "working_hours": 0.0
+            },
+            "confidence": similarity,
+            "liveness_score": liveness_score,
+            "greeting": {
+                "title": f"Welcome, {employee.name}",
+                "subtitle": f"{salutation} {icon}",
+                "detail": "Attendance Recorded Successfully",
+                "closing": "Have a Great Day"
+            },
+            "tts_url": tts_url
+        }
+
+    else:
+        # --- Attendance record exists for today ---
+        if attendance_record.check_out is not None:
+            # Already checked out -> Locked!
+            # Check if emergency bypass is enabled
+            if getattr(attendance_record, "emergency_allowed", False):
+                # Emergency check-in!
+                attendance_record.check_out = None
+                attendance_record.emergency_allowed = False
+                db.commit()
+
+                log_entry = crud.create_attendance_log(
+                    db=db,
+                    employee_id=employee.id,
+                    camera=payload.camera,
+                    confidence=similarity,
+                    liveness_score=liveness_score,
+                    is_spoof=False,
+                    status="Match Success",
+                    timestamp=now
+                )
+                _publish_log(log_entry, employee)
+
+                current_hour = now.hour
+                if 5 <= current_hour < 12:
+                    salutation = "Good Morning"
+                    icon = "☀️"
+                elif 12 <= current_hour < 17:
+                    salutation = "Good Afternoon"
+                    icon = "🌤️"
+                else:
+                    salutation = "Good Evening"
+                    icon = "🌙"
+
+                greeting_text = f"Welcome {employee.name}. {salutation}. Emergency Attendance Recorded. Have a Great Day."
+                tts_url = f"{settings.API_V1_STR}/kiosk/tts?text={urllib.parse.quote(greeting_text)}" if (voice_enabled and should_greet) else None
+
+                return {
+                    "status": "success",
+                    "employee": {
+                        "id": employee.id,
+                        "employee_id": employee.employee_id,
+                        "name": employee.name,
+                        "designation": employee.designation,
+                        "department": employee.department.name if employee.department else "General"
+                    },
+                    "attendance": {
+                        "date": str(attendance_record.date),
+                        "check_in": str(attendance_record.check_in.time().strftime("%H:%M:%S")) if attendance_record.check_in else None,
+                        "check_out": None,
+                        "status": attendance_record.status,
+                        "working_hours": 0.0
+                    },
+                    "confidence": similarity,
+                    "liveness_score": liveness_score,
+                    "greeting": {
+                        "title": f"Welcome back, {employee.name}",
+                        "subtitle": f"{salutation} {icon}",
+                        "detail": "Emergency Check-In Recorded",
+                        "closing": "Have a Great Day"
+                    },
+                    "tts_url": tts_url
+                }
+            else:
+                # Locked for the day!
+                log_entry = crud.create_attendance_log(
+                    db=db,
+                    employee_id=employee.id,
+                    camera=payload.camera,
+                    confidence=similarity,
+                    liveness_score=liveness_score,
+                    is_spoof=False,
+                    status="Attendance Locked",
+                    timestamp=now
+                )
+                _publish_log(log_entry, employee)
+
+                return {
+                    "status": "locked",
+                    "message": "Attendance locked until tomorrow. Emergency entry must be approved by Admin.",
+                    "should_retry": False
+                }
+
+        else:
+            # Checked in, but not checked out yet -> Prompt for check-out
+            if not payload.confirm_checkout:
+                # Ask user if they want to check out
+                # Calculate working hours so far
+                diff = now - attendance_record.check_in
+                hours = round(diff.total_seconds() / 3600.0, 2)
+                
+                # Format: only say "Thank you" before checkout confirmation
+                greeting_text = "Thank you"
+                tts_url = f"{settings.API_V1_STR}/kiosk/tts?text={urllib.parse.quote(greeting_text)}" if (voice_enabled and should_greet) else None
+
+                return {
+                    "status": "ask_checkout",
+                    "employee": {
+                        "id": employee.id,
+                        "employee_id": employee.employee_id,
+                        "name": employee.name,
+                        "designation": employee.designation,
+                        "department": employee.department.name if employee.department else "General"
+                    },
+                    "attendance": {
+                        "date": str(attendance_record.date),
+                        "check_in": str(attendance_record.check_in.time().strftime("%H:%M:%S")),
+                        "status": attendance_record.status
+                    },
+                    "working_hours_so_far": hours,
+                    "confidence": similarity,
+                    "liveness_score": liveness_score,
+                    "greeting": {
+                        "title": "Identity Verified",
+                        "subtitle": "Thank You",
+                        "detail": "Tap Yes to confirm Check Out",
+                        "closing": f"Duration: {hours} hours"
+                    },
+                    "tts_url": tts_url
+                }
+            else:
+                # User confirmed checkout!
+                attendance_record.check_out = now
+                diff = now - attendance_record.check_in
+                hours = round(diff.total_seconds() / 3600.0, 2)
+                attendance_record.working_hours = hours
+
+                # Early departure and overtime
+                end_time_setting = crud.get_setting_by_key(db, "CHECK_OUT_END")
+                end_str = end_time_setting.value if end_time_setting else "17:00"
+                try:
+                    ehr, emn = map(int, end_str.split(":"))
+                    departure_deadline = datetime.combine(now.date(), time(ehr, emn))
+                except Exception:
+                    departure_deadline = datetime.combine(now.date(), time(17, 0))
+                attendance_record.early_departure = now < departure_deadline
+                attendance_record.overtime = max(0.0, round(hours - 8.0, 2))
+
+                # Update status based on hours
+                if hours < 8.0:
+                    attendance_record.status = "Half Day"
+                else:
+                    if attendance_record.status in ["Half Day", "Absent"]:
+                        attendance_record.status = "Present"
+
+                db.commit()
+                db.refresh(attendance_record)
+
+                log_entry = crud.create_attendance_log(
+                    db=db,
+                    employee_id=employee.id,
+                    camera=payload.camera,
+                    confidence=similarity,
+                    liveness_score=liveness_score,
+                    is_spoof=False,
+                    status="Match Success",
+                    timestamp=now
+                )
+                _publish_log(log_entry, employee)
+
+                # Play timing greeting after confirmation
+                current_hour = now.hour
+                if 5 <= current_hour < 12:
+                    salutation = "Good Morning"
+                    icon = "☀️"
+                elif 12 <= current_hour < 17:
+                    salutation = "Good Afternoon"
+                    icon = "🌤️"
+                else:
+                    salutation = "Good Evening"
+                    icon = "🌙"
+
+                greeting_text = f"Welcome {employee.name}. {salutation}. Checkout Recorded Successfully. Have a Relaxing Evening."
+                tts_url = f"{settings.API_V1_STR}/kiosk/tts?text={urllib.parse.quote(greeting_text)}" if (voice_enabled and should_greet) else None
+
+                return {
+                    "status": "success",
+                    "employee": {
+                        "id": employee.id,
+                        "employee_id": employee.employee_id,
+                        "name": employee.name,
+                        "designation": employee.designation,
+                        "department": employee.department.name if employee.department else "General"
+                    },
+                    "attendance": {
+                        "date": str(attendance_record.date),
+                        "check_in": str(attendance_record.check_in.time().strftime("%H:%M:%S")),
+                        "check_out": str(attendance_record.check_out.time().strftime("%H:%M:%S")),
+                        "status": attendance_record.status,
+                        "working_hours": hours
+                    },
+                    "confidence": similarity,
+                    "liveness_score": liveness_score,
+                    "greeting": {
+                        "title": f"Goodbye, {employee.name}",
+                        "subtitle": f"{salutation} {icon}",
+                        "detail": "Checkout Recorded Successfully",
+                        "closing": f"Worked: {hours} hours"
+                    },
+                    "tts_url": tts_url
+                }
 
 @router.get("/tts")
 def play_tts(text: str):

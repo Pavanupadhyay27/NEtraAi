@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import SidebarLayout from "@/components/SidebarLayout";
 import { fetchApi, getLocalDateString } from "@/app/utils/api";
+import { useToast } from "@/app/utils/toast";
 import { 
   FileText, Calendar, Download, Loader2, CheckCircle2, 
   FileSpreadsheet, FileDown, CalendarDays, User, Layers, ChevronDown, Check
@@ -23,6 +24,7 @@ const FORMATS = [
 ];
 
 export default function ReportsPage() {
+  const { toast } = useToast();
   const [reportType, setReportType] = useState("daily");
   const [format, setFormat] = useState("xlsx");
   const [startDate, setStartDate] = useState(() => {
@@ -55,7 +57,7 @@ export default function ReportsPage() {
       setSuccess(true);
       setTimeout(() => setSuccess(false), 5000);
     } catch (err: any) {
-      alert(err.message || "Failed to generate report.");
+      toast.error(err.message || "Failed to generate report.");
     } finally {
       setExporting(false);
     }
@@ -70,9 +72,6 @@ export default function ReportsPage() {
         {/* Header */}
         <div className="pb-5 border-b border-white/5">
           <h1 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">Reports & Export</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Compile and generate compliance-ready corporate records in PDF, Excel, or CSV format.
-          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -84,7 +83,6 @@ export default function ReportsPage() {
               </div>
               <div>
                 <h2 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">Export Parameters</h2>
-                <p className="text-[10px] text-slate-500 mt-0.5">Specify report criteria and format</p>
               </div>
             </div>
 

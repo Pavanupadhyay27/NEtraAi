@@ -8,7 +8,7 @@ def test_read_employees(mock_get, authenticated_client):
         employee_id="EMP101",
         name="John Doe",
         email="john@netraid.ai",
-        phone="1234567890",
+        phone="9876543210",
         designation="Software Engineer",
         joining_date="2026-06-10",
         status="Active"
@@ -30,11 +30,15 @@ def test_read_employee_not_found(mock_get_id, authenticated_client):
 
 @patch("app.api.v1.employees.crud.get_employee_by_uuid")
 @patch("app.api.v1.employees.crud.get_employee_by_email")
+@patch("app.api.v1.employees.crud.get_employee_by_name")
+@patch("app.api.v1.employees.crud.get_employee_by_phone")
 @patch("app.api.v1.employees.crud.create_employee")
 @patch("app.api.v1.employees.crud.create_audit_log")
-def test_create_employee(mock_audit, mock_create, mock_get_email, mock_get_uuid, authenticated_client):
+def test_create_employee(mock_audit, mock_create, mock_get_phone, mock_get_name, mock_get_email, mock_get_uuid, authenticated_client):
     mock_get_uuid.return_value = None
     mock_get_email.return_value = None
+    mock_get_name.return_value = None
+    mock_get_phone.return_value = None
     
     mock_employee = models.Employee(
         id=2,
@@ -50,7 +54,7 @@ def test_create_employee(mock_audit, mock_create, mock_get_email, mock_get_uuid,
         "employee_id": "EMP102",
         "name": "Jane Smith",
         "email": "jane@netraid.ai",
-        "phone": "9876543210",
+        "phone": "9876543211",
         "designation": "HR Manager",
         "joining_date": "2026-06-10",
         "status": "Active",
