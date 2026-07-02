@@ -1,10 +1,11 @@
-from sqlalchemy import text
+from sqlalchemy import text, select
 from sqlalchemy.orm import Session
 from app.core.database import Base, engine
 from app.models import models
 from app.crud import crud
 from app.schemas import schemas
 from app.core.config import settings
+from datetime import time
 import logging
 
 logger = logging.getLogger("InitDB")
@@ -19,6 +20,20 @@ def init_db(db: Session):
     # Create all tables if they don't exist
     logger.info("Creating all database tables if they do not exist...")
     Base.metadata.create_all(bind=engine)
+
+    # Ensure HNSW index exists on PostgreSQL
+    if db.bind.dialect.name == "postgresql":
+        try:
+            logger.info("Ensuring face_embeddings pgvector HNSW index is present...")
+            db.execute(text("""
+                CREATE INDEX IF NOT EXISTS face_embeddings_hnsw_idx 
+                ON face_embeddings 
+                USING hnsw (embedding vector_cosine_ops);
+            """))
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.warning(f"Could not create HNSW index: {e}")
 
     # Ensure emergency_allowed column exists
     try:
@@ -37,6 +52,39 @@ def init_db(db: Session):
         logger.info("Adding image_path column to attendance_logs table...")
         db.execute(text("ALTER TABLE attendance_logs ADD COLUMN image_path VARCHAR(255) DEFAULT NULL"))
         db.commit()
+
+    # Ensure shift_id column exists in employees table
+    try:
+        db.execute(text("SELECT shift_id FROM employees LIMIT 1"))
+    except Exception:
+        db.rollback()
+        logger.info("Adding shift_id column to employees table...")
+        db.execute(text("ALTER TABLE employees ADD COLUMN shift_id INTEGER REFERENCES shifts(id) DEFAULT NULL"))
+        db.commit()
+
+    # Ensure allow_wfh column exists in employees table
+    try:
+        db.execute(text("SELECT allow_wfh FROM employees LIMIT 1"))
+    except Exception:
+        db.rollback()
+        logger.info("Adding allow_wfh column to employees table...")
+        db.execute(text("ALTER TABLE employees ADD COLUMN allow_wfh BOOLEAN DEFAULT FALSE"))
+        db.commit()
+    
+    # 0. Seed Shifts
+    shifts_to_seed = [
+        {"name": "Regular Day Shift", "start_time": time(9, 0), "end_time": time(17, 0), "grace_period_minutes": 15, "description": "Standard business hours"},
+        {"name": "Morning Shift", "start_time": time(7, 0), "end_time": time(15, 0), "grace_period_minutes": 15, "description": "Early morning shift"},
+        {"name": "Evening Shift", "start_time": time(15, 0), "end_time": time(23, 0), "grace_period_minutes": 15, "description": "Evening / second shift"},
+        {"name": "Night Shift", "start_time": time(23, 0), "end_time": time(7, 0), "grace_period_minutes": 15, "description": "Overnight shift"}
+    ]
+    for s in shifts_to_seed:
+        shift_record = db.execute(select(models.Shift).where(models.Shift.name == s["name"])).scalar_one_or_none()
+        if not shift_record:
+            logger.info(f"Seeding shift: {s['name']}")
+            db_shift = models.Shift(**s)
+            db.add(db_shift)
+    db.commit()
     
     # 1. Seed Roles
     roles = [
@@ -76,11 +124,23 @@ def init_db(db: Session):
         {"key": "KIOSK_FACE_THRESHOLD", "value": str(settings.KIOSK_FACE_THRESHOLD), "description": "Cosine similarity threshold for face match"},
         {"key": "KIOSK_LIVENESS_THRESHOLD", "value": str(settings.KIOSK_LIVENESS_THRESHOLD), "description": "Softmax probability threshold for face liveness"},
         {"key": "ENROLLMENT_LIVENESS_CHECK", "value": "true", "description": "Enforce liveness check during employee facial enrollment"},
-        {"key": "ENROLLMENT_LIVENESS_THRESHOLD", "value": "0.70", "description": "Liveness probability threshold specifically for employee facial enrollment"},
+        {"key": "ENROLLMENT_LIVENESS_THRESHOLD", "value": "0.50", "description": "Liveness probability threshold specifically for employee facial enrollment"},
         {"key": "VOICE_GREETING_ENABLED", "value": "true", "description": "Enable voice greeting on successful attendance"},
         {"key": "SYSTEM_MAINTENANCE_MODE", "value": "false", "description": "Toggle maintenance mode to suspend active check-ins"},
         {"key": "MAX_ENROLLMENT_IMAGES", "value": "5", "description": "Maximum face images captured during registration"},
-        {"key": "KIOSK_AUTO_RESET_SECONDS", "value": "5", "description": "Duration in seconds the success screen stays visible before scanning again"}
+        {"key": "KIOSK_AUTO_RESET_SECONDS", "value": "5", "description": "Duration in seconds the success screen stays visible before scanning again"},
+        {"key": "NOTIFICATION_WEBHOOK_URL", "value": "", "description": "Slack, Discord or Telegram webhook URL for spoof security alerts"},
+        {"key": "QR_FALLBACK_ENABLED", "value": "true", "description": "Enable QR Code badge verification fallback on kiosk if face match is borderline"},
+        {"key": "RTSP_STREAM_ENABLED", "value": "false", "description": "Enable asynchronous RTSP IP camera frame processing background service"},
+        {"key": "RTSP_STREAM_URL", "value": "rtsp://admin:admin123@192.168.1.100:554/stream1", "description": "RTSP video stream connection URL"},
+        {"key": "COMPANY_NAME", "value": "NetraID Enterprise", "description": "Name of the organization displayed on employee ID cards"},
+        {"key": "COMPANY_LOGO", "value": "", "description": "Base64 image data or URL of the company logo displayed on ID cards"},
+        {"key": "BADGE_THEME_COLOR", "value": "Navy Blue", "description": "Primary color theme of employee ID cards (Navy Blue, Charcoal, Emerald, Saffron)"},
+        {"key": "BADGE_PATTERN_TYPE", "value": "Indian Mandala", "description": "Background pattern design style (None, Indian Mandala, Corporate Waves, Cyber Grid)"},
+        {"key": "LOCATION_RESTRICTION_ENABLED", "value": "false", "description": "Enable location restriction for kiosk attendance"},
+        {"key": "LOCATION_LATITUDE", "value": "0.0", "description": "Office center latitude coordinate"},
+        {"key": "LOCATION_LONGITUDE", "value": "0.0", "description": "Office center longitude coordinate"},
+        {"key": "LOCATION_RADIUS_METERS", "value": "50", "description": "Allowed radius in meters for marking attendance"}
     ]
     
     for s in default_settings:

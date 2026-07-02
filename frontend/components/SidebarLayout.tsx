@@ -336,7 +336,7 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
       </aside>
 
       {/* ─── Mobile Top Bar ─── */}
-      <div className="md:hidden fixed top-0 left-0 right-0 h-14 z-50 flex items-center justify-between px-5 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/95 backdrop-blur-xl">
+      <div className="md:hidden fixed top-0 left-0 right-0 h-14 z-50 flex items-center justify-between px-5 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/95 backdrop-blur-xl no-print">
         <div className="flex items-center gap-3">
           <div className="relative inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-900 border border-slate-700/80 shadow-[0_0_15px_rgba(6,182,212,0.25)] overflow-hidden shrink-0">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.15)_0%,transparent_70%)] animate-pulse" />
@@ -374,7 +374,7 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
       {/* ─── Mobile Drawer ─── */}
       {sidebarOpen && (
         <div
-          className="md:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-xs animate-fade-in"
+          className="md:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-xs animate-fade-in no-print"
           onClick={() => setSidebarOpen(false)}
         >
           <aside

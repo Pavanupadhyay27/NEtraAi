@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/app/utils/toast";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 // Avatar gradient styles
 const avatarColors = [
@@ -65,6 +66,7 @@ function InputField({ label, required, children }: { label: string; required?: b
 
 export default function EmployeesPage() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
@@ -75,7 +77,6 @@ export default function EmployeesPage() {
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState<string>("");
 
@@ -91,6 +92,7 @@ export default function EmployeesPage() {
   const [deptId, setDeptId] = useState("");
   const [createUserLogin, setCreateUserLogin] = useState(false);
   const [password, setPassword] = useState("");
+  const [allowWfh, setAllowWfh] = useState(false);
 
   const { data: departments } = useQuery({
     queryKey: ["departments"],
@@ -109,14 +111,6 @@ export default function EmployeesPage() {
     }
   });
 
-  const { data: empAttendance, isLoading: loadingEmpAttendance } = useQuery({
-    queryKey: ["employee-attendance", selectedEmployee?.id],
-    queryFn: () => {
-      if (!selectedEmployee) return [];
-      return fetchApi(`/attendance/employee/${selectedEmployee.id}`);
-    },
-    enabled: !!selectedEmployee
-  });
 
   const createMutation = useMutation({
     mutationFn: (payload: any) => fetchApi("/employees/", { method: "POST", body: JSON.stringify(payload) }),
@@ -145,6 +139,7 @@ export default function EmployeesPage() {
     setEmpId(""); setName(""); setEmail(""); setPhone(""); setDesignation("");
     setJoiningDate(getLocalDateString()); setStatusVal("Active");
     setDeptId(""); setCreateUserLogin(false); setPassword("");
+    setAllowWfh(false);
     setPhoneError(null);
     setSubmissionError(null);
   };
@@ -196,7 +191,8 @@ export default function EmployeesPage() {
       employee_id: empId, name, email, phone: phone || null,
       designation: designation || null, joining_date: joiningDate,
       status: statusVal, department_id: deptId ? parseInt(deptId) : null,
-      create_user_login: createUserLogin
+      create_user_login: createUserLogin,
+      allow_wfh: allowWfh
     };
     if (createUserLogin) payload.password = password;
     createMutation.mutate(payload);
@@ -233,23 +229,6 @@ export default function EmployeesPage() {
     }
   };
 
-  const handleExportEmployee = async () => {
-    if (!selectedEmployee) return;
-    try {
-      const responseBlob = await fetchApi(`/reports/export?report_type=employee&employee_id=${selectedEmployee.id}&format=csv`);
-      const url = window.URL.createObjectURL(responseBlob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `attendance_${selectedEmployee.name.replace(/\s+/g, "_")}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success("Employee ledger exported successfully.");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to export CSV.");
-    }
-  };
 
   const inputCls = "input-field h-9.5 text-[12.5px] bg-white border-slate-200 focus:border-slate-800 text-slate-900 rounded-xl transition-all w-full";
   const selectCls = "input-field h-9.5 text-[12.5px] bg-white border-slate-200 focus:border-slate-800 text-slate-900 rounded-xl transition-all appearance-none cursor-pointer w-full pr-8";
@@ -368,7 +347,7 @@ export default function EmployeesPage() {
                   employees?.map((emp: any) => {
                     const avatarColor = avatarColors[emp.id % avatarColors.length];
                     return (
-                      <tr key={emp.id} className="group/row cursor-pointer hover:bg-white/[0.015]" onClick={() => setSelectedEmployee(emp)}>
+                      <tr key={emp.id} className="group/row cursor-pointer hover:bg-white/[0.015]" onClick={() => router.push(`/employees/${emp.id}`)}>
                         <td className="py-3.5 px-5">
                           <div className="flex items-center gap-3">
                             <EmployeeAvatar emp={emp} size="md" />
@@ -543,6 +522,27 @@ export default function EmployeesPage() {
                 )}
               </div>
 
+              {/* WFH Permission Toggle */}
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                <div>
+                  <p className="text-[12.5px] font-bold text-slate-800">Work From Home (WFH) Allowed</p>
+                  <p className="text-[10px] text-slate-450 mt-0.5">Bypasses geofenced location checks for this employee</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAllowWfh(!allowWfh)}
+                  className={`relative inline-flex h-5.5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    allowWfh ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800"
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow-xs transition duration-200 ease-in-out ${
+                      allowWfh ? "translate-x-4.5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+
               <div className="flex justify-end gap-2.5 pt-3 border-t border-white/5">
                 <button 
                   type="button" 
@@ -646,156 +646,6 @@ export default function EmployeesPage() {
         </div>
       )}
     </SidebarLayout>
-
-      {/* ─── Employee Details & Attendance History Modal ─── */}
-      {selectedEmployee && (
-        <div className="modal-backdrop z-50">
-          <div className="modal-content max-w-2xl bg-white border border-zinc-200 text-zinc-900 shadow-2xl">
-            {/* Header info */}
-            <div className="flex items-start justify-between pb-5 border-b border-zinc-100">
-              <div className="flex items-center gap-4">
-                <EmployeeAvatar emp={selectedEmployee} size="lg" />
-                <div>
-                  <h3 className="text-base font-bold text-zinc-900 leading-tight">
-                    {selectedEmployee.name}
-                  </h3>
-                  <p className="text-xs text-zinc-550 mt-1 flex items-center gap-1.5">
-                    <span className="font-mono text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded border border-zinc-200">{selectedEmployee.employee_id}</span>
-                    <span>·</span>
-                    <span className="font-semibold text-zinc-700">{selectedEmployee.designation || "No Title"}</span>
-                  </p>
-                  <p className="text-[10px] text-zinc-400 font-bold mt-1 uppercase tracking-wider">
-                    {selectedEmployee.department?.name || "General Department"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleExportEmployee}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 border border-zinc-200 hover:bg-zinc-200 rounded-xl text-[11px] font-bold text-zinc-700 transition-all cursor-pointer"
-                  title="Export employee attendance data"
-                >
-                  <Download className="w-3.5 h-3.5 text-zinc-500" />
-                  Export CSV
-                </button>
-                <button 
-                  onClick={() => setSelectedEmployee(null)} 
-                  className="p-2 rounded-xl hover:bg-zinc-100 text-zinc-400 hover:text-zinc-650 transition-all cursor-pointer"
-                >
-                  <X className="w-4.5 h-4.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Profile fields details grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 py-4 border-b border-zinc-100 text-[11.5px] text-zinc-600">
-              <div className="flex items-center gap-2 bg-zinc-50/50 p-2.5 rounded-xl border border-zinc-100">
-                <Mail className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                <span className="truncate font-medium text-zinc-700" title={selectedEmployee.email}>{selectedEmployee.email}</span>
-              </div>
-              <div className="flex items-center gap-2 bg-zinc-50/50 p-2.5 rounded-xl border border-zinc-100">
-                <Phone className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                <span className="font-medium text-zinc-700">{selectedEmployee.phone || "No phone added"}</span>
-              </div>
-              <div className="flex items-center gap-2 bg-zinc-50/50 p-2.5 rounded-xl border border-zinc-100">
-                <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                <span className="font-medium text-zinc-700">Joined: <span className="font-mono">{selectedEmployee.joining_date}</span></span>
-              </div>
-            </div>
-
-            {/* Stats Summary cards */}
-            <div className="grid grid-cols-4 gap-3 py-4">
-              {(() => {
-                const total = empAttendance?.length || 0;
-                const present = empAttendance?.filter((r: any) => r.status === "Present").length || 0;
-                const late = empAttendance?.filter((r: any) => r.status === "Late").length || 0;
-                const half = empAttendance?.filter((r: any) => r.status === "Half Day").length || 0;
-                
-                const cardCls = "p-3 rounded-xl border border-zinc-150 bg-zinc-50/30 flex flex-col justify-between h-[64px] shadow-sm";
-                return (
-                  <>
-                    <div className={cardCls}>
-                      <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Logged Days</span>
-                      <span className="text-base font-bold text-zinc-800 leading-none mt-1 font-mono">{total}</span>
-                    </div>
-                    <div className={cardCls}>
-                      <span className="text-[9px] text-emerald-600 font-bold uppercase tracking-wider">Present</span>
-                      <span className="text-base font-bold text-emerald-600 leading-none mt-1 font-mono">{present}</span>
-                    </div>
-                    <div className={cardCls}>
-                      <span className="text-[9px] text-amber-600 font-bold uppercase tracking-wider">Late Arrivals</span>
-                      <span className="text-base font-bold text-amber-600 leading-none mt-1 font-mono">{late}</span>
-                    </div>
-                    <div className={cardCls}>
-                      <span className="text-[9px] text-indigo-600 font-bold uppercase tracking-wider">Half Days</span>
-                      <span className="text-base font-bold text-indigo-650 leading-none mt-1 font-mono">{half}</span>
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
-
-            {/* Attendance Ledger Table */}
-            <div className="mt-2 space-y-2">
-              <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest font-mono">Attendance Ledger (Past 30 Days)</h4>
-              <div className="overflow-y-auto max-h-[200px] border border-zinc-200 rounded-xl bg-white shadow-sm">
-                <table className="w-full text-left border-collapse text-[11px]">
-                  <thead>
-                    <tr className="border-b border-zinc-200 bg-zinc-50 text-zinc-500 uppercase tracking-wider font-mono">
-                      <th className="py-2.5 px-4 font-semibold">Date</th>
-                      <th className="py-2.5 px-4 font-semibold">Check In</th>
-                      <th className="py-2.5 px-4 font-semibold">Check Out</th>
-                      <th className="py-2.5 px-4 font-semibold">Hours</th>
-                      <th className="py-2.5 px-4 font-semibold text-center">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100 text-zinc-700">
-                    {loadingEmpAttendance ? (
-                      Array.from({ length: 3 }).map((_, i) => (
-                        <tr key={i}>
-                          {Array.from({ length: 5 }).map((_, j) => (
-                            <td key={j} className="py-3 px-4"><div className="skeleton h-3 w-16" /></td>
-                          ))}
-                        </tr>
-                      ))
-                    ) : !empAttendance || empAttendance.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="py-8 text-center text-zinc-450 italic">No attendance records stored.</td>
-                      </tr>
-                    ) : (
-                      empAttendance.map((rec: any) => (
-                        <tr key={rec.id} className="hover:bg-zinc-50/50 transition-colors">
-                          <td className="py-2.5 px-4 font-mono text-zinc-550">{rec.date}</td>
-                          <td className="py-2.5 px-4 font-mono text-zinc-800">
-                            {rec.check_in ? parseDateTime(rec.check_in)?.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : "—"}
-                          </td>
-                          <td className="py-2.5 px-4 font-mono text-zinc-800">
-                            {rec.check_out ? parseDateTime(rec.check_out)?.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : "—"}
-                          </td>
-                          <td className="py-2.5 px-4 font-mono text-zinc-700">
-                            {rec.working_hours ? `${rec.working_hours.toFixed(1)} hrs` : "—"}
-                          </td>
-                          <td className="py-2.5 px-4 text-center">
-                            <span className={`inline-block text-[8.5px] font-semibold px-2 py-0.5 rounded-full border ${
-                              rec.status === "Present" ? "bg-emerald-50 border-emerald-200 text-emerald-700" :
-                              rec.status === "Late" ? "bg-amber-50 border-amber-200 text-amber-700" :
-                              rec.status === "Half Day" ? "bg-indigo-50 border-indigo-200 text-indigo-750" :
-                              "bg-rose-50 border-rose-200 text-rose-700"
-                            }`}>
-                              {rec.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmId !== null && (

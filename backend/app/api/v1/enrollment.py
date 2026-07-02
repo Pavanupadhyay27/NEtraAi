@@ -57,6 +57,11 @@ async def upload_face_image(
     if confidence < 0.5:
         raise HTTPException(status_code=400, detail=f"Face detection confidence too low ({confidence:.2f}). Please upload a clearer image.")
 
+    # Image Quality Validation
+    quality = face_engine.validate_image_quality(img)
+    if not quality["is_valid"]:
+        raise HTTPException(status_code=400, detail=quality["reason"])
+
     # Optional liveness check on enrollment (preventing enroll spoofing)
     liveness_enabled_setting = crud.get_setting_by_key(db, "ENROLLMENT_LIVENESS_CHECK")
     liveness_enabled = liveness_enabled_setting.value.lower() == "true" if liveness_enabled_setting else True

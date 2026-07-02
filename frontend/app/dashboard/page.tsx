@@ -8,9 +8,10 @@ import { fetchApi, getAccessToken, getBackendUrl, parseDateTime, getLocalDateStr
 import { 
   Users, UserCheck, UserMinus, Clock, TrendingUp, Activity,
   ArrowRight, AlertTriangle, CheckCircle, Zap, ShieldAlert,
-  Calendar, Award, Server, Cpu, X
+  Calendar, Award, Server, Cpu, X, Search
 } from "lucide-react";
 import Link from "next/link";
+import AttendanceHeatmap from "@/components/AttendanceHeatmap";
 
 // Pure SVG sparkline helper for premium look
 function Sparkline({ color, data }: { color: string; data: number[] }) {
@@ -179,6 +180,45 @@ const getDeptTheme = (code: string) => {
   };
 };
 
+// Avatar gradient styles
+const avatarColors = [
+  "from-blue-50 to-indigo-150 text-blue-600 border-blue-200",
+  "from-emerald-50 to-teal-150 text-emerald-600 border-emerald-200",
+  "from-rose-50 to-orange-150 text-rose-600 border-rose-200",
+  "from-purple-50 to-pink-150 text-purple-600 border-purple-200",
+  "from-cyan-50 to-blue-150 text-cyan-600 border-cyan-200",
+];
+
+function TeammateAvatar({ emp, size = "md" }: { emp: any; size?: "sm" | "md" }) {
+  const [error, setError] = React.useState(false);
+  const avatarColor = avatarColors[emp.id % avatarColors.length];
+  const hasFrontImage = emp.images?.some((img: any) => img.pose_type.toLowerCase() === "front");
+  
+  const sizeClasses = {
+    sm: "w-8 h-8 text-[10.5px] rounded-lg shrink-0",
+    md: "w-10 h-10 text-xs rounded-xl shrink-0",
+  };
+  const sc = sizeClasses[size];
+
+  if (hasFrontImage && !error) {
+    const baseUrl = getBackendUrl().replace("/api/v1", "");
+    return (
+      <img
+        src={`${baseUrl}/uploads/${emp.employee_id}/front.jpg`}
+        alt={emp.name}
+        className={`${sc} object-cover border border-zinc-200 shadow-sm`}
+        onError={() => setError(true)}
+      />
+    );
+  }
+
+  return (
+    <div className={`${sc} bg-gradient-to-br ${avatarColor} flex items-center justify-center shrink-0 border font-bold shadow-sm`}>
+      {emp.name.charAt(0).toUpperCase()}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [currentTime, setCurrentTime] = React.useState("");
   const [currentDate, setCurrentDate] = React.useState("");
@@ -186,6 +226,15 @@ export default function DashboardPage() {
   const [selectedDept, setSelectedDept] = React.useState<any | null>(null);
   const [isDark, setIsDark] = React.useState(false);
   const queryClient = useQueryClient();
+
+  // Presence Board states
+  const [presenceSearch, setPresenceSearch] = React.useState("");
+  const [presenceFilter, setPresenceFilter] = React.useState<"ALL" | "IN_OFFICE" | "ABSENT" | "CHECKED_OUT">("ALL");
+  const [showManualModal, setShowManualModal] = React.useState(false);
+  const [selectedEmpManual, setSelectedEmpManual] = React.useState<any | null>(null);
+  const [manualTime, setManualTime] = React.useState("");
+  const [manualStatus, setManualStatus] = React.useState<"Present" | "Late" | "Half Day" | "Absent">("Present");
+  const [manualIsLoading, setManualIsLoading] = React.useState(false);
 
   React.useEffect(() => {
     setIsDark(document.documentElement.classList.contains("dark"));
@@ -249,6 +298,7 @@ export default function DashboardPage() {
         queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
         queryClient.invalidateQueries({ queryKey: ["department-distribution"] });
         queryClient.invalidateQueries({ queryKey: ["attendance-trends"] });
+        queryClient.invalidateQueries({ queryKey: ["daily-attendance-today"] });
       } catch (err) {
         console.error("Error handling SSE message:", err);
       }
@@ -284,6 +334,138 @@ export default function DashboardPage() {
     queryFn: () => fetchApi("/analytics/recent-activity?limit=6"),
     refetchInterval: 60000
   });
+
+  const { data: employees, isLoading: loadingEmployees } = useQuery({
+    queryKey: ["employees-all"],
+    queryFn: () => fetchApi("/employees/")
+  });
+
+  const todayStr = getLocalDateString();
+  const { data: dailyAttendance, isLoading: loadingDaily } = useQuery({
+    queryKey: ["daily-attendance-today"],
+    queryFn: () => fetchApi(`/attendance/daily?date_val=${todayStr}`),
+    refetchInterval: 15000
+  });
+
+  const mergedEmployees = React.useMemo(() => {
+    if (!employees) return [];
+    return employees.map((emp: any) => {
+      const att = dailyAttendance?.find((a: any) => a.employee_id === emp.id);
+      return {
+        ...emp,
+        todayAttendance: att || null
+      };
+    });
+  }, [employees, dailyAttendance]);
+
+  const filteredTeammates = React.useMemo(() => {
+    return mergedEmployees.filter((emp: any) => {
+      const matchesSearch = emp.name.toLowerCase().includes(presenceSearch.toLowerCase()) || 
+        (emp.designation && emp.designation.toLowerCase().includes(presenceSearch.toLowerCase()));
+      
+      if (!matchesSearch) return false;
+
+      const att = emp.todayAttendance;
+      const isAbsent = !att || att.status === "Absent";
+      const isCheckedOut = att && att.check_out;
+      const isInOffice = att && !isCheckedOut && ["Present", "Late", "Half Day"].includes(att.status);
+
+      if (presenceFilter === "ALL") return true;
+      if (presenceFilter === "IN_OFFICE") return isInOffice;
+      if (presenceFilter === "ABSENT") return isAbsent;
+      if (presenceFilter === "CHECKED_OUT") return isCheckedOut;
+
+      return true;
+    });
+  }, [mergedEmployees, presenceSearch, presenceFilter]);
+
+  const openClockIn = (emp: any) => {
+    setSelectedEmpManual(emp);
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mm = String(now.getMinutes()).padStart(2, "0");
+    setManualTime(`${hh}:${mm}`);
+    setManualStatus(emp.todayAttendance?.status || "Present");
+    setShowManualModal(true);
+  };
+
+  const handleClockOut = async (emp: any) => {
+    if (!emp.todayAttendance) return;
+    setManualIsLoading(true);
+    try {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      const hours = String(now.getHours()).padStart(2, "0");
+      const minutes = String(now.getMinutes()).padStart(2, "0");
+      const seconds = String(now.getSeconds()).padStart(2, "0");
+      const localISO = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+
+      const payload = {
+        employee_id: emp.id,
+        date: todayStr,
+        check_in: emp.todayAttendance.check_in,
+        check_out: localISO,
+        status: emp.todayAttendance.status
+      };
+      
+      await fetchApi("/attendance/manual", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["daily-attendance-today"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["recent-activity"] });
+    } catch (err: any) {
+      alert(err.message || "Failed to clock out employee.");
+    } finally {
+      setManualIsLoading(false);
+    }
+  };
+
+  const handleClockInSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEmpManual) return;
+    setManualIsLoading(true);
+    try {
+      const now = new Date();
+      const [hh, mm] = manualTime.split(":");
+      const checkInDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(hh), parseInt(mm));
+      
+      const year = checkInDate.getFullYear();
+      const month = String(checkInDate.getMonth() + 1).padStart(2, "0");
+      const day = String(checkInDate.getDate()).padStart(2, "0");
+      const hours = String(checkInDate.getHours()).padStart(2, "0");
+      const minutes = String(checkInDate.getMinutes()).padStart(2, "0");
+      const seconds = "00";
+      const checkInISO = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+
+      const payload = {
+        employee_id: selectedEmpManual.id,
+        date: todayStr,
+        check_in: checkInISO,
+        check_out: selectedEmpManual.todayAttendance?.check_out || null,
+        status: manualStatus
+      };
+      
+      await fetchApi("/attendance/manual", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["daily-attendance-today"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["recent-activity"] });
+      setShowManualModal(false);
+      setSelectedEmpManual(null);
+    } catch (err: any) {
+      alert(err.message || "Failed to clock in employee.");
+    } finally {
+      setManualIsLoading(false);
+    }
+  };
 
   // Map real database trends to the card sparklines
   const trendsLoaded = trends && trends.length > 0;
@@ -599,6 +781,163 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* ─── Team Presence Board ("Who's In Today") ─── */}
+        <div className="bg-white border border-zinc-100 rounded-xl p-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+            <div>
+              <h2 className="text-[11px] font-bold text-slate-450 uppercase tracking-wider">Who's In Today</h2>
+              <p className="text-[10px] text-slate-400 mt-0.5">Real-time team presence tracking and manual adjustments</p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              {/* Search Teammate */}
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-zinc-400" />
+                <input
+                  type="text"
+                  placeholder="Search team member..."
+                  value={presenceSearch}
+                  onChange={(e) => setPresenceSearch(e.target.value)}
+                  className="pl-8.5 pr-4 py-1.5 text-xs bg-zinc-50 border border-zinc-100 rounded-xl focus:border-zinc-350 focus:bg-white text-zinc-800 transition-all outline-none placeholder-zinc-400 w-full sm:w-48"
+                />
+              </div>
+              
+              {/* Status Filters */}
+              <div className="flex bg-zinc-50 border border-zinc-100 p-0.5 rounded-xl text-[10px] font-semibold text-zinc-400">
+                {(["ALL", "IN_OFFICE", "ABSENT", "CHECKED_OUT"] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => setPresenceFilter(filter)}
+                    className={`px-2.5 py-1 rounded-lg transition-all font-bold tracking-wide uppercase font-mono ${
+                      presenceFilter === filter
+                        ? "bg-white text-slate-900 shadow-xs border border-zinc-150/40 cursor-pointer"
+                        : "bg-transparent hover:text-slate-700 cursor-pointer"
+                    }`}
+                  >
+                    {filter === "IN_OFFICE" ? "In Office" : filter === "CHECKED_OUT" ? "Checked Out" : filter.toLowerCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Employee Presence Grid */}
+          {loadingEmployees || loadingDaily ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="skeleton h-24 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : (
+            <>
+              {filteredTeammates.length === 0 ? (
+                <div className="text-center py-10 border border-dashed border-zinc-100 rounded-xl text-zinc-400 text-xs">
+                  No teammates match the active filters or search terms.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {filteredTeammates.map((member: any) => {
+                    const att = member.todayAttendance;
+                    const isAbsent = !att || att.status === "Absent";
+                    const isCheckedOut = att && att.check_out;
+                    const isInOffice = att && !isCheckedOut && ["Present", "Late", "Half Day"].includes(att.status);
+
+                    let statusText = "Absent";
+                    let badgeColor = "bg-zinc-100 text-zinc-500 border-zinc-200/50";
+                    
+                    if (isInOffice) {
+                      const checkInTime = parseDateTime(att.check_in)?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) || "";
+                      statusText = `In at ${checkInTime}`;
+                      badgeColor = att.status === "Late"
+                        ? "bg-amber-50 text-amber-700 border-amber-100"
+                        : "bg-emerald-50 text-emerald-700 border-emerald-100";
+                    } else if (isCheckedOut) {
+                      const checkOutTime = parseDateTime(att.check_out)?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) || "";
+                      statusText = `Out at ${checkOutTime}`;
+                      badgeColor = "bg-slate-50 text-slate-655 border-slate-100";
+                    }
+
+                    return (
+                      <div
+                        key={member.id}
+                        className={`p-3.5 rounded-xl border transition-all duration-200 flex flex-col justify-between h-[125px] ${
+                          isAbsent 
+                            ? "bg-zinc-50/30 border-zinc-100 hover:border-zinc-200" 
+                            : "bg-white border-zinc-100 hover:border-zinc-250 shadow-xs"
+                        }`}
+                      >
+                        {/* Member Row */}
+                        <div className="flex gap-2.5 items-start">
+                          <div className="relative shrink-0">
+                            <TeammateAvatar emp={member} size="sm" />
+                            <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-white flex items-center justify-center shadow-xs ${
+                              isInOffice ? "bg-emerald-500" : isCheckedOut ? "bg-slate-400" : "bg-rose-450"
+                            }`} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-xs font-bold text-slate-800 truncate" title={member.name}>
+                              {member.name}
+                            </h3>
+                            <p className="text-[9.5px] text-slate-400 truncate mt-0.5">
+                              {member.designation}
+                            </p>
+                            {member.department && (
+                              <span className="inline-block mt-1 text-[8px] font-bold font-mono px-1 rounded bg-zinc-50 text-zinc-500 border border-zinc-100/60 uppercase">
+                                {member.department.code}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Status + Action buttons */}
+                        <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-zinc-50">
+                          <span className={`inline-block text-[9px] font-bold font-mono px-1.5 py-0.5 rounded border ${badgeColor}`}>
+                            {statusText}
+                          </span>
+
+                          <div className="flex items-center gap-1.5">
+                            {isAbsent && (
+                              <button
+                                onClick={() => openClockIn(member)}
+                                disabled={manualIsLoading}
+                                className="px-2 py-1 text-[9px] font-bold font-mono bg-zinc-950 hover:bg-zinc-800 text-white rounded-lg transition-colors cursor-pointer"
+                              >
+                                Clock In
+                              </button>
+                            )}
+                            {isInOffice && (
+                              <button
+                                onClick={() => handleClockOut(member)}
+                                disabled={manualIsLoading}
+                                className="px-2 py-1 text-[9px] font-bold font-mono border border-zinc-200 hover:border-zinc-400 text-slate-650 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
+                              >
+                                Clock Out
+                              </button>
+                            )}
+                            {(isCheckedOut || !isAbsent) && (
+                              <button
+                                onClick={() => openClockIn(member)}
+                                disabled={manualIsLoading}
+                                className="p-1 border border-zinc-100 hover:border-zinc-200 hover:bg-zinc-50 text-slate-400 hover:text-slate-700 rounded-lg transition-colors cursor-pointer"
+                                title="Edit log"
+                              >
+                                <Activity className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* ─── Attendance Heatmap ─── */}
+        <AttendanceHeatmap />
+
         {/* ─── Bottom Section: Department Breakdown ─── */}
         <div className="bg-white border border-zinc-100 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
@@ -748,6 +1087,97 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Manual Clock-in Modal ─── */}
+      {showManualModal && selectedEmpManual && (
+        <div className="modal-backdrop z-50">
+          <div className="modal-content max-w-sm bg-white border border-zinc-200 text-zinc-900 shadow-2xl">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-100">
+              <h3 className="text-sm font-bold text-zinc-900">
+                Manual Clock In / Override
+              </h3>
+              <button 
+                onClick={() => {
+                  setShowManualModal(false);
+                  setSelectedEmpManual(null);
+                }} 
+                className="p-1.5 rounded-lg hover:bg-zinc-100 text-zinc-400 hover:text-zinc-650 transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleClockInSubmit} className="space-y-4">
+              <div>
+                <p className="text-xs text-zinc-500 font-medium">Employee</p>
+                <div className="flex items-center gap-2 mt-1.5 p-2 bg-zinc-50 border border-zinc-100 rounded-lg">
+                  <TeammateAvatar emp={selectedEmpManual} size="sm" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-800 truncate">{selectedEmpManual.name}</p>
+                    <p className="text-[10px] text-slate-450 truncate">{selectedEmpManual.designation}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Check-in Time (HH:MM)
+                </label>
+                <input
+                  type="time"
+                  required
+                  value={manualTime}
+                  onChange={(e) => setManualTime(e.target.value)}
+                  className="input-field h-9.5 text-xs bg-white border-zinc-200 focus:border-zinc-800 text-zinc-900 rounded-xl transition-all w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Attendance Status
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(["Present", "Late", "Half Day"] as const).map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => setManualStatus(status)}
+                      className={`py-1.5 text-[10.5px] font-semibold border rounded-lg transition-all cursor-pointer ${
+                        manualStatus === status
+                          ? "bg-zinc-950 border-zinc-950 text-white"
+                          : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+                      }`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowManualModal(false);
+                    setSelectedEmpManual(null);
+                  }}
+                  className="btn-ghost text-xs px-3.5 py-2 rounded-xl cursor-pointer hover:bg-zinc-100 text-zinc-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={manualIsLoading}
+                  className="px-4 py-2 text-xs bg-zinc-950 hover:bg-zinc-850 text-white font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  {manualIsLoading && <span className="animate-spin text-white">⌛</span>}
+                  Confirm
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

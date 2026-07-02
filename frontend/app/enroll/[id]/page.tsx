@@ -5,10 +5,12 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import SidebarLayout from "@/components/SidebarLayout";
 import { fetchApi, getBackendUrl } from "@/app/utils/api";
+import { useToast } from "@/app/utils/toast";
 import {
   Camera, Upload, CheckCircle2, ChevronLeft, XCircle, Video,
   RefreshCw, AlertCircle, Trash2, Play, Pause, Save, RotateCcw, Shield, Activity, Sparkles,
-  User, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Smile, Meh, Lightbulb, Sun, Glasses
+  User, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Smile, Meh, Lightbulb, Sun, Glasses,
+  Printer, Download
 } from "lucide-react";
 
 interface PoseInfo {
@@ -88,6 +90,7 @@ export default function EnrollPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const employeeId = params.id;
+  const { toast } = useToast();
 
   // State Machine for biometric scanner:
   // "idle": Pre-start screen
@@ -129,6 +132,140 @@ export default function EnrollPage() {
     queryFn: () => fetchApi(`/enrollment/status/${employeeId}`),
     enabled: !!employeeId
   });
+
+  const { data: settings } = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => fetchApi("/settings/")
+  });
+
+  const settingsMap = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    if (settings) {
+      settings.forEach((s: any) => {
+        map[s.key] = s.value;
+      });
+    }
+    return map;
+  }, [settings]);
+
+  const companyName = settingsMap["COMPANY_NAME"] || "NetraID Enterprise";
+  const companyLogo = settingsMap["COMPANY_LOGO"] || "";
+  const badgeTheme = settingsMap["BADGE_THEME_COLOR"] || "Navy Blue";
+  const badgePattern = settingsMap["BADGE_PATTERN_TYPE"] || "Indian Mandala";
+
+  const themeStyles = React.useMemo(() => {
+    switch (badgeTheme) {
+      case "Saffron":
+        return {
+          headerBg: "bg-gradient-to-tr from-amber-600 via-orange-500 to-red-600",
+          accentText: "text-orange-600 dark:text-orange-400",
+          accentBorder: "border-orange-500",
+          accentBg: "bg-orange-50/40 dark:bg-orange-950/20",
+          photoBorder: "from-amber-500 to-red-500",
+          dotColor: "bg-orange-500",
+          primaryHex: "#f97316",
+          headerHex1: "#d97706",
+          headerHex2: "#dc2626"
+        };
+      case "Emerald":
+        return {
+          headerBg: "bg-gradient-to-tr from-slate-900 via-emerald-950 to-teal-900",
+          accentText: "text-emerald-600 dark:text-emerald-400",
+          accentBorder: "border-emerald-500",
+          accentBg: "bg-emerald-50/40 dark:bg-emerald-950/20",
+          photoBorder: "from-emerald-500 to-teal-400",
+          dotColor: "bg-emerald-500",
+          primaryHex: "#10b981",
+          headerHex1: "#064e3b",
+          headerHex2: "#0f766e"
+        };
+      case "Charcoal":
+        return {
+          headerBg: "bg-gradient-to-tr from-zinc-900 via-slate-800 to-zinc-950",
+          accentText: "text-zinc-650 dark:text-zinc-400",
+          accentBorder: "border-zinc-500",
+          accentBg: "bg-zinc-50/40 dark:bg-zinc-900/20",
+          photoBorder: "from-zinc-500 to-slate-400",
+          dotColor: "bg-zinc-500",
+          primaryHex: "#6b7280",
+          headerHex1: "#18181b",
+          headerHex2: "#27272a"
+        };
+      case "Navy Blue":
+      default:
+        return {
+          headerBg: "bg-gradient-to-tr from-slate-900 via-blue-900 to-indigo-950",
+          accentText: "text-cyan-500 dark:text-cyan-400",
+          accentBorder: "border-cyan-500",
+          accentBg: "bg-slate-50/40 dark:bg-slate-900/20",
+          photoBorder: "from-cyan-500 to-emerald-400",
+          dotColor: "bg-cyan-500",
+          primaryHex: "#06b6d4",
+          headerHex1: "#0f172a",
+          headerHex2: "#1e3a8a"
+        };
+    }
+  }, [badgeTheme]);
+
+  const BadgeWatermark = ({ type }: { type: string }) => {
+    switch (type) {
+      case "Indian Mandala":
+        return (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.06] text-slate-800 dark:text-slate-100 z-0 overflow-hidden badge-watermark-container">
+            <svg className="w-[110%] h-[110%]" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="0.4">
+              <circle cx="50" cy="50" r="42" strokeDasharray="1 1.5" />
+              <circle cx="50" cy="50" r="35" />
+              <circle cx="50" cy="50" r="28" strokeDasharray="0.5 1" />
+              <circle cx="50" cy="50" r="21" />
+              <circle cx="50" cy="50" r="14" strokeDasharray="1 1" />
+              <circle cx="50" cy="50" r="7" />
+              {Array.from({ length: 24 }).map((_, i) => {
+                const angle = (i * 15 * Math.PI) / 180;
+                const x1 = 50 + 7 * Math.cos(angle);
+                const y1 = 50 + 7 * Math.sin(angle);
+                const x2 = 50 + 35 * Math.cos(angle);
+                const y2 = 50 + 35 * Math.sin(angle);
+                const cx1 = 50 + 20 * Math.cos(angle - 0.08);
+                const cy1 = 50 + 20 * Math.sin(angle - 0.08);
+                return (
+                  <g key={i}>
+                    <line x1={x1} y1={y1} x2={x2} y2={y2} />
+                    <path d={`M ${x1} ${y1} Q ${cx1} ${cy1} ${x2} ${y2}`} strokeWidth="0.25" />
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+        );
+      case "Corporate Waves":
+        return (
+          <div className="absolute inset-0 pointer-events-none opacity-[0.05] text-slate-800 dark:text-slate-100 z-0 badge-watermark-container">
+            <svg className="w-full h-full" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="0.5">
+              <path d="M-20,40 C20,20 40,60 60,40 C80,20 100,60 120,40" />
+              <path d="M-20,50 C20,30 40,70 60,50 C80,30 100,70 120,50" strokeDasharray="1 1" />
+              <path d="M-20,60 C20,40 40,80 60,60 C80,40 100,80 120,60" />
+              <path d="M-20,70 C20,50 40,90 60,70 C80,50 100,90 120,70" strokeDasharray="0.5 1" />
+            </svg>
+          </div>
+        );
+      case "Cyber Grid":
+        return (
+          <div className="absolute inset-0 pointer-events-none opacity-[0.03] text-slate-800 dark:text-slate-100 z-0 badge-watermark-container">
+            <svg className="w-full h-full" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="0.5">
+              {Array.from({ length: 11 }).map((_, i) => (
+                <g key={i}>
+                  <line x1="0" y1={i * 10} x2="100" y2={i * 10} />
+                  <line x1={i * 10} y1="0" x2={i * 10} y2="100" />
+                </g>
+              ))}
+            </svg>
+          </div>
+        );
+      case "None":
+      default:
+        return null;
+    }
+  };
 
   const clearMutation = useMutation({
     mutationFn: () => fetchApi(`/enrollment/${employeeId}`, { method: "DELETE" }),
@@ -185,6 +322,330 @@ export default function EnrollPage() {
       if (eng) utterance.voice = eng;
       
       window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const handleDownloadBadge = async () => {
+    if (!employee) return;
+    try {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      // Set standard high-resolution dimensions for printing (e.g., 600x900 for 2:3 aspect ratio)
+      canvas.width = 600;
+      canvas.height = 900;
+
+      // 1. Draw rounded background card
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      if (typeof ctx.roundRect === "function") {
+        ctx.roundRect(0, 0, 600, 900, 30);
+      } else {
+        const x = 0, y = 0, width = 600, height = 900, radius = 30;
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+      }
+      ctx.fill();
+      ctx.strokeStyle = "#cbd5e1"; // lighter border
+      ctx.lineWidth = 4;
+      ctx.stroke();
+
+      // Draw custom background pattern
+      const cx = 300;
+      const cy = 450;
+      if (badgePattern === "Indian Mandala") {
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.08)";
+        ctx.lineWidth = 1.5;
+        // Concentric rings
+        ctx.beginPath(); ctx.arc(cx, cy, 252, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx, cy, 210, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx, cy, 168, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx, cy, 126, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx, cy, 84, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx, cy, 42, 0, Math.PI * 2); ctx.stroke();
+        // Rays & Arches
+        for (let i = 0; i < 24; i++) {
+          const angle = (i * 15 * Math.PI) / 180;
+          ctx.beginPath();
+          ctx.moveTo(cx + 42 * Math.cos(angle), cy + 42 * Math.sin(angle));
+          ctx.lineTo(cx + 210 * Math.cos(angle), cy + 210 * Math.sin(angle));
+          ctx.stroke();
+        }
+      } else if (badgePattern === "Corporate Waves") {
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.06)";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(-50, 420);
+        ctx.bezierCurveTo(150, 220, 350, 620, 650, 420);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-50, 500);
+        ctx.bezierCurveTo(150, 300, 350, 700, 650, 500);
+        ctx.stroke();
+      } else if (badgePattern === "Cyber Grid") {
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.04)";
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 900; i += 60) {
+          ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(600, i); ctx.stroke();
+        }
+        for (let i = 0; i <= 600; i += 60) {
+          ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 900); ctx.stroke();
+        }
+      }
+
+      // 2. Draw Header Area (Dynamic gradient based on active theme)
+      const gradient = ctx.createLinearGradient(0, 0, 600, 0);
+      gradient.addColorStop(0, themeStyles.headerHex1);
+      gradient.addColorStop(1, themeStyles.headerHex2);
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      if (typeof ctx.roundRect === "function") {
+        ctx.roundRect(0, 0, 600, 200, [30, 30, 0, 0]);
+      } else {
+        const x = 0, y = 0, width = 600, height = 200, radius = 30;
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height);
+        ctx.lineTo(x, y + height);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+      }
+      ctx.fill();
+
+      // 3. Draw Lanyard Punch Hole representation (premium visual detail)
+      ctx.fillStyle = "#f1f5f9";
+      ctx.beginPath();
+      if (typeof ctx.roundRect === "function") {
+        ctx.roundRect(260, 20, 80, 20, 10);
+      } else {
+        ctx.rect(260, 20, 80, 20);
+      }
+      ctx.fill();
+      ctx.fillStyle = "#0f172a";
+      ctx.beginPath();
+      if (typeof ctx.roundRect === "function") {
+        ctx.roundRect(270, 25, 60, 10, 5);
+      } else {
+        ctx.rect(270, 25, 60, 10);
+      }
+      ctx.fill();
+
+      // Helper function to load an image
+      const loadImage = (src: string): Promise<HTMLImageElement> => {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = "anonymous"; // Avoid CORS taint
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error("Failed to load image: " + src));
+          img.src = src;
+        });
+      };
+
+      // Load logo, photo, and QR code
+      const baseUrl = getBackendUrl().replace("/api/v1", "");
+      const photoSrc = `${baseUrl}/uploads/${employee.employee_id}/front.jpg`;
+      const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${employee.employee_id}`;
+
+      let logoImg: HTMLImageElement | null = null;
+      if (companyLogo) {
+        try {
+          logoImg = await loadImage(companyLogo);
+        } catch (e) {
+          console.warn("Could not load company logo for canvas", e);
+        }
+      }
+
+      let photoImg: HTMLImageElement | null = null;
+      try {
+        photoImg = await loadImage(photoSrc);
+      } catch (e) {
+        console.warn("Could not load profile photo for canvas", e);
+      }
+
+      let qrImg: HTMLImageElement | null = null;
+      try {
+        qrImg = await loadImage(qrSrc);
+      } catch (e) {
+        console.warn("Could not load QR code for canvas", e);
+      }
+
+      // Draw Company Logo
+      if (logoImg) {
+        const logoAspectRatio = logoImg.width / logoImg.height;
+        const logoHeight = 45;
+        const logoWidth = logoHeight * logoAspectRatio;
+        ctx.drawImage(logoImg, 50, 75, logoWidth, logoHeight);
+        
+        // Draw Company Name next to logo
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 24px sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(companyName, 65 + logoWidth, 106);
+      } else {
+        // Draw default badge branding text
+        ctx.fillStyle = themeStyles.primaryHex;
+        ctx.font = "black 28px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("NETRAID", 300, 100);
+        
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 16px sans-serif";
+        ctx.fillText(companyName.toUpperCase(), 300, 130);
+      }
+
+      // Draw Profile Picture Container (with double border)
+      const photoX = 200;
+      const photoY = 220;
+      const photoSize = 200;
+
+      // Draw Photo Outer border (theme accent color)
+      ctx.strokeStyle = themeStyles.primaryHex;
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.arc(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2 + 6, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Clip and Draw Photo
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2, 0, Math.PI * 2);
+      ctx.clip();
+      if (photoImg) {
+        ctx.drawImage(photoImg, photoX, photoY, photoSize, photoSize);
+      } else {
+        // Draw placeholder avatar
+        ctx.fillStyle = "#f1f5f9";
+        ctx.fillRect(photoX, photoY, photoSize, photoSize);
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = "bold 80px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("?", photoX + photoSize / 2, photoY + photoSize / 2);
+      }
+      ctx.restore();
+
+      // Draw Holographic checkmark seal on Canvas
+      ctx.save();
+      const sealX = photoX + photoSize - 35;
+      const sealY = photoY + photoSize - 35;
+      const sealSize = 45;
+      const sealGrad = ctx.createLinearGradient(sealX, sealY, sealX + sealSize, sealY + sealSize);
+      sealGrad.addColorStop(0, "#fbbf24");
+      sealGrad.addColorStop(0.5, "#fb923c");
+      sealGrad.addColorStop(1, "#fde047");
+      ctx.fillStyle = sealGrad;
+      ctx.beginPath();
+      ctx.arc(sealX + sealSize / 2, sealY + sealSize / 2, sealSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      // Draw small tick
+      ctx.strokeStyle = "#451a03"; // deep amber
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.moveTo(sealX + 13, sealY + 22);
+      ctx.lineTo(sealX + 20, sealY + 29);
+      ctx.lineTo(sealX + 32, sealY + 16);
+      ctx.stroke();
+      ctx.restore();
+
+      // Draw Employee Details
+      ctx.fillStyle = "#0f172a"; // slate-900
+      ctx.font = "bold 32px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(employee.name.toUpperCase(), 300, 480);
+
+      ctx.fillStyle = themeStyles.primaryHex; // theme color designation
+      ctx.font = "bold 20px sans-serif";
+      ctx.fillText(employee.designation?.toUpperCase() || "STAFF MEMBER", 300, 515);
+
+      // Separator Line
+      ctx.strokeStyle = "#f1f5f9";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(100, 545);
+      ctx.lineTo(500, 545);
+      ctx.stroke();
+
+      // Draw metadata labels
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#64748b"; // slate-500
+      ctx.font = "bold 14px sans-serif";
+      ctx.fillText("EMPLOYEE ID", 100, 580);
+      ctx.fillText("DEPARTMENT", 320, 580);
+      ctx.fillText("DATE OF JOIN", 100, 640);
+      ctx.fillText("STATUS", 320, 640);
+
+      // Draw metadata values
+      ctx.fillStyle = "#0f172a"; // slate-900
+      ctx.font = "bold 18px sans-serif";
+      ctx.fillText(employee.employee_id, 100, 605);
+      ctx.fillText(employee.department?.name?.toUpperCase() || "GENERAL", 320, 605);
+      
+      const joinDate = employee.joining_date ? new Date(employee.joining_date).toLocaleDateString("en-US", {
+        year: "numeric", month: "short", day: "numeric"
+      }) : "N/A";
+      ctx.fillText(joinDate.toUpperCase(), 100, 665);
+      
+      // Draw status with verified indicator
+      ctx.fillStyle = themeStyles.primaryHex;
+      ctx.fillText("VERIFIED", 320, 665);
+
+      // 4. Bottom section: QR Code
+      const qrSize = 130;
+      const qrX = 235;
+      const qrY = 710;
+
+      // Draw QR border / background card
+      ctx.fillStyle = "#f8fafc";
+      ctx.beginPath();
+      if (typeof ctx.roundRect === "function") {
+        ctx.roundRect(qrX - 15, qrY - 15, qrSize + 30, qrSize + 30, 15);
+      } else {
+        ctx.rect(qrX - 15, qrY - 15, qrSize + 30, qrSize + 30);
+      }
+      ctx.fill();
+      ctx.strokeStyle = "#e2e8f0";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      if (qrImg) {
+        ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+      } else {
+        // Draw placeholder QR
+        ctx.strokeStyle = "#cbd5e1";
+        ctx.strokeRect(qrX, qrY, qrSize, qrSize);
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = "12px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("QR CODE", qrX + qrSize / 2, qrY + qrSize / 2);
+      }
+
+      ctx.fillStyle = "#64748b"; // slate-500
+      ctx.font = "bold 12px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("SCAN AS BACKUP IF KIOSK FACE RECOGNITION FAILS", 300, 875);
+
+      // Trigger download of the image
+      const dataUrl = canvas.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.download = `ID_Card_${employee.employee_id}.png`;
+      link.href = dataUrl;
+      link.click();
+      toast.success("ID Card PNG downloaded successfully!");
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Failed to generate and download ID Card image: " + err.message);
     }
   };
 
@@ -387,7 +848,7 @@ export default function EnrollPage() {
 
   return (
     <SidebarLayout>
-      <div className="space-y-6 max-w-5xl page-enter relative">
+      <div className="space-y-6 max-w-5xl page-enter relative print-reset-container">
         {/* CSS Scanner Animations style block */}
         <style>{`
           @keyframes scanline {
@@ -541,9 +1002,6 @@ export default function EnrollPage() {
               {/* Upload Fallback File Option */}
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
                 <h4 className="text-[11.5px] font-bold text-slate-700 uppercase tracking-wider">Manual Photo Upload</h4>
-                <p className="text-[10px] text-slate-500 leading-normal">
-                  If the employee cannot use a live camera, select a target pose and upload a photo from disk.
-                </p>
                 <div className="flex gap-2">
                   <select
                     value={selectedPose}
@@ -572,9 +1030,6 @@ export default function EnrollPage() {
             {/* Right: Big visual grid checklist */}
             <div className="md:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
               <h3 className="text-sm font-black text-slate-900 tracking-tight">Facial Pose Checklist</h3>
-              <p className="text-xs text-slate-500">
-                To capture accurate biometric details under varying orientations and lighting, we index 10 distinct facial angles.
-              </p>
               
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5 pt-2">
                 {POSE_KEYS.map((key) => {
@@ -850,50 +1305,328 @@ export default function EnrollPage() {
 
         {/* ─── State 5: SUCCESS SCREEN ─── */}
         {captureState === "success" && (
-          <div className="max-w-md mx-auto bg-white border border-slate-200 rounded-3xl p-8 shadow-2xl text-center space-y-6 animate-scaleIn">
-            <div className="relative w-20 h-20 mx-auto bg-emerald-50 rounded-full flex items-center justify-center border border-emerald-100 success-circle">
-              <svg className="w-10 h-10 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" className="success-check" />
-              </svg>
+          <div className="max-w-5xl mx-auto space-y-6 print-reset-container">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start animate-scaleIn print-reset-container">
+              
+              {/* Left Column: Success message box & Control Panel */}
+              <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-md text-center space-y-6 no-print">
+                <div className="relative w-20 h-20 mx-auto bg-emerald-50 rounded-full flex items-center justify-center border border-emerald-100 success-circle">
+                  <svg className="w-10 h-10 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" className="success-check" />
+                  </svg>
+                </div>
+
+                <div className="space-y-2">
+                  <h2 className="text-xl font-bold text-slate-900 tracking-tight">Biometric Profile Secured</h2>
+                  <p className="text-xs text-slate-550 leading-relaxed">
+                    All 10 facial profiles and mathematical vectors have been successfully registered for <strong className="text-slate-800">{employee?.name}</strong>. The kiosk scan terminal is now ready to verify attendance.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-2xl text-left border border-slate-150 space-y-2">
+                  <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider font-mono">System Integrity Verification</h4>
+                  <ul className="text-[10px] text-slate-500 font-mono space-y-1">
+                    <li className="flex items-center gap-1.5 text-emerald-600">
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                      10/10 BIOMETRIC POSES RECORDED
+                    </li>
+                    <li className="flex items-center gap-1.5 text-emerald-600">
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                      HNSW VECTOR INDEX UPDATED
+                    </li>
+                    <li className="flex items-center gap-1.5 text-emerald-600">
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                      BACKUP SECURITY QR CODE ENCODED
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <button
+                    onClick={() => router.push("/employees")}
+                    className="h-10 bg-white hover:bg-slate-55 border border-slate-250 text-slate-800 font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-sm cursor-pointer"
+                  >
+                    Employees List
+                  </button>
+
+                  <button
+                    onClick={startAutoCapture}
+                    className="h-10 bg-slate-100 hover:bg-slate-150 border border-slate-200 text-slate-800 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+                  >
+                    Re-enroll
+                  </button>
+                </div>
+
+                <div className="border-t border-slate-100 pt-5 space-y-3">
+                  <p className="text-[10.5px] text-slate-450 leading-relaxed">
+                    Generate the physical identification card below. Keep a digital copy or print immediately.
+                  </p>
+                  
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => window.print()}
+                      className={`flex-1 h-11 ${themeStyles.headerBg} hover:opacity-90 text-white font-extrabold text-[11px] uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 transition-all shadow-md hover:shadow-lg active:scale-[0.98] border border-white/10 cursor-pointer`}
+                    >
+                      <Printer className="w-4 h-4 text-white/90" />
+                      Print ID Badge
+                    </button>
+
+                    <button
+                      onClick={handleDownloadBadge}
+                      className="flex-1 h-11 bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 font-extrabold text-[11px] uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow-md active:scale-[0.98] cursor-pointer"
+                    >
+                      <Download className="w-4 h-4 text-slate-650" />
+                      Download PNG
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: ID Card Gorgeous 3D Preview */}
+              <div className="flex flex-col items-center justify-center print-reset-container">
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 font-mono no-print">
+                  Badge Live Preview ({badgeTheme} + {badgePattern})
+                </div>
+                
+                {/* Printable ID Card Element */}
+                <div 
+                  id="printable-id-card-wrap"
+                  className="w-[320px] h-[500px] bg-white rounded-[24px] border border-slate-200 shadow-[0_15px_40px_rgba(0,0,0,0.08)] overflow-hidden relative flex flex-col transition-all hover:scale-[1.01] hover:shadow-[0_20px_50px_rgba(0,0,0,0.12)] duration-300 select-none font-sans animate-fadeIn"
+                >
+                  {/* Watermark Pattern Overlay */}
+                  <BadgeWatermark type={badgePattern} />
+
+                  {/* Holographic Glossy Overlay (Premium aesthetic) */}
+                  <div className="absolute inset-0 bg-linear-to-tr from-white/0 via-white/5 to-white/10 pointer-events-none z-10" />
+
+                  {/* Lanyard punch hole detail */}
+                  <div className="absolute top-3.5 left-1/2 -translate-x-1/2 w-10 h-3 bg-slate-100 rounded-full border border-slate-200/50 flex items-center justify-center pointer-events-none no-print">
+                    <div className="w-6 h-1 bg-slate-300 rounded-full" />
+                  </div>
+
+                  {/* Header: Company Name & Logo */}
+                  <div className={`h-[105px] ${themeStyles.headerBg} relative flex flex-col justify-end px-5 pb-3`}>
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.1),transparent_70%)] pointer-events-none" />
+                    
+                    <div className="flex items-center gap-3.5 mt-2 relative z-10">
+                      {companyLogo ? (
+                        <img 
+                          src={companyLogo} 
+                          alt="Logo" 
+                          className="h-8 max-w-[90px] object-contain shrink-0" 
+                        />
+                      ) : (
+                        <div className="w-7 h-7 rounded-lg bg-white/20 backdrop-blur-xs flex items-center justify-center text-white text-[10px] font-black tracking-tighter shadow-sm font-mono shrink-0 border border-white/10">
+                          NID
+                        </div>
+                      )}
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[12px] font-black tracking-wider text-white uppercase truncate">
+                          {companyName}
+                        </span>
+                        <span className="text-[7.5px] font-bold text-white/80 tracking-widest uppercase">
+                          SECURED IDENTITY CARD
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Body Content */}
+                  <div className="flex-1 flex flex-col items-center pt-7 px-6 relative bg-transparent z-10">
+                    
+                    {/* Employee Profile Image Container */}
+                    <div className={`relative w-[120px] h-[120px] rounded-full p-1 bg-gradient-to-tr ${themeStyles.photoBorder} shadow-md`}>
+                      <div className="w-full h-full rounded-full overflow-hidden border-2 border-white bg-slate-100">
+                        <img
+                          src={`${getBackendUrl().replace("/api/v1", "")}/uploads/${employee?.employee_id}/front.jpg`}
+                          alt={employee?.name}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+                          }}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      
+                      {/* Holographic Official Seal */}
+                      <div className="absolute -bottom-1.5 -right-1.5 bg-gradient-to-tr from-amber-400 via-orange-400 to-yellow-300 text-amber-950 font-bold border-2 border-white rounded-full w-6 h-6 flex items-center justify-center shadow-md z-10 pointer-events-none">
+                        <svg className="w-3.5 h-3.5 stroke-amber-950" viewBox="0 0 24 24" fill="none" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      </div>
+                    </div>
+
+                    {/* Employee Identity details */}
+                    <div className="text-center mt-4 space-y-0.5">
+                      <h3 className="text-base font-extrabold text-slate-900 tracking-tight uppercase leading-tight">
+                        {employee?.name}
+                      </h3>
+                      <p className={`text-[11px] font-bold ${themeStyles.accentText} tracking-widest uppercase`}>
+                        {employee?.designation || "Staff Member"}
+                      </p>
+                    </div>
+
+                    {/* Meta Fields Table */}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 w-full border-t border-slate-100 mt-5 pt-3.5 bg-transparent">
+                      <div>
+                        <span className="text-[7.5px] font-extrabold text-slate-400 uppercase tracking-widest block font-mono">
+                          Employee ID
+                        </span>
+                        <span className="text-[10px] font-extrabold text-slate-800 tracking-tight block">
+                          {employee?.employee_id}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[7.5px] font-extrabold text-slate-400 uppercase tracking-widest block font-mono">
+                          Department
+                        </span>
+                        <span className="text-[10px] font-extrabold text-slate-800 tracking-tight block truncate uppercase">
+                          {employee?.department?.name || "General"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[7.5px] font-extrabold text-slate-400 uppercase tracking-widest block font-mono">
+                          Date of Join
+                        </span>
+                        <span className="text-[10px] font-extrabold text-slate-800 tracking-tight block">
+                          {employee?.joining_date ? new Date(employee.joining_date).toLocaleDateString("en-US", {
+                            year: "numeric", month: "short", day: "numeric"
+                          }) : "N/A"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[7.5px] font-extrabold text-slate-400 uppercase tracking-widest block font-mono">
+                          Security Status
+                        </span>
+                        <span className={`text-[10px] font-bold ${themeStyles.accentText} tracking-tight flex items-center gap-1`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${themeStyles.dotColor}`} />
+                          VERIFIED
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* QR Code Fallback Section */}
+                  <div className="bg-slate-50/80 backdrop-blur-xs border-t border-slate-100 h-[120px] flex items-center justify-between px-6 pb-2.5 shrink-0 z-10">
+                    <div className="flex flex-col min-w-0 pr-2">
+                      <span className="text-[8px] font-black text-slate-900 tracking-wider uppercase font-mono">
+                        SCAN TO VERIFY
+                      </span>
+                      <p className="text-[7px] text-slate-450 font-medium leading-snug mt-0.5 max-w-[130px] font-mono">
+                        If facial scanner recognition fails, scan this backup QR code at Kiosk terminal.
+                      </p>
+                    </div>
+
+                    {/* QR Code Container */}
+                    <div className="w-[75px] h-[75px] bg-white rounded-lg border border-slate-200/80 p-1 flex items-center justify-center shadow-2xs shrink-0 font-mono">
+                      <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${employee?.employee_id}`}
+                        alt="QR Code"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <h2 className="text-lg font-black text-slate-900 tracking-tight">Biometric Profile Secured</h2>
-              <p className="text-xs text-slate-550 leading-relaxed">
-                All 10 facial profiles and mathematical vectors have been successfully registered for <strong className="text-slate-800">{employee?.name}</strong>. The kiosk scan terminal is now ready to verify attendance.
-              </p>
-            </div>
+            {/* Print Styling Injected locally */}
+            <style dangerouslySetInnerHTML={{ __html: `
+              @media print {
+                /* Hide sidebar, headers, footers and any elements marked no-print */
+                aside, header, footer, .no-print, button, input, select, [role="navigation"], .ambient-bg, .mesh-bg {
+                  display: none !important;
+                }
+                
+                @page {
+                  size: portrait;
+                  margin: 0;
+                }
+                
+                /* Reset container layout models so they don't center, shift or clip the content */
+                html, body, html.dark, body.dark {
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  width: 100% !important;
+                  height: 100% !important;
+                  overflow: hidden !important;
+                  background-color: white !important;
+                  background: white !important;
+                  position: relative !important;
+                }
 
-            <div className="flex gap-3 justify-center pt-2">
-              <button
-                onClick={() => router.push("/employees")}
-                className="h-10 px-6 bg-slate-950 hover:bg-slate-900 border border-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
-              >
-                Employees List
-              </button>
+                /* Reset only parent layout hierarchy, leaving internal elements of card intact */
+                main, 
+                body > div,
+                #sidebar-layout-container, 
+                .sidebar-layout-content, 
+                .print-reset-container,
+                .page-enter,
+                .dark main,
+                .dark body > div,
+                .dark #sidebar-layout-container,
+                .dark .sidebar-layout-content,
+                .dark .print-reset-container,
+                .dark .page-enter {
+                  border: none !important;
+                  box-shadow: none !important;
+                  background: transparent !important;
+                  background-color: transparent !important;
+                  padding: 0 !important;
+                  margin: 0 !important;
+                  height: auto !important;
+                  min-height: 0 !important;
+                  overflow: visible !important;
+                  position: static !important;
+                  width: auto !important;
+                  display: block !important;
+                  /* Clear transform/animations that would trap fixed/absolute positioning context */
+                  transform: none !important;
+                  animation: none !important;
+                  transition: none !important;
+                }
+                
+                /* Center and display only the card wrapper */
+                #printable-id-card-wrap {
+                  display: flex !important;
+                  flex-direction: column !important;
+                  visibility: visible !important;
+                  position: fixed !important;
+                  left: 50% !important;
+                  top: 50% !important;
+                  transform: translate(-50%, -50%) scale(1.1) !important;
+                  border: 1px solid #cbd5e1 !important;
+                  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+                  border-radius: 24px !important;
+                  background-color: white !important;
+                  width: 320px !important;
+                  height: 500px !important;
+                  margin: 0 !important;
+                  overflow: hidden !important;
+                  page-break-inside: avoid;
+                }
 
-              <button
-                onClick={startAutoCapture}
-                className="h-10 px-6 bg-slate-100 hover:bg-slate-150 border border-slate-200 text-slate-800 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
-              >
-                Re-enroll Profile
-              </button>
-            </div>
+                #printable-id-card-wrap * {
+                  visibility: visible !important;
+                }
+                
+                /* Force print watermark color & visibility */
+                .badge-watermark-container,
+                .dark .badge-watermark-container {
+                  color: #475569 !important;
+                  opacity: 0.12 !important;
+                }
+                
+                /* Ensure background colors and images print properly */
+                * {
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                }
+              }
+            ` }} />
           </div>
         )}
 
-        {/* ─── Tips Section ─── */}
-        {captureState === "idle" && (
-          <div className="flex items-start gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
-            <AlertCircle className="w-4 h-4 text-slate-700 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-[11px] font-bold text-slate-900 uppercase tracking-wider mb-1 font-mono">Registry Specifications</p>
-              <p className="text-[10px] text-slate-650 leading-relaxed font-mono uppercase">
-                AUTOMATED ENROLLMENT PROCESS IS COMPLETELY HANDS-FREE. SYSTEM WILL INSTRUCT AND SYNC CAMERAS IN SEQUENCE. ENSURE STABLE ROOM LIGHTING AND POSES TO ACCURATELY INDEX FACIAL VECTORS.
-              </p>
-            </div>
-          </div>
-        )}
+
       </div>
 
       {/* Clear Biometric Confirmation Modal */}

@@ -62,6 +62,28 @@ class DepartmentOut(DepartmentBase):
     id: int
     model_config = ConfigDict(from_attributes=True)
 
+# Shift Schemas
+class ShiftBase(BaseModel):
+    name: str = Field(..., max_length=100)
+    start_time: time
+    end_time: time
+    grace_period_minutes: int = 15
+    description: Optional[str] = None
+
+class ShiftCreate(ShiftBase):
+    pass
+
+class ShiftUpdate(BaseModel):
+    name: Optional[str] = None
+    start_time: Optional[time] = None
+    end_time: Optional[time] = None
+    grace_period_minutes: Optional[int] = None
+    description: Optional[str] = None
+
+class ShiftOut(ShiftBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
 # Employee Schemas
 class EmployeeBase(BaseModel):
     employee_id: str
@@ -72,6 +94,8 @@ class EmployeeBase(BaseModel):
     joining_date: date
     status: str = "Active"
     department_id: Optional[int] = None
+    shift_id: Optional[int] = None
+    allow_wfh: bool = False
 
     @field_validator('phone')
     @classmethod
@@ -96,6 +120,8 @@ class EmployeeUpdate(BaseModel):
     joining_date: Optional[date] = None
     status: Optional[str] = None
     department_id: Optional[int] = None
+    shift_id: Optional[int] = None
+    allow_wfh: Optional[bool] = None
 
 class EmployeeImageOut(BaseModel):
     id: int
@@ -108,6 +134,7 @@ class EmployeeOut(EmployeeBase):
     id: int
     user_id: Optional[int] = None
     department: Optional[DepartmentOut] = None
+    shift: Optional[ShiftOut] = None
     images: List[EmployeeImageOut] = []
     created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)

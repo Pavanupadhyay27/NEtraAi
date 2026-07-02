@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
+from typing import Optional
 import base64
 import cv2
 import numpy as np
@@ -59,10 +60,31 @@ def _publish_log(log_obj, employee=None):
     except Exception as exc:
         logger.warning(f"Failed to publish scan event: {exc}")
 
+import math
+
+def calculate_distance_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    # Haversine formula
+    R = 6371000.0  # Earth radius in meters
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+    
+    a = math.sin(delta_phi / 2.0)**2 + \
+        math.cos(phi1) * math.cos(phi2) * \
+        math.sin(delta_lambda / 2.0)**2
+    c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+    return R * c
+
 class KioskScanRequest(BaseModel):
     image: str = Field(..., description="Base64 encoded image frame (JPEG/PNG data URL)")
     camera: str = Field("Main Kiosk", description="Identifier of the kiosk scanner device")
     confirm_checkout: bool = Field(False, description="Whether the check-out is confirmed by the employee")
+    qr_code: str = Field(None, description="Pre-detected QR code string from frontend")
+    qr_only: bool = Field(False, description="If True, only allow QR-based logging and disable face recognition")
+    latitude: Optional[float] = Field(None, description="Latitude of the kiosk/device marking attendance")
+    longitude: Optional[float] = Field(None, description="Longitude of the kiosk/device marking attendance")
+
 
 @router.post("/scan")
 def scan_face(
@@ -107,132 +129,238 @@ def scan_face(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid Base64 image data")
 
-    # 2. Detect face
-    faces = face_engine.detect_faces(img)
-    if not faces:
-        return {
-            "status": "no_face",
-            "message": "No face detected. Frame your face within the scanner.",
-            "should_retry": True
-        }
-    if len(faces) > 1:
-        return {
-            "status": "multiple_faces",
-            "message": "Multiple faces detected. Please scan one person at a time.",
-            "should_retry": True
-        }
-        
-    face = faces[0]
-    bbox = face["bbox"]
-    confidence = face["confidence"]
-    landmarks = face["landmarks"]
-    
-    # 3. Liveness Check
-    liveness_score, is_live = face_engine.check_liveness(img, bbox, threshold=liveness_threshold)
-    if not is_live and not face_engine.mock_mode:
-        # Save spoof log
-        log_entry = crud.create_attendance_log(
-            db=db,
-            employee_id=None,
-            camera=payload.camera,
-            confidence=confidence,
-            liveness_score=liveness_score,
-            is_spoof=True,
-            status="Spoof Rejected",
-            timestamp=now
-        )
-        _publish_log(log_entry)
-        return {
-            "status": "spoof_detected",
-            "message": "Liveness check failed! Verification denied.",
-            "confidence": float(confidence),
-            "liveness_score": float(liveness_score),
-            "should_retry": False
-        }
+    qr_employee = None
+    is_qr_scan = False
+    bbox_list = None
 
-    # 4. Extract Embedding
-    aligned = face_engine.align_face(img, landmarks)
-    embedding = face_engine.extract_embedding(aligned)
-    
-    # 5. DB Matching: fetch all vectors and compute similarity in memory (completely database-agnostic)
-    if face_engine.embeddings_cache is None:
-        face_engine.load_embeddings_cache(db)
-        
-    all_embeddings = face_engine.embeddings_cache
-    if not all_embeddings:
-        match_result = None
-    else:
+    # Check if qr_code was pre-detected by the frontend
+    if getattr(payload, "qr_code", None):
+        qr_val = payload.qr_code.strip()
+        qr_employee = db.query(models.Employee).filter(
+            models.Employee.employee_id == qr_val
+        ).first()
+        if qr_employee:
+            is_qr_scan = True
+            logger.info(f"QR code pre-detected by frontend: {qr_employee.employee_id}")
+
+    if not is_qr_scan:
         try:
-            # High-performance vectorized search using NumPy matrix multiplication.
-            # ArcFace embeddings are L2-normalized, so cosine similarity is just the dot product.
-            embeddings_matrix = np.stack([emb["embedding"] for emb in all_embeddings])  # shape (N, 512)
-            similarities = np.dot(embeddings_matrix, embedding)  # shape (N,)
-            best_idx = int(np.argmax(similarities))
-            best_similarity = float(similarities[best_idx])
+            qr_detector = cv2.QRCodeDetector()
+            qr_val, _, _ = qr_detector.detectAndDecode(img)
+            if qr_val:
+                qr_val = qr_val.strip()
+                qr_employee = db.query(models.Employee).filter(
+                    models.Employee.employee_id == qr_val
+                ).first()
+                if qr_employee:
+                    is_qr_scan = True
+                    logger.info(f"QR code scanned successfully for employee: {qr_employee.employee_id}")
+        except Exception as qr_err:
+            logger.warning(f"QR code parsing error: {qr_err}")
+
+    if is_qr_scan:
+        employee = qr_employee
+        similarity = 1.0
+        liveness_score = 1.0
+        confidence = 1.0
+        log_status_success = "Match Success (QR Scanned)"
+    else:
+        if getattr(payload, "qr_only", False):
+            return {
+                "status": "unknown",
+                "message": "Invalid QR code. Employee badge not found.",
+                "should_retry": True
+            }
+        # 2. Detect face
+        faces = face_engine.detect_faces(img)
+        if not faces:
+            return {
+                "status": "no_face",
+                "message": "No face detected. Frame your face within the scanner.",
+                "should_retry": True
+            }
+        if len(faces) > 1:
+            return {
+                "status": "multiple_faces",
+                "message": "Multiple faces detected. Please scan one person at a time.",
+                "should_retry": True
+            }
             
-            best_emb_record = all_embeddings[best_idx]
-            class MockEmb:
-                id = best_emb_record["id"]
-                employee_id = best_emb_record["employee_id"]
+        face = faces[0]
+        bbox = face["bbox"]
+        bbox_list = [float(x) for x in bbox]
+        confidence = face["confidence"]
+        landmarks = face["landmarks"]
+        
+        # 3. Liveness Check
+        liveness_score, is_live = face_engine.check_liveness(img, bbox, threshold=liveness_threshold)
+        if not is_live and not face_engine.mock_mode:
+            # Save spoof log
+            log_entry = crud.create_attendance_log(
+                db=db,
+                employee_id=None,
+                camera=payload.camera,
+                confidence=confidence,
+                liveness_score=liveness_score,
+                is_spoof=True,
+                status="Spoof Rejected",
+                timestamp=now
+            )
+            _publish_log(log_entry)
             
-            # distance = 1 - similarity
-            best_dist = 1.0 - best_similarity
-            match_result = (MockEmb(), best_dist)
-        except Exception as e:
-            logger.error(f"Error in vectorized face matching: {e}")
-            match_result = None
-    
-    if not match_result:
-        # Database has no enrolled embeddings
-        log_entry = crud.create_attendance_log(
-            db=db,
-            employee_id=None,
-            camera=payload.camera,
-            confidence=confidence,
-            liveness_score=liveness_score,
-            is_spoof=False,
-            status="Empty Vector Index",
-            timestamp=now
-        )
-        _publish_log(log_entry)
-        return {
-            "status": "unknown",
-            "message": "No employees registered in the system. Please register first.",
-            "should_retry": False
-        }
+            # Dispatch Webhook alert
+            try:
+                from app.services.notifications import trigger_security_alert
+                trigger_security_alert(
+                    db=db,
+                    alert_type="Spoofing Attempt Rejected",
+                    details={
+                        "camera": payload.camera,
+                        "confidence": float(confidence),
+                        "liveness_score": float(liveness_score),
+                        "timestamp": now.strftime("%Y-%m-%d %H:%M:%S")
+                    }
+                )
+            except Exception as alert_err:
+                logger.error(f"Failed to dispatch security alert: {alert_err}")
+
+            return {
+                "status": "spoof_detected",
+                "message": "Liveness check failed! Verification denied.",
+                "confidence": float(confidence),
+                "liveness_score": float(liveness_score),
+                "should_retry": False,
+                "bbox": bbox_list
+            }
+
+        # 4. Extract Embedding
+        aligned = face_engine.align_face(img, landmarks)
+        embedding = face_engine.extract_embedding(aligned)
         
-    db_emb, distance = match_result
-    # Similarity = 1 - Distance
-    similarity = 1.0 - float(distance)
-    
-    if similarity < face_threshold:
-        # Low confidence match -> Unknown
-        log_entry = crud.create_attendance_log(
-            db=db,
-            employee_id=None,
-            camera=payload.camera,
-            confidence=similarity,
-            liveness_score=liveness_score,
-            is_spoof=False,
-            status="Unknown Person",
-            timestamp=now
-        )
-        _publish_log(log_entry)
-        return {
-            "status": "unknown",
-            "message": "Face not recognized. Please try again or contact HR.",
-            "confidence": similarity,
-            "liveness_score": liveness_score,
-            "should_retry": True
-        }
+        # 5. DB Matching: query pgvector if postgresql, else fallback to numpy cache-matching
+        match_result = None
+        is_pg = False
+        try:
+            is_pg = (db.bind.dialect.name == "postgresql")
+        except Exception as dialect_err:
+            logger.warning(f"Could not determine DB dialect: {dialect_err}")
+
+        if is_pg:
+            try:
+                # Run database-level query using pgvector's cosine distance (<=>) operator
+                emb_list = embedding.tolist() if isinstance(embedding, np.ndarray) else list(embedding)
+                distance_expr = models.FaceEmbedding.embedding.op('<=>')(emb_list).label('distance')
+                query_res = db.query(models.FaceEmbedding, distance_expr).order_by(distance_expr).limit(1).first()
+                if query_res:
+                    db_emb, distance = query_res
+                    match_result = (db_emb, float(distance))
+            except Exception as pg_err:
+                logger.error(f"Failed to query pgvector: {pg_err}. Falling back to SQLite/NumPy matching.")
+                match_result = None
+
+        if match_result is None:
+            if face_engine.embeddings_cache is None:
+                face_engine.load_embeddings_cache(db)
+                
+            all_embeddings = face_engine.embeddings_cache
+            if not all_embeddings:
+                match_result = None
+            else:
+                try:
+                    # High-performance vectorized search using NumPy matrix multiplication.
+                    # ArcFace embeddings are L2-normalized, so cosine similarity is just the dot product.
+                    embeddings_matrix = np.stack([emb["embedding"] for emb in all_embeddings])  # shape (N, 512)
+                    similarities = np.dot(embeddings_matrix, embedding)  # shape (N,)
+                    best_idx = int(np.argmax(similarities))
+                    best_similarity = float(similarities[best_idx])
+                    
+                    best_emb_record = all_embeddings[best_idx]
+                    class MockEmb:
+                        id = best_emb_record["id"]
+                        employee_id = best_emb_record["employee_id"]
+                    
+                    # distance = 1 - similarity
+                    best_dist = 1.0 - best_similarity
+                    match_result = (MockEmb(), best_dist)
+                except Exception as e:
+                    logger.error(f"Error in vectorized face matching: {e}")
+                    match_result = None
         
-    # Face Matched!
-    employee = crud.get_employee_by_id(db, db_emb.employee_id)
+        if not match_result:
+            # Database has no enrolled embeddings
+            log_entry = crud.create_attendance_log(
+                db=db,
+                employee_id=None,
+                camera=payload.camera,
+                confidence=confidence,
+                liveness_score=liveness_score,
+                is_spoof=False,
+                status="Empty Vector Index",
+                timestamp=now
+            )
+            _publish_log(log_entry)
+            return {
+                "status": "unknown",
+                "message": "No employees registered in the system. Please register first.",
+                "should_retry": False,
+                "bbox": bbox_list
+            }
+            
+        db_emb, distance = match_result
+        # Similarity = 1 - Distance
+        similarity = 1.0 - float(distance)
+        
+        employee = crud.get_employee_by_id(db, db_emb.employee_id) if db_emb else None
+        
+        if similarity < face_threshold:
+            qr_fallback_setting = crud.get_setting_by_key(db, "QR_FALLBACK_ENABLED")
+            qr_fallback_enabled = qr_fallback_setting.value.lower() == "true" if qr_fallback_setting else True
+            
+            if False:  # Disable automatic QR fallback on borderline match
+                return {
+                    "status": "needs_qr",
+                    "message": "Face matched but requires identity verification. Please scan your employee QR code.",
+                    "employee": {
+                        "id": employee.id,
+                        "employee_id": employee.employee_id,
+                        "name": employee.name,
+                        "designation": employee.designation,
+                        "department": employee.department.name if employee.department else "General"
+                    },
+                    "confidence": similarity,
+                    "liveness_score": liveness_score,
+                    "should_retry": False,
+                    "bbox": bbox_list
+                }
+                
+            # Low confidence match -> Unknown
+            log_entry = crud.create_attendance_log(
+                db=db,
+                employee_id=None,
+                camera=payload.camera,
+                confidence=similarity,
+                liveness_score=liveness_score,
+                is_spoof=False,
+                status="Unknown Person",
+                timestamp=now
+            )
+            _publish_log(log_entry)
+            return {
+                "status": "unknown",
+                "message": "Face not recognized. Please try again or contact HR.",
+                "confidence": similarity,
+                "liveness_score": liveness_score,
+                "should_retry": True,
+                "bbox": bbox_list
+            }
+        log_status_success = "Match Success"
+
     if not employee or employee.status != "Active":
         # Inactive employee
+        emp_id_to_log = employee.id if employee else (db_emb.employee_id if ('db_emb' in locals() and db_emb) else None)
         log_entry = crud.create_attendance_log(
             db=db,
-            employee_id=db_emb.employee_id,
+            employee_id=emp_id_to_log,
             camera=payload.camera,
             confidence=similarity,
             liveness_score=liveness_score,
@@ -241,11 +369,88 @@ def scan_face(
             timestamp=now
         )
         _publish_log(log_entry, employee)
+        
+        # Dispatch Webhook alert
+        try:
+            from app.services.notifications import trigger_security_alert
+            trigger_security_alert(
+                db=db,
+                alert_type="Deactivated Employee Access Attempt",
+                details={
+                    "camera": payload.camera,
+                    "confidence": float(similarity),
+                    "liveness_score": float(liveness_score),
+                    "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
+                    "employee_name": employee.name if employee else "Unknown",
+                    "employee_id": employee.employee_id if employee else "Unknown"
+                }
+            )
+        except Exception as alert_err:
+            logger.error(f"Failed to dispatch security alert: {alert_err}")
+
         return {
             "status": "inactive",
             "message": "Employee account is deactivated. Access denied.",
-            "should_retry": False
+            "should_retry": False,
+            "bbox": bbox_list
         }
+        
+    # Geofencing validation check
+    loc_enabled_setting = crud.get_setting_by_key(db, "LOCATION_RESTRICTION_ENABLED")
+    loc_enabled = loc_enabled_setting.value.lower() == "true" if loc_enabled_setting else False
+
+    if loc_enabled and not getattr(employee, "allow_wfh", False):
+        if payload.latitude is None or payload.longitude is None:
+            log_entry = crud.create_attendance_log(
+                db=db,
+                employee_id=employee.id,
+                camera=payload.camera,
+                confidence=similarity if 'similarity' in locals() else 1.0,
+                liveness_score=liveness_score if 'liveness_score' in locals() else 1.0,
+                is_spoof=False,
+                status="Location Missing",
+                timestamp=now
+            )
+            _publish_log(log_entry, employee)
+            return {
+                "status": "location_error",
+                "message": "GPS coordinates are required to mark attendance.",
+                "should_retry": False,
+                "bbox": bbox_list
+            }
+
+        loc_lat_setting = crud.get_setting_by_key(db, "LOCATION_LATITUDE")
+        loc_lon_setting = crud.get_setting_by_key(db, "LOCATION_LONGITUDE")
+        loc_rad_setting = crud.get_setting_by_key(db, "LOCATION_RADIUS_METERS")
+
+        try:
+            office_lat = float(loc_lat_setting.value) if loc_lat_setting else 0.0
+            office_lon = float(loc_lon_setting.value) if loc_lon_setting else 0.0
+            allowed_radius = float(loc_rad_setting.value) if loc_rad_setting else 50.0
+        except ValueError:
+            office_lat = 0.0
+            office_lon = 0.0
+            allowed_radius = 50.0
+
+        dist = calculate_distance_meters(payload.latitude, payload.longitude, office_lat, office_lon)
+        if dist > allowed_radius:
+            log_entry = crud.create_attendance_log(
+                db=db,
+                employee_id=employee.id,
+                camera=payload.camera,
+                confidence=similarity if 'similarity' in locals() else 1.0,
+                liveness_score=liveness_score if 'liveness_score' in locals() else 1.0,
+                is_spoof=False,
+                status="Outside Office Bounds",
+                timestamp=now
+            )
+            _publish_log(log_entry, employee)
+            return {
+                "status": "location_error",
+                "message": f"Outside allowed area. Distance: {dist:.1f}m. Max radius: {allowed_radius}m.",
+                "should_retry": False,
+                "bbox": bbox_list
+            }
         
     global _last_greeted_employee_id
     should_greet = True
@@ -256,6 +461,32 @@ def scan_face(
 
     from sqlalchemy import select, and_
     from datetime import time, timedelta
+
+    # Resolve shift details for employee
+    if employee.shift:
+        shift_start = employee.shift.start_time
+        shift_end = employee.shift.end_time
+        grace_mins = employee.shift.grace_period_minutes
+    else:
+        start_time_setting = crud.get_setting_by_key(db, "CHECK_IN_START")
+        end_time_setting = crud.get_setting_by_key(db, "CHECK_OUT_END")
+        grace_period_setting = crud.get_setting_by_key(db, "GRACE_PERIOD_MINUTES")
+        
+        start_str = start_time_setting.value if start_time_setting else "09:00"
+        end_str = end_time_setting.value if end_time_setting else "17:00"
+        grace_mins = int(grace_period_setting.value) if grace_period_setting else 15
+        
+        try:
+            hr, mn = map(int, start_str.split(":"))
+            shift_start = time(hr, mn)
+        except Exception:
+            shift_start = time(9, 0)
+            
+        try:
+            hr, mn = map(int, end_str.split(":"))
+            shift_end = time(hr, mn)
+        except Exception:
+            shift_end = time(17, 0)
 
     # 6. Check state of attendance
     stmt = select(models.Attendance).where(
@@ -268,16 +499,7 @@ def scan_face(
 
     if not attendance_record:
         # --- First scan of the day: Check-In ---
-        start_time_setting = crud.get_setting_by_key(db, "CHECK_IN_START")
-        grace_period_setting = crud.get_setting_by_key(db, "GRACE_PERIOD_MINUTES")
-        start_str = start_time_setting.value if start_time_setting else "09:00"
-        grace_mins = int(grace_period_setting.value) if grace_period_setting else 15
-        try:
-            hr, mn = map(int, start_str.split(":"))
-            check_in_deadline = datetime.combine(now.date(), time(hr, mn)) + timedelta(minutes=grace_mins)
-        except Exception:
-            check_in_deadline = datetime.combine(now.date(), time(9, 15))
-
+        check_in_deadline = datetime.combine(now.date(), shift_start) + timedelta(minutes=grace_mins)
         is_late = now > check_in_deadline
         status = "Late" if is_late else "Present"
 
@@ -300,7 +522,7 @@ def scan_face(
             confidence=similarity,
             liveness_score=liveness_score,
             is_spoof=False,
-            status="Match Success",
+            status=log_status_success,
             timestamp=now
         )
         _publish_log(log_entry, employee)
@@ -344,7 +566,8 @@ def scan_face(
                 "detail": "Attendance Recorded Successfully",
                 "closing": "Have a Great Day"
             },
-            "tts_url": tts_url
+            "tts_url": tts_url,
+            "bbox": bbox_list
         }
 
     else:
@@ -365,7 +588,7 @@ def scan_face(
                     confidence=similarity,
                     liveness_score=liveness_score,
                     is_spoof=False,
-                    status="Match Success",
+                    status=log_status_success,
                     timestamp=now
                 )
                 _publish_log(log_entry, employee)
@@ -408,7 +631,8 @@ def scan_face(
                         "detail": "Emergency Check-In Recorded",
                         "closing": "Have a Great Day"
                     },
-                    "tts_url": tts_url
+                    "tts_url": tts_url,
+                    "bbox": bbox_list
                 }
             else:
                 # Locked for the day!
@@ -427,7 +651,8 @@ def scan_face(
                 return {
                     "status": "locked",
                     "message": "Attendance locked until tomorrow. Emergency entry must be approved by Admin.",
-                    "should_retry": False
+                    "should_retry": False,
+                    "bbox": bbox_list
                 }
 
         else:
@@ -465,7 +690,8 @@ def scan_face(
                         "detail": "Tap Yes to confirm Check Out",
                         "closing": f"Duration: {hours} hours"
                     },
-                    "tts_url": tts_url
+                    "tts_url": tts_url,
+                    "bbox": bbox_list
                 }
             else:
                 # User confirmed checkout!
@@ -475,18 +701,20 @@ def scan_face(
                 attendance_record.working_hours = hours
 
                 # Early departure and overtime
-                end_time_setting = crud.get_setting_by_key(db, "CHECK_OUT_END")
-                end_str = end_time_setting.value if end_time_setting else "17:00"
-                try:
-                    ehr, emn = map(int, end_str.split(":"))
-                    departure_deadline = datetime.combine(now.date(), time(ehr, emn))
-                except Exception:
-                    departure_deadline = datetime.combine(now.date(), time(17, 0))
+                departure_deadline = datetime.combine(now.date(), shift_end)
                 attendance_record.early_departure = now < departure_deadline
-                attendance_record.overtime = max(0.0, round(hours - 8.0, 2))
+                
+                dt_start = datetime.combine(now.date(), shift_start)
+                dt_end = datetime.combine(now.date(), shift_end)
+                if dt_end < dt_start:
+                    dt_end += timedelta(days=1)
+                shift_duration_hours = (dt_end - dt_start).total_seconds() / 3600.0
+                
+                attendance_record.overtime = max(0.0, round(hours - shift_duration_hours, 2))
 
-                # Update status based on hours
-                if hours < 8.0:
+                # Update status based on hours: Half Day if hours < 50% of shift duration
+                half_day_threshold = shift_duration_hours * 0.5 if shift_duration_hours > 0 else 4.0
+                if hours < half_day_threshold:
                     attendance_record.status = "Half Day"
                 else:
                     if attendance_record.status in ["Half Day", "Absent"]:
@@ -502,7 +730,7 @@ def scan_face(
                     confidence=similarity,
                     liveness_score=liveness_score,
                     is_spoof=False,
-                    status="Match Success",
+                    status=log_status_success,
                     timestamp=now
                 )
                 _publish_log(log_entry, employee)
@@ -546,7 +774,8 @@ def scan_face(
                         "detail": "Checkout Recorded Successfully",
                         "closing": f"Worked: {hours} hours"
                     },
-                    "tts_url": tts_url
+                    "tts_url": tts_url,
+                    "bbox": bbox_list
                 }
 
 @router.get("/tts")
@@ -564,3 +793,153 @@ def play_tts(text: str):
     except Exception as e:
         logger.error(f"Error serving TTS endpoint: {e}")
         raise HTTPException(status_code=500, detail="Voice generation failed")
+
+class KioskQRConfirmRequest(BaseModel):
+    employee_id: int
+    qr_code: str
+    camera: str = Field("Main Kiosk", description="Identifier of the kiosk scanner device")
+    latitude: Optional[float] = Field(None, description="Latitude of the kiosk/device marking attendance")
+    longitude: Optional[float] = Field(None, description="Longitude of the kiosk/device marking attendance")
+
+@router.post("/confirm-qr")
+def confirm_qr(
+    payload: KioskQRConfirmRequest,
+    db: Session = Depends(get_db)
+):
+    employee = crud.get_employee_by_id(db, payload.employee_id)
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+        
+    # Geofencing check for QR Confirmation
+    loc_enabled_setting = crud.get_setting_by_key(db, "LOCATION_RESTRICTION_ENABLED")
+    loc_enabled = loc_enabled_setting.value.lower() == "true" if loc_enabled_setting else False
+
+    if loc_enabled and not getattr(employee, "allow_wfh", False):
+        if payload.latitude is None or payload.longitude is None:
+            crud.create_attendance_log(
+                db=db,
+                employee_id=employee.id,
+                camera=payload.camera,
+                confidence=1.0,
+                liveness_score=1.0,
+                is_spoof=False,
+                status="Location Missing (QR)",
+                timestamp=datetime.now()
+            )
+            raise HTTPException(status_code=400, detail="GPS coordinates are required to mark attendance.")
+
+        loc_lat_setting = crud.get_setting_by_key(db, "LOCATION_LATITUDE")
+        loc_lon_setting = crud.get_setting_by_key(db, "LOCATION_LONGITUDE")
+        loc_rad_setting = crud.get_setting_by_key(db, "LOCATION_RADIUS_METERS")
+
+        try:
+            office_lat = float(loc_lat_setting.value) if loc_lat_setting else 0.0
+            office_lon = float(loc_lon_setting.value) if loc_lon_setting else 0.0
+            allowed_radius = float(loc_rad_setting.value) if loc_rad_setting else 50.0
+        except ValueError:
+            office_lat = 0.0
+            office_lon = 0.0
+            allowed_radius = 50.0
+
+        dist = calculate_distance_meters(payload.latitude, payload.longitude, office_lat, office_lon)
+        if dist > allowed_radius:
+            crud.create_attendance_log(
+                db=db,
+                employee_id=employee.id,
+                camera=payload.camera,
+                confidence=1.0,
+                liveness_score=1.0,
+                is_spoof=False,
+                status="Outside Office Bounds (QR)",
+                timestamp=datetime.now()
+            )
+            raise HTTPException(status_code=400, detail=f"Outside allowed area. Distance: {dist:.1f}m. Max radius: {allowed_radius}m.")
+        
+    if payload.qr_code.strip() != employee.employee_id.strip():
+        # Audit log for failed verification
+        log_entry = crud.create_attendance_log(
+            db=db,
+            employee_id=employee.id,
+            camera=payload.camera,
+            confidence=0.55,
+            liveness_score=1.0,
+            is_spoof=False,
+            status="QR Verification Failed",
+            timestamp=datetime.now()
+        )
+        _publish_log(log_entry, employee)
+        raise HTTPException(status_code=400, detail="QR Code verification failed. Badge does not match matched face.")
+        
+    now = datetime.now()
+    attendance_record = crud.mark_kiosk_attendance(
+        db=db,
+        employee_id=employee.id,
+        timestamp=now,
+        camera=payload.camera,
+        confidence=1.0
+    )
+    
+    log_entry = crud.create_attendance_log(
+        db=db,
+        employee_id=employee.id,
+        camera=payload.camera,
+        confidence=1.0,
+        liveness_score=1.0,
+        is_spoof=False,
+        status="Match Success (QR Verified)",
+        timestamp=now
+    )
+    _publish_log(log_entry, employee)
+    
+    current_hour = now.hour
+    if 5 <= current_hour < 12:
+        salutation = "Good Morning"
+        icon = "☀️"
+    elif 12 <= current_hour < 17:
+        salutation = "Good Afternoon"
+        icon = "🌤️"
+    else:
+        salutation = "Good Evening"
+        icon = "🌙"
+        
+    voice_greeting_setting = crud.get_setting_by_key(db, "VOICE_GREETING_ENABLED")
+    voice_enabled = voice_greeting_setting.value.lower() == "true" if voice_greeting_setting else True
+    is_checkout = attendance_record.check_out is not None
+    
+    if is_checkout:
+        greeting_text = f"Welcome {employee.name}. {salutation}. Checkout Recorded Successfully. Have a Relaxing Evening."
+        detail_msg = "Checkout Recorded Successfully"
+        closing_msg = f"Worked: {attendance_record.working_hours} hours"
+    else:
+        greeting_text = f"Welcome {employee.name}. {salutation}. Attendance Recorded Successfully. Have a Great Day."
+        detail_msg = "Attendance Recorded Successfully"
+        closing_msg = "Have a Great Day"
+        
+    tts_url = f"{settings.API_V1_STR}/kiosk/tts?text={urllib.parse.quote(greeting_text)}" if voice_enabled else None
+    
+    return {
+        "status": "success",
+        "employee": {
+            "id": employee.id,
+            "employee_id": employee.employee_id,
+            "name": employee.name,
+            "designation": employee.designation,
+            "department": employee.department.name if employee.department else "General"
+        },
+        "attendance": {
+            "date": str(attendance_record.date),
+            "check_in": str(attendance_record.check_in.time().strftime("%H:%M:%S")) if attendance_record.check_in else None,
+            "check_out": str(attendance_record.check_out.time().strftime("%H:%M:%S")) if attendance_record.check_out else None,
+            "status": attendance_record.status,
+            "working_hours": attendance_record.working_hours
+        },
+        "confidence": 1.0,
+        "liveness_score": 1.0,
+        "greeting": {
+            "title": f"Verified, {employee.name}",
+            "subtitle": f"{salutation} {icon}",
+            "detail": detail_msg,
+            "closing": closing_msg
+        },
+        "tts_url": tts_url
+    }

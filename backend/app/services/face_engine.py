@@ -410,26 +410,39 @@ class FaceEngine:
 
         try:
             x1, y1, x2, y2 = bbox
-            w, h = x2 - x1, y2 - y1
+            box_w, box_h = x2 - x1, y2 - y1
+            cx, cy = x1 + box_w / 2, y1 + box_h / 2
+            src_h, src_w = image_np.shape[:2]
             
-            # MiniFASNet uses scaled crops. Let's crop with scale=2.7 for 80x80 model
+            # MiniFASNet uses scaled square crops. Let's crop with scale=2.7 for 80x80 model
             scale_27 = 2.7
-            cx, cy = x1 + w/2, y1 + h/2
+            crop_size_27 = int(max(box_w, box_h) * scale_27)
+            x1_crop_27 = int(cx - crop_size_27 // 2)
+            y1_crop_27 = int(cy - crop_size_27 // 2)
+            x2_crop_27 = x1_crop_27 + crop_size_27
+            y2_crop_27 = y1_crop_27 + crop_size_27
             
-            # Crop 2.7x bounding box
-            w_new, h_new = w * scale_27, h * scale_27
-            x1_new = int(max(0, cx - w_new/2))
-            y1_new = int(max(0, cy - h_new/2))
-            x2_new = int(min(image_np.shape[1], cx + w_new/2))
-            y2_new = int(min(image_np.shape[0], cy + h_new/2))
+            pad_left_27 = max(0, -x1_crop_27)
+            pad_top_27 = max(0, -y1_crop_27)
+            pad_right_27 = max(0, x2_crop_27 - src_w)
+            pad_bottom_27 = max(0, y2_crop_27 - src_h)
             
-            crop_27 = image_np[y1_new:y2_new, x1_new:x2_new]
+            if pad_left_27 > 0 or pad_top_27 > 0 or pad_right_27 > 0 or pad_bottom_27 > 0:
+                padded_27 = cv2.copyMakeBorder(image_np, pad_top_27, pad_bottom_27, pad_left_27, pad_right_27, cv2.BORDER_REPLICATE)
+                x1_crop_27 += pad_left_27
+                x2_crop_27 += pad_left_27
+                y1_crop_27 += pad_top_27
+                y2_crop_27 += pad_top_27
+                crop_27 = padded_27[y1_crop_27:y2_crop_27, x1_crop_27:x2_crop_27]
+            else:
+                crop_27 = image_np[y1_crop_27:y2_crop_27, x1_crop_27:x2_crop_27]
+                
             if crop_27.size == 0:
                 return 0.0, False
                 
             # Resize to 80x80
             resized_27 = cv2.resize(crop_27, (80, 80))
-            # Preprocess: Transpose and batch
+            # Preprocess: Transpose and batch (Keep [0, 255] range as model expects)
             blob_27 = np.transpose(resized_27, (2, 0, 1)).astype(np.float32)
             blob_27 = np.expand_dims(blob_27, axis=0)
 
@@ -446,15 +459,28 @@ class FaceEngine:
             
             # If 1.8 model is loaded, average the scores
             if self.live_session_18 is not None:
-                # MiniFASNet uses scaled crops. Let's crop with scale=1.8 for 128x128 model
                 scale_18 = 1.8
-                w_new_18, h_new_18 = w * scale_18, h * scale_18
-                x1_new_18 = int(max(0, cx - w_new_18/2))
-                y1_new_18 = int(max(0, cy - h_new_18/2))
-                x2_new_18 = int(min(image_np.shape[1], cx + w_new_18/2))
-                y2_new_18 = int(min(image_np.shape[0], cy + h_new_18/2))
+                crop_size_18 = int(max(box_w, box_h) * scale_18)
+                x1_crop_18 = int(cx - crop_size_18 // 2)
+                y1_crop_18 = int(cy - crop_size_18 // 2)
+                x2_crop_18 = x1_crop_18 + crop_size_18
+                y2_crop_18 = y1_crop_18 + crop_size_18
                 
-                crop_18 = image_np[y1_new_18:y2_new_18, x1_new_18:x2_new_18]
+                pad_left_18 = max(0, -x1_crop_18)
+                pad_top_18 = max(0, -y1_crop_18)
+                pad_right_18 = max(0, x2_crop_18 - src_w)
+                pad_bottom_18 = max(0, y2_crop_18 - src_h)
+                
+                if pad_left_18 > 0 or pad_top_18 > 0 or pad_right_18 > 0 or pad_bottom_18 > 0:
+                    padded_18 = cv2.copyMakeBorder(image_np, pad_top_18, pad_bottom_18, pad_left_18, pad_right_18, cv2.BORDER_REPLICATE)
+                    x1_crop_18 += pad_left_18
+                    x2_crop_18 += pad_left_18
+                    y1_crop_18 += pad_top_18
+                    y2_crop_18 += pad_top_18
+                    crop_18 = padded_18[y1_crop_18:y2_crop_18, x1_crop_18:x2_crop_18]
+                else:
+                    crop_18 = image_np[y1_crop_18:y2_crop_18, x1_crop_18:x2_crop_18]
+                    
                 if crop_18.size > 0:
                     # Resize to 128x128
                     resized_18 = cv2.resize(crop_18, (128, 128))
@@ -478,6 +504,55 @@ class FaceEngine:
         except Exception as e:
             logger.error(f"Error in check_liveness: {e}")
             return 0.0, False
+
+    def validate_image_quality(self, image_np):
+        """
+        Validates the image quality (checks for blur and lighting conditions).
+        Returns: {"is_valid": bool, "blur_score": float, "brightness": float, "reason": str}
+        """
+        try:
+            gray = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY) if len(image_np.shape) == 3 else image_np
+            blur_score = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+            brightness = float(np.mean(gray))
+            
+            # Allow mock mode to always pass
+            if self.mock_mode:
+                return {
+                    "is_valid": True,
+                    "blur_score": blur_score if blur_score > 0 else 150.0,
+                    "brightness": brightness if brightness > 0 else 128.0,
+                    "reason": None
+                }
+                
+            is_valid = True
+            reason = None
+            
+            # Check brightness (threshold < 45 is too dark, > 235 is too bright/washed out)
+            if brightness < 45.0:
+                is_valid = False
+                reason = "Image is too dark. Please ensure there is sufficient lighting."
+            elif brightness > 235.0:
+                is_valid = False
+                reason = "Image is too bright or washed out. Please adjust the lighting."
+            # Check blur (threshold < 70 is considered blurry)
+            elif blur_score < 70.0:
+                is_valid = False
+                reason = "Image is too blurry. Please capture a steadier, clearer image."
+                
+            return {
+                "is_valid": is_valid,
+                "blur_score": blur_score,
+                "brightness": brightness,
+                "reason": reason
+            }
+        except Exception as e:
+            logger.error(f"Error in validate_image_quality: {e}")
+            return {
+                "is_valid": True,
+                "blur_score": 100.0,
+                "brightness": 120.0,
+                "reason": None
+            }
             
     def cosine_similarity(self, embedding1, embedding2):
         """

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -21,3 +21,24 @@ def read_audit_logs(
     current_user: models.User = Depends(checker_view)
 ):
     return crud.get_audit_logs(db, skip=skip, limit=limit)
+
+@router.delete("/")
+def delete_all_audit_logs(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(checker_view)
+):
+    deleted_count = crud.clear_all_audit_logs(db)
+    
+    # Audit log the deletion itself
+    crud.create_audit_log(
+        db=db,
+        user_id=current_user.id,
+        action="Clear Audit Logs",
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+        details=f"Cleared {deleted_count} system audit logs."
+    )
+    
+    return {"message": "Audit logs cleared successfully", "deleted_count": deleted_count}
+

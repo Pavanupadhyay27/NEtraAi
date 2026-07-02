@@ -73,6 +73,16 @@ class Department(Base):
 
     employees = relationship("Employee", back_populates="department")
 
+class Shift(Base):
+    __tablename__ = "shifts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), unique=True, nullable=False)
+    start_time = Column(Time, nullable=False)
+    end_time = Column(Time, nullable=False)
+    grace_period_minutes = Column(Integer, default=15)
+    description = Column(String(255), nullable=True)
+
 class Employee(Base):
     __tablename__ = "employees"
 
@@ -85,11 +95,14 @@ class Employee(Base):
     joining_date = Column(Date, nullable=False, default=datetime.date.today)
     status = Column(String(20), default="Active")  # Active, Inactive, Suspended
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    shift_id = Column(Integer, ForeignKey("shifts.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, unique=True)
+    allow_wfh = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
     department = relationship("Department", back_populates="employees")
+    shift = relationship("Shift")
     user = relationship("User", back_populates="employee")
     images = relationship("EmployeeImage", back_populates="employee", cascade="all, delete-orphan")
     embeddings = relationship("FaceEmbedding", back_populates="employee", cascade="all, delete-orphan")

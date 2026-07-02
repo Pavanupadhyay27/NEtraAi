@@ -170,7 +170,9 @@ def create_employee(db: Session, emp: schemas.EmployeeCreate, user_id: int = Non
         joining_date=emp.joining_date,
         status=emp.status,
         department_id=emp.department_id,
-        user_id=user_id
+        shift_id=emp.shift_id,
+        user_id=user_id,
+        allow_wfh=emp.allow_wfh
     )
     db.add(db_emp)
     db.commit()
@@ -353,9 +355,38 @@ def mark_kiosk_attendance(db: Session, employee_id: int, timestamp: datetime, ca
     - If one exists and check_out is empty, mark check-out and calculate hours.
     - If both exist, do nothing or update checkout to a later timestamp.
     """
-    local_now = datetime.now()
-    today = local_now.date()
+    today = timestamp.date()
     
+    employee = db.get(models.Employee, employee_id)
+    if not employee:
+        raise ValueError(f"Employee {employee_id} not found")
+        
+    # Resolve shift details for employee
+    if employee.shift:
+        shift_start = employee.shift.start_time
+        shift_end = employee.shift.end_time
+        grace_mins = employee.shift.grace_period_minutes
+    else:
+        start_time_setting = get_setting_by_key(db, "CHECK_IN_START")
+        end_time_setting = get_setting_by_key(db, "CHECK_OUT_END")
+        grace_period_setting = get_setting_by_key(db, "GRACE_PERIOD_MINUTES")
+        
+        start_str = start_time_setting.value if start_time_setting else "09:00"
+        end_str = end_time_setting.value if end_time_setting else "17:00"
+        grace_mins = int(grace_period_setting.value) if grace_period_setting else 15
+        
+        try:
+            hr, mn = map(int, start_str.split(":"))
+            shift_start = time(hr, mn)
+        except Exception:
+            shift_start = time(9, 0)
+            
+        try:
+            hr, mn = map(int, end_str.split(":"))
+            shift_end = time(hr, mn)
+        except Exception:
+            shift_end = time(17, 0)
+            
     # Check if a record exists
     stmt = select(models.Attendance).where(
         and_(
@@ -365,22 +396,11 @@ def mark_kiosk_attendance(db: Session, employee_id: int, timestamp: datetime, ca
     )
     db_attendance = db.execute(stmt).scalar_one_or_none()
     
-    # Check system configurations for status mapping
-    start_time_setting = get_setting_by_key(db, "CHECK_IN_START")
-    grace_period_setting = get_setting_by_key(db, "GRACE_PERIOD_MINUTES")
-    
-    start_str = start_time_setting.value if start_time_setting else "09:00"
-    grace_mins = int(grace_period_setting.value) if grace_period_setting else 15
-    
-    try:
-        hr, mn = map(int, start_str.split(":"))
-        check_in_deadline = datetime.combine(today, time(hr, mn)) + timedelta(minutes=grace_mins)
-    except Exception:
-        check_in_deadline = datetime.combine(today, time(9, 15))
+    check_in_deadline = datetime.combine(today, shift_start) + timedelta(minutes=grace_mins)
  
     if not db_attendance:
         # First scan of the day -> CHECK-IN
-        is_late = local_now > check_in_deadline
+        is_late = timestamp > check_in_deadline
         status = "Late" if is_late else "Present"
         
         db_attendance = models.Attendance(
@@ -403,22 +423,22 @@ def mark_kiosk_attendance(db: Session, employee_id: int, timestamp: datetime, ca
             hours = round(diff.total_seconds() / 3600.0, 2)
             db_attendance.working_hours = hours
             
-            # Early departure: Check if checkout is before e.g., 5:00 PM
-            end_time_setting = get_setting_by_key(db, "CHECK_OUT_END")
-            end_str = end_time_setting.value if end_time_setting else "17:00"
-            try:
-                ehr, emn = map(int, end_str.split(":"))
-                departure_deadline = datetime.combine(today, time(ehr, emn))
-            except Exception:
-                departure_deadline = datetime.combine(today, time(17, 0))
-                
-            db_attendance.early_departure = local_now < departure_deadline
+            # Early departure: Check if checkout is before shift end
+            departure_deadline = datetime.combine(today, shift_end)
+            db_attendance.early_departure = timestamp < departure_deadline
             
-            # Overtime: Hours worked beyond 8 hours
-            db_attendance.overtime = max(0.0, round(hours - 8.0, 2))
+            # Overtime: Hours worked beyond shift duration
+            dt_start = datetime.combine(today, shift_start)
+            dt_end = datetime.combine(today, shift_end)
+            if dt_end < dt_start:
+                dt_end += timedelta(days=1)
+            shift_duration_hours = (dt_end - dt_start).total_seconds() / 3600.0
             
-            # Half Day check: If total working hours is less than 8 hours
-            if hours < 8.0:
+            db_attendance.overtime = max(0.0, round(hours - shift_duration_hours, 2))
+            
+            # Half Day check: If total working hours is less than 50% of shift duration
+            half_day_threshold = shift_duration_hours * 0.5 if shift_duration_hours > 0 else 4.0
+            if hours < half_day_threshold:
                 db_attendance.status = "Half Day"
             else:
                 if db_attendance.status == "Half Day" or db_attendance.status == "Absent":
@@ -532,3 +552,11 @@ def create_audit_log(db: Session, user_id: int, action: str, ip_address: str = N
 def get_audit_logs(db: Session, skip: int = 0, limit: int = 100):
     query = select(models.AuditLog).order_by(models.AuditLog.timestamp.desc()).offset(skip).limit(limit)
     return db.execute(query).scalars().all()
+
+def clear_all_audit_logs(db: Session) -> int:
+    from sqlalchemy import delete
+    stmt = delete(models.AuditLog)
+    result = db.execute(stmt)
+    db.commit()
+    return result.rowcount
+

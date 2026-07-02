@@ -1,12 +1,17 @@
 import os
+import threading
+import time
+from datetime import datetime, timedelta
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+from sqlalchemy import delete
 
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.init_db import init_db
 from app.api.v1 import auth, employees, departments, enrollment, kiosk, attendance, reports, analytics, settings as settings_api, audit
+from app.models import models
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -36,6 +41,24 @@ app.add_middleware(
 
 db_error = None
 
+def purge_old_audit_logs():
+    """Background loop to delete audit logs older than 24 hours."""
+    logger.info("Starting background audit log purger thread...")
+    while True:
+        try:
+            db = SessionLocal()
+            cutoff = datetime.now() - timedelta(hours=24)
+            stmt = delete(models.AuditLog).where(models.AuditLog.timestamp < cutoff)
+            result = db.execute(stmt)
+            db.commit()
+            deleted_count = result.rowcount
+            if deleted_count > 0:
+                logger.info(f"Purged {deleted_count} audit logs older than 24 hours.")
+            db.close()
+        except Exception as e:
+            logger.error(f"Error purging old audit logs: {e}")
+        time.sleep(3600)
+
 # Create folders on startup
 @app.on_event("startup")
 def startup_event():
@@ -55,12 +78,37 @@ def startup_event():
     try:
         init_db(db)
         db_error = "Success"
+        
+        # Start background RTSP processor
+        try:
+            from app.services.singletons import rtsp_processor
+            rtsp_processor.start()
+        except Exception as rtsp_err:
+            logger.error(f"Failed to start background RTSP processor: {rtsp_err}")
+            
+        # Start background audit logs purger
+        try:
+            purger_thread = threading.Thread(target=purge_old_audit_logs, daemon=True)
+            purger_thread.start()
+            logger.info("Background audit logs purger started successfully.")
+        except Exception as purger_err:
+            logger.error(f"Failed to start background audit logs purger: {purger_err}")
+            
     except Exception as e:
         import traceback
         db_error = f"{e}\n{traceback.format_exc()}"
         logger.error(f"Error seeding database: {e}")
     finally:
         db.close()
+
+@app.on_event("shutdown")
+def shutdown_event():
+    logger.info("Stopping NetraID Backend...")
+    try:
+        from app.services.singletons import rtsp_processor
+        rtsp_processor.stop()
+    except Exception as e:
+        logger.error(f"Failed to stop background RTSP processor: {e}")
 
 # Health check and root route
 @app.get("/")
@@ -115,3 +163,5 @@ app.include_router(reports.router, prefix=f"{settings.API_V1_STR}/reports", tags
 app.include_router(analytics.router, prefix=f"{settings.API_V1_STR}/analytics", tags=["Dashboard Analytics"])
 app.include_router(settings_api.router, prefix=f"{settings.API_V1_STR}/settings", tags=["System Settings"])
 app.include_router(audit.router, prefix=f"{settings.API_V1_STR}/audit", tags=["System Audit Logs"])
+# Trigger reload - reload 2
+

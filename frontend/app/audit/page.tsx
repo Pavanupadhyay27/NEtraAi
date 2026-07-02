@@ -6,7 +6,7 @@ import SidebarLayout from "@/components/SidebarLayout";
 import { fetchApi, parseDateTime } from "@/app/utils/api";
 import { 
   History, Search, RefreshCw, ChevronLeft, ChevronRight, 
-  ShieldAlert, Activity, Key, UserPlus, Sliders, Laptop
+  ShieldAlert, Activity, Key, UserPlus, Sliders, Laptop, Trash2
 } from "lucide-react";
 
 export default function AuditLogsPage() {
@@ -19,6 +19,26 @@ export default function AuditLogsPage() {
     queryFn: () => fetchApi(`/audit/?skip=${page * limit}&limit=${limit}`),
     placeholderData: (prev) => prev
   });
+
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleClearLogs = async () => {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete all system audit logs? This action cannot be undone."
+    );
+    if (!confirmDelete) return;
+
+    setIsDeleting(true);
+    try {
+      await fetchApi("/audit/", { method: "DELETE" });
+      refetch();
+    } catch (err: any) {
+      alert(err.message || "Failed to clear audit logs");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
 
   const filteredLogs = logs?.filter((log: any) => {
     if (!search) return true;
@@ -50,13 +70,23 @@ export default function AuditLogsPage() {
               System Audit Logs
             </h1>
           </div>
-          <button
-            onClick={() => refetch()}
-            className="btn-ghost text-[12px] h-9.5 px-4 flex items-center gap-2 rounded-xl border border-zinc-200 hover:bg-zinc-50 text-zinc-700 cursor-pointer transition-all"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            Refresh Logs
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleClearLogs}
+              disabled={isDeleting}
+              className="text-[12px] h-9.5 px-4 flex items-center gap-2 rounded-xl border border-zinc-200 text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:border-rose-100 disabled:opacity-50 cursor-pointer transition-all active:scale-95 font-medium"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              {isDeleting ? "Clearing..." : "Clear Logs"}
+            </button>
+            <button
+              onClick={() => refetch()}
+              className="btn-ghost text-[12px] h-9.5 px-4 flex items-center gap-2 rounded-xl border border-zinc-200 hover:bg-zinc-50 text-zinc-700 cursor-pointer transition-all active:scale-95"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Refresh Logs
+            </button>
+          </div>
         </div>
 
         {/* Filter Bar */}

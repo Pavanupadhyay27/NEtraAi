@@ -2,6 +2,13 @@ import os
 from typing import List, Union
 from pydantic import AnyHttpUrl, validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from dotenv import load_dotenv
+
+env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env")
+load_dotenv(dotenv_path=env_path, override=True)
+
+
+
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "NetraID AI Face Attendance"
@@ -51,7 +58,7 @@ class Settings(BaseSettings):
     
     # Face recognition & liveness detection parameters
     KIOSK_FACE_THRESHOLD: float = 0.60
-    KIOSK_LIVENESS_THRESHOLD: float = 0.75
+    KIOSK_LIVENESS_THRESHOLD: float = 0.55
     FORCE_MOCK_MODE: bool = False
     
     # Performance Optimizations

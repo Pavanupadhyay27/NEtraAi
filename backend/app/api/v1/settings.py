@@ -35,6 +35,16 @@ def update_setting(
     old_value = setting.value
     updated = crud.set_setting(db, key=key, value=payload.value)
     
+    # Dynamically restart RTSP processor if RTSP settings were updated
+    if key in ["RTSP_STREAM_ENABLED", "RTSP_STREAM_URL"]:
+        try:
+            from app.services.singletons import rtsp_processor
+            rtsp_processor.stop()
+            rtsp_processor.start()
+        except Exception as rtsp_err:
+            import logging
+            logging.getLogger("SettingsAPI").error(f"Failed to dynamically restart RTSP processor: {rtsp_err}")
+
     # Audit log setting change
     crud.create_audit_log(
         db=db,

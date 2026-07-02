@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, time
+from sqlalchemy import and_
 
 from app.core.database import get_db
 from app.core import security
@@ -47,6 +48,95 @@ def manual_update_attendance(
         details=f"Adjusted attendance ID: {id} for date {updated.date}. New Status: {updated.status}"
     )
     return updated
+
+@router.post("/manual", response_model=schemas.AttendanceOut)
+def manual_create_or_update_attendance(
+    request: Request,
+    data: schemas.AttendanceBase,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(checker_manage)
+):
+    # Verify employee exists
+    employee = db.query(models.Employee).filter(models.Employee.id == data.employee_id).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+        
+    # Check if record already exists for that employee and date
+    db_att = db.query(models.Attendance).filter(
+        and_(
+            models.Attendance.employee_id == data.employee_id,
+            models.Attendance.date == data.date
+        )
+    ).first()
+    
+    if db_att:
+        # Update existing record
+        db_att.check_in = data.check_in
+        db_att.check_out = data.check_out
+        db_att.status = data.status
+    else:
+        # Create new record
+        db_att = models.Attendance(
+            employee_id=data.employee_id,
+            date=data.date,
+            check_in=data.check_in,
+            check_out=data.check_out,
+            status=data.status,
+            late_arrival=False,
+            early_departure=False,
+            working_hours=0.0,
+            overtime=0.0,
+            emergency_allowed=False
+        )
+        db.add(db_att)
+        
+    # Determine late arrival flag based on shift or global settings
+    if db_att.check_in:
+        # Resolve shift start
+        if employee.shift:
+            shift_start = employee.shift.start_time
+            grace_mins = employee.shift.grace_period_minutes
+        else:
+            start_time_setting = crud.get_setting_by_key(db, "CHECK_IN_START")
+            grace_period_setting = crud.get_setting_by_key(db, "GRACE_PERIOD_MINUTES")
+            
+            start_str = start_time_setting.value if start_time_setting else "09:00"
+            grace_mins = int(grace_period_setting.value) if grace_period_setting else 15
+            try:
+                hr, mn = map(int, start_str.split(":"))
+                shift_start = time(hr, mn)
+            except Exception:
+                shift_start = time(9, 0)
+                
+        check_in_deadline = datetime.combine(db_att.date, shift_start) + timedelta(minutes=grace_mins)
+        db_att.late_arrival = db_att.check_in > check_in_deadline
+        if db_att.status not in ["Absent", "Half Day"]:
+            db_att.status = "Late" if db_att.late_arrival else "Present"
+    else:
+        db_att.late_arrival = False
+
+    # Recalculate working hours if both check_in and check_out exist
+    if db_att.check_in and db_att.check_out:
+        diff = db_att.check_out - db_att.check_in
+        db_att.working_hours = round(diff.total_seconds() / 3600.0, 2)
+        db_att.overtime = max(0.0, round(db_att.working_hours - 8.0, 2))
+    else:
+        db_att.working_hours = 0.0
+        db_att.overtime = 0.0
+        
+    db.commit()
+    db.refresh(db_att)
+    
+    # Create audit log
+    crud.create_audit_log(
+        db=db,
+        user_id=current_user.id,
+        action="Manual Attendance Override",
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+        details=f"Manually logged attendance for employee {employee.name} (ID: {employee.employee_id}) on {data.date}. Status: {db_att.status}"
+    )
+    return db_att
 
 @router.get("/logs", response_model=List[schemas.AttendanceLogOut])
 def read_attendance_logs(

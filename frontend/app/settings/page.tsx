@@ -7,10 +7,10 @@ import { fetchApi } from "@/app/utils/api";
 import { useToast } from "@/app/utils/toast";
 import { 
   Check, Loader2, CheckCircle2, AlertCircle, Sliders, Info,
-  Fingerprint, Clock, Volume2
+  Fingerprint, Clock, Volume2, Palette, Upload, Trash2, Camera, MapPin
 } from "lucide-react";
 
-type SettingsTab = "biometrics" | "shift" | "voice" | "advanced";
+type SettingsTab = "biometrics" | "shift" | "voice" | "branding" | "location" | "advanced";
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
@@ -19,6 +19,7 @@ export default function SettingsPage() {
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const [successKey, setSuccessKey] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
+  const [fetchingGps, setFetchingGps] = useState(false);
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["settings"],
@@ -51,8 +52,43 @@ export default function SettingsPage() {
     saveMutation.mutate({ key, value: editValues[key] });
   };
 
+  const handleSetCurrentLocation = () => {
+    if (typeof window !== "undefined" && navigator.geolocation) {
+      setFetchingGps(true);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude.toString();
+          const lon = position.coords.longitude.toString();
+          
+          setEditValues(prev => ({
+            ...prev,
+            LOCATION_LATITUDE: lat,
+            LOCATION_LONGITUDE: lon
+          }));
+          
+          // Save both settings
+          saveMutation.mutate({ key: "LOCATION_LATITUDE", value: lat });
+          saveMutation.mutate({ key: "LOCATION_LONGITUDE", value: lon });
+          
+          toast.success("Coordinates updated to current location!");
+          setFetchingGps(false);
+        },
+        (err) => {
+          console.error("GPS error:", err);
+          toast.error("Failed to get current location. Ensure GPS permission is granted.");
+          setFetchingGps(false);
+        },
+        { enableHighAccuracy: true }
+      );
+    } else {
+      toast.error("Geolocation is not supported by your browser.");
+    }
+  };
+
   // Group settings by keys for our tabs
   const getTabForSettings = (key: string): SettingsTab => {
+    if (key.includes("LOCATION")) return "location";
+    if (key.includes("COMPANY") || key.includes("LOGO") || key.includes("BADGE")) return "branding";
     if (key.includes("FACE") || key.includes("LIVENESS")) return "biometrics";
     if (key.includes("SHIFT") || key.includes("CHECK") || key.includes("GRACE")) return "shift";
     if (key.includes("VOICE") || key.includes("GREETING")) return "voice";
@@ -166,6 +202,97 @@ export default function SettingsPage() {
       );
     }
 
+    if (key === "BADGE_THEME_COLOR") {
+      return (
+        <select
+          value={val}
+          disabled={isUpdating}
+          onChange={(e) => {
+            setEditValues(prev => ({ ...prev, [key]: e.target.value }));
+            setUpdatingKey(key);
+            saveMutation.mutate({ key, value: e.target.value });
+          }}
+          className="input-field h-9 text-[12.5px] w-40 bg-white border-slate-250 rounded-xl px-3 focus:border-slate-800 transition-all font-semibold cursor-pointer text-center"
+        >
+          <option value="Navy Blue">Navy Blue</option>
+          <option value="Charcoal">Charcoal</option>
+          <option value="Emerald">Emerald</option>
+          <option value="Saffron">Saffron</option>
+        </select>
+      );
+    }
+
+    if (key === "BADGE_PATTERN_TYPE") {
+      return (
+        <select
+          value={val}
+          disabled={isUpdating}
+          onChange={(e) => {
+            setEditValues(prev => ({ ...prev, [key]: e.target.value }));
+            setUpdatingKey(key);
+            saveMutation.mutate({ key, value: e.target.value });
+          }}
+          className="input-field h-9 text-[12.5px] w-40 bg-white border-slate-250 rounded-xl px-3 focus:border-slate-800 transition-all font-semibold cursor-pointer text-center"
+        >
+          <option value="None">None</option>
+          <option value="Indian Mandala">Indian Mandala</option>
+          <option value="Corporate Waves">Corporate Waves</option>
+          <option value="Cyber Grid">Cyber Grid</option>
+        </select>
+      );
+    }
+
+    if (key === "COMPANY_LOGO") {
+      return (
+        <div className="flex flex-col items-center gap-3 w-full sm:w-64">
+          {val ? (
+            <div className="relative w-full h-24 border border-slate-200 rounded-xl overflow-hidden bg-slate-50 flex items-center justify-center p-2 group">
+              <img src={val} alt="Company Logo" className="max-w-full max-h-full object-contain" />
+              <button
+                type="button"
+                onClick={() => {
+                  setEditValues(prev => ({ ...prev, [key]: "" }));
+                  setUpdatingKey(key);
+                  saveMutation.mutate({ key, value: "" });
+                }}
+                className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold gap-1 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Remove Logo
+              </button>
+            </div>
+          ) : (
+            <label className="w-full h-24 border border-dashed border-slate-300 hover:border-slate-400 rounded-xl flex flex-col items-center justify-center gap-1.5 cursor-pointer bg-slate-50 hover:bg-slate-100/50 transition-all">
+              <Upload className="w-5 h-5 text-slate-450" />
+              <span className="text-[11px] text-slate-500 font-medium">Upload PNG/JPG (Max 500KB)</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={isUpdating}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 512 * 1024) {
+                    toast.error("Logo must be under 500KB");
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    const base64String = reader.result as string;
+                    setEditValues(prev => ({ ...prev, [key]: base64String }));
+                    setUpdatingKey(key);
+                    saveMutation.mutate({ key, value: base64String });
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </label>
+          )}
+        </div>
+      );
+    }
+
     // Default Fallback
     return (
       <input
@@ -183,6 +310,8 @@ export default function SettingsPage() {
       case "biometrics": return <Fingerprint className="w-4 h-4" />;
       case "shift": return <Clock className="w-4 h-4" />;
       case "voice": return <Volume2 className="w-4 h-4" />;
+      case "branding": return <Palette className="w-4 h-4" />;
+      case "location": return <MapPin className="w-4 h-4" />;
       case "advanced": return <Sliders className="w-4 h-4" />;
     }
   };
@@ -192,6 +321,8 @@ export default function SettingsPage() {
       case "biometrics": return "Biometrics & AI";
       case "shift": return "Shift & Grace Hours";
       case "voice": return "Voice Alerts";
+      case "branding": return "Branding & Badge";
+      case "location": return "Location Restriction";
       case "advanced": return "Advanced Configurations";
     }
   };
@@ -201,6 +332,8 @@ export default function SettingsPage() {
       case "biometrics": return "Configure facial matching similarity and liveness parameters";
       case "shift": return "Manage daily check-in start, grace window, and shifts";
       case "voice": return "Enable or disable text-to-speech audio feedback at terminals";
+      case "branding": return "Set organization logo and name for employee ID cards";
+      case "location": return "Set coordinates and allowed radius for geofenced kiosk attendance";
       case "advanced": return "System variables and advanced parameters";
     }
   };
@@ -218,7 +351,7 @@ export default function SettingsPage() {
           
           {/* Left Navigation: Vertical tabs */}
           <div className="space-y-1 md:col-span-1">
-            {(["biometrics", "shift", "voice", "advanced"] as SettingsTab[]).map(tab => {
+            {(["biometrics", "shift", "voice", "branding", "location", "advanced"] as SettingsTab[]).map(tab => {
               const isActive = activeTab === tab;
               return (
                 <button
@@ -285,6 +418,7 @@ export default function SettingsPage() {
                         const getSettingIcon = (k: string) => {
                           if (k.includes("VOICE") || k.includes("GREETING")) return <Volume2 className="w-5 h-5" />;
                           if (k.includes("MAINTENANCE")) return <AlertCircle className="w-5 h-5" />;
+                          if (k.includes("RTSP")) return <Camera className="w-5 h-5" />;
                           return <Sliders className="w-5 h-5" />;
                         };
 
@@ -379,29 +513,60 @@ export default function SettingsPage() {
                             <div className="flex items-center gap-2.5 shrink-0">
                               {renderSettingControl(setting, isUpdating)}
 
-                              <button
-                                onClick={() => handleSave(setting.key)}
-                                disabled={isUpdating || !isDirty}
-                                className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${
-                                  isSuccess
-                                    ? "bg-emerald-55 border-emerald-250 text-emerald-600 shadow-xs scale-105"
-                                    : isDirty
-                                      ? "bg-slate-900 border-slate-900 text-white hover:bg-slate-800 hover:scale-105 active:scale-95 cursor-pointer shadow-md shadow-slate-900/10"
-                                      : "bg-slate-50 border-slate-200 text-slate-300 cursor-not-allowed"
-                                }`}
-                              >
-                                {isUpdating ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : isSuccess ? (
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                ) : (
-                                  <Check className="w-3.5 h-3.5" />
-                                )}
-                              </button>
+                              {setting.key !== "COMPANY_LOGO" && setting.key !== "BADGE_THEME_COLOR" && setting.key !== "BADGE_PATTERN_TYPE" && (
+                                <button
+                                  onClick={() => handleSave(setting.key)}
+                                  disabled={isUpdating || !isDirty}
+                                  className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${
+                                    isSuccess
+                                      ? "bg-emerald-55 border-emerald-250 text-emerald-600 shadow-xs scale-105"
+                                      : isDirty
+                                        ? "bg-slate-900 border-slate-900 text-white hover:bg-slate-800 hover:scale-105 active:scale-95 cursor-pointer shadow-md shadow-slate-900/10"
+                                        : "bg-slate-50 border-slate-200 text-slate-300 cursor-not-allowed"
+                                  }`}
+                                >
+                                  {isUpdating ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : isSuccess ? (
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                  ) : (
+                                    <Check className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              )}
                             </div>
                           </div>
                         );
                       })}
+                    </div>
+                  )}
+
+                  {/* Location Extra Actions */}
+                  {activeTab === "location" && (
+                    <div className="px-6 py-5 border-t border-slate-100/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/20 transition-all duration-200">
+                      <div className="flex-1 space-y-0.5">
+                        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Auto-Detect Coordinates</h3>
+                        <p className="text-xs text-slate-450 leading-normal max-w-sm sm:max-w-md">
+                          Automatically capture this device's current GPS latitude and longitude coordinates.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={fetchingGps}
+                        onClick={handleSetCurrentLocation}
+                        className={`h-9.5 px-4 rounded-xl text-[12px] font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-sm hover:scale-[1.02] active:scale-[0.98] ${
+                          fetchingGps 
+                            ? "bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed" 
+                            : "bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900"
+                        }`}
+                      >
+                        {fetchingGps ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <MapPin className="w-3.5 h-3.5" />
+                        )}
+                        Set to Current GPS Location
+                      </button>
                     </div>
                   )}
                 </div>
@@ -423,6 +588,24 @@ export default function SettingsPage() {
                 <Info className="w-4 h-4 text-zinc-500 shrink-0" />
                 <span>
                   <strong>Note:</strong> Check-ins past the start time plus the grace window will automatically be flagged as <strong>Late</strong>.
+                </span>
+              </div>
+            )}
+
+            {activeTab === "branding" && (
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-650 text-[11px] animate-fadeInUp">
+                <Info className="w-4 h-4 text-zinc-500 shrink-0" />
+                <span>
+                  <strong>Tip:</strong> The company name and logo uploaded here will dynamically populate on all newly enrolled employee ID Cards and badge PDF prints.
+                </span>
+              </div>
+            )}
+
+            {activeTab === "location" && (
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-650 text-[11px] animate-fadeInUp">
+                <Info className="w-4 h-4 text-zinc-500 shrink-0" />
+                <span>
+                  <strong>Note:</strong> When Location Restriction is enabled, kiosk swiping is only permitted for employees within the radius limit unless they have the WFH bypass permission.
                 </span>
               </div>
             )}

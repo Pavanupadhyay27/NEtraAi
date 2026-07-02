@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, and_, desc
 from datetime import date, datetime, timedelta
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import asyncio
 import json
 
@@ -189,3 +189,32 @@ async def live_stream(
             event_bus.unsubscribe(queue)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@router.get("/heatmap")
+def get_attendance_heatmap(
+    employee_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(checker_view)
+):
+    """
+    Returns daily attendance counts for the last 365 days to render a GitHub-style heatmap.
+    """
+    start_date = date.today() - timedelta(days=365)
+    
+    query = db.query(
+        models.Attendance.date,
+        func.count(models.Attendance.id)
+    ).filter(
+        models.Attendance.date >= start_date
+    )
+    
+    if employee_id:
+        query = query.filter(models.Attendance.employee_id == employee_id)
+        query = query.filter(models.Attendance.status.in_(["Present", "Late", "Half Day"]))
+    else:
+        query = query.filter(models.Attendance.status.in_(["Present", "Late", "Half Day"]))
+        
+    results = query.group_by(models.Attendance.date).all()
+    
+    heatmap_data = {r[0].isoformat(): r[1] for r in results}
+    return heatmap_data

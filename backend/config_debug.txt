@@ -1,0 +1,3 @@
+Loaded config.py
+env_path: C:\Users\Lenovo\OneDrive\Desktop\NetraID\backend\.env
+os.environ DATABASE_URL: sqlite:///./netraid.db
