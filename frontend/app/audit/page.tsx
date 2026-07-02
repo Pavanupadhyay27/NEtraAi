@@ -8,6 +8,8 @@ import {
   History, Search, RefreshCw, ChevronLeft, ChevronRight, 
   ShieldAlert, Activity, Key, UserPlus, Sliders, Laptop, Trash2
 } from "lucide-react";
+import { useToast } from "@/app/utils/toast";
+
 
 export default function AuditLogsPage() {
   const [page, setPage] = useState(0);
@@ -20,24 +22,24 @@ export default function AuditLogsPage() {
     placeholderData: (prev) => prev
   });
 
+  const { toast } = useToast();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const handleClearLogs = async () => {
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete all system audit logs? This action cannot be undone."
-    );
-    if (!confirmDelete) return;
-
     setIsDeleting(true);
     try {
       await fetchApi("/audit/", { method: "DELETE" });
+      toast.success("Audit logs cleared successfully.");
+      setShowClearConfirm(false);
       refetch();
     } catch (err: any) {
-      alert(err.message || "Failed to clear audit logs");
+      toast.error(err.message || "Failed to clear audit logs");
     } finally {
       setIsDeleting(false);
     }
   };
+
 
 
   const filteredLogs = logs?.filter((log: any) => {
@@ -72,12 +74,12 @@ export default function AuditLogsPage() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={handleClearLogs}
+              onClick={() => setShowClearConfirm(true)}
               disabled={isDeleting}
               className="text-[12px] h-9.5 px-4 flex items-center gap-2 rounded-xl border border-zinc-200 text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:border-rose-100 disabled:opacity-50 cursor-pointer transition-all active:scale-95 font-medium"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              {isDeleting ? "Clearing..." : "Clear Logs"}
+              Clear Logs
             </button>
             <button
               onClick={() => refetch()}
@@ -190,6 +192,50 @@ export default function AuditLogsPage() {
           </div>
         </div>
       </div>
+
+      {/* Clear Logs Confirmation Modal */}
+      {showClearConfirm && (
+        <div className="modal-backdrop z-50">
+          <div className="modal-content max-w-sm border border-red-500/10 shadow-[0_12px_40px_rgba(239,68,68,0.12)]">
+            <div className="flex flex-col items-center text-center p-2 space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/15 flex items-center justify-center text-rose-500 shadow-inner">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-zinc-900 uppercase tracking-wider">Confirm Clear Logs</h3>
+                <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                  Are you absolutely sure you want to clear all system audit logs?
+                </p>
+                <p className="text-[10.5px] text-rose-650 font-medium bg-rose-500/5 border border-rose-500/10 rounded-xl p-2.5 mt-3 leading-normal">
+                  Warning: All existing system activity and audit logs will be permanently cleared. This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex gap-2.5 w-full pt-2 border-t border-zinc-100">
+                <button 
+                  type="button" 
+                  onClick={() => setShowClearConfirm(false)} 
+                  disabled={isDeleting}
+                  className="flex-1 btn-ghost h-9.5 text-[12px] rounded-xl cursor-pointer hover:bg-zinc-100 text-zinc-700 font-medium border border-zinc-200"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  onClick={handleClearLogs}
+                  disabled={isDeleting}
+                  className="flex-1 bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-bold text-[12px] rounded-xl cursor-pointer h-9.5 flex items-center justify-center gap-2 shadow-md shadow-rose-950/20 border border-rose-500/20"
+                >
+                  {isDeleting ? (
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    "Clear Logs"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </SidebarLayout>
   );
 }
