@@ -249,7 +249,8 @@ def scan_face(
             try:
                 # Run database-level query using pgvector's cosine distance (<=>) operator
                 emb_list = embedding.tolist() if isinstance(embedding, np.ndarray) else list(embedding)
-                distance_expr = models.FaceEmbedding.embedding.op('<=>')(emb_list).label('distance')
+                from sqlalchemy import type_coerce, Float
+                distance_expr = type_coerce(models.FaceEmbedding.embedding.op('<=>')(emb_list), Float).label('distance')
                 query_res = db.query(models.FaceEmbedding, distance_expr).order_by(distance_expr).limit(1).first()
                 if query_res:
                     db_emb, distance = query_res
