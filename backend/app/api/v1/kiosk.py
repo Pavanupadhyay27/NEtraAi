@@ -55,6 +55,7 @@ def _publish_log(log_obj, employee=None):
             "status": log_obj.status,
             "image_path": log_obj.image_path,
             "employee": emp_data,
+            "company_id": employee.company_id if employee else None
         }
         event_bus.publish_scan_event(payload)
     except Exception as exc:

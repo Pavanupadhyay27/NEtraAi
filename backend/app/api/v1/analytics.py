@@ -25,31 +25,40 @@ def get_dashboard_summary(
     current_user: models.User = Depends(checker_view)
 ):
     today = date.today()
+    company_id = current_user.company_id
     
     # 1. Total Employees
-    total_employees = db.query(func.count(models.Employee.id)).filter(models.Employee.status == "Active").scalar() or 0
+    total_employees = db.query(func.count(models.Employee.id)).filter(
+        and_(
+            models.Employee.status == "Active",
+            models.Employee.company_id == company_id
+        )
+    ).scalar() or 0
     
     # 2. Present Today (Status = Present or Late or Half Day)
-    present_today = db.query(func.count(models.Attendance.id)).filter(
+    present_today = db.query(func.count(models.Attendance.id)).join(models.Employee).filter(
         and_(
             models.Attendance.date == today,
-            models.Attendance.status.in_(["Present", "Late", "Half Day"])
+            models.Attendance.status.in_(["Present", "Late", "Half Day"]),
+            models.Employee.company_id == company_id
         )
     ).scalar() or 0
     
     # 3. Late Today
-    late_today = db.query(func.count(models.Attendance.id)).filter(
+    late_today = db.query(func.count(models.Attendance.id)).join(models.Employee).filter(
         and_(
             models.Attendance.date == today,
-            models.Attendance.status == "Late"
+            models.Attendance.status == "Late",
+            models.Employee.company_id == company_id
         )
     ).scalar() or 0
     
     # 4. Checked Out
-    checked_out_today = db.query(func.count(models.Attendance.id)).filter(
+    checked_out_today = db.query(func.count(models.Attendance.id)).join(models.Employee).filter(
         and_(
             models.Attendance.date == today,
-            models.Attendance.check_out.isnot(None)
+            models.Attendance.check_out.isnot(None),
+            models.Employee.company_id == company_id
         )
     ).scalar() or 0
     
@@ -80,26 +89,34 @@ def get_attendance_trends(
     """
     end_date = date.today()
     start_date = end_date - timedelta(days=days - 1)
+    company_id = current_user.company_id
     
     # Generate list of dates
     date_list = [start_date + timedelta(days=i) for i in range(days)]
     
     # Get total active employees
-    total_active = db.query(func.count(models.Employee.id)).filter(models.Employee.status == "Active").scalar() or 0
+    total_active = db.query(func.count(models.Employee.id)).filter(
+        and_(
+            models.Employee.status == "Active",
+            models.Employee.company_id == company_id
+        )
+    ).scalar() or 0
     
     trends = []
     for d in date_list:
-        present = db.query(func.count(models.Attendance.id)).filter(
+        present = db.query(func.count(models.Attendance.id)).join(models.Employee).filter(
             and_(
                 models.Attendance.date == d,
-                models.Attendance.status.in_(["Present", "Late", "Half Day"])
+                models.Attendance.status.in_(["Present", "Late", "Half Day"]),
+                models.Employee.company_id == company_id
             )
         ).scalar() or 0
         
-        late = db.query(func.count(models.Attendance.id)).filter(
+        late = db.query(func.count(models.Attendance.id)).join(models.Employee).filter(
             and_(
                 models.Attendance.date == d,
-                models.Attendance.status == "Late"
+                models.Attendance.status == "Late",
+                models.Employee.company_id == company_id
             )
         ).scalar() or 0
         
@@ -123,7 +140,8 @@ def get_department_distribution(
     Returns employee and attendance counts by department for ECharts.
     """
     today = date.today()
-    departments = db.query(models.Department).all()
+    company_id = current_user.company_id
+    departments = db.query(models.Department).filter(models.Department.company_id == company_id).all()
     
     dist = []
     for dept in departments:
@@ -131,7 +149,8 @@ def get_department_distribution(
         total_in_dept = db.query(func.count(models.Employee.id)).filter(
             and_(
                 models.Employee.department_id == dept.id,
-                models.Employee.status == "Active"
+                models.Employee.status == "Active",
+                models.Employee.company_id == company_id
             )
         ).scalar() or 0
         
@@ -140,7 +159,8 @@ def get_department_distribution(
             and_(
                 models.Employee.department_id == dept.id,
                 models.Attendance.date == today,
-                models.Attendance.status.in_(["Present", "Late", "Half Day"])
+                models.Attendance.status.in_(["Present", "Late", "Half Day"]),
+                models.Employee.company_id == company_id
             )
         ).scalar() or 0
         
@@ -164,7 +184,12 @@ def get_recent_activity(
     Returns latest kiosk scan logs for the dashboard tickfeed.
     """
     cutoff = datetime.utcnow() - timedelta(hours=24)
-    return db.query(models.AttendanceLog).filter(models.AttendanceLog.timestamp >= cutoff).order_by(desc(models.AttendanceLog.timestamp)).limit(limit).all()
+    return db.query(models.AttendanceLog).join(models.Employee).filter(
+        and_(
+            models.AttendanceLog.timestamp >= cutoff,
+            models.Employee.company_id == current_user.company_id
+        )
+    ).order_by(desc(models.AttendanceLog.timestamp)).limit(limit).all()
 
 
 @router.get("/live-stream")
@@ -180,6 +205,12 @@ async def live_stream(
             while True:
                 # Wait for next event published to the bus
                 event_data = await queue.get()
+                
+                # Filter by company
+                company_id = event_data.get("company_id")
+                if company_id and company_id != current_user.company_id:
+                    continue
+                
                 # Yield standard SSE formatted message
                 yield f"data: {json.dumps(event_data)}\n\n"
         except asyncio.CancelledError:
@@ -208,12 +239,16 @@ def get_attendance_heatmap(
     Returns daily attendance counts for the last 365 days to render a GitHub-style heatmap.
     """
     start_date = date.today() - timedelta(days=365)
+    company_id = current_user.company_id
     
     query = db.query(
         models.Attendance.date,
         func.count(models.Attendance.id)
-    ).filter(
-        models.Attendance.date >= start_date
+    ).join(models.Employee).filter(
+        and_(
+            models.Attendance.date >= start_date,
+            models.Employee.company_id == company_id
+        )
     )
     
     if employee_id:

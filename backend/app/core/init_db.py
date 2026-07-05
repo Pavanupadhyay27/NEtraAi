@@ -21,6 +21,35 @@ def init_db(db: Session):
     logger.info("Creating all database tables if they do not exist...")
     Base.metadata.create_all(bind=engine)
 
+    # 1. Add company_id columns if they don't exist
+    tables_to_migrate = ["users", "employees", "departments", "shifts", "settings", "audit_logs"]
+    for table in tables_to_migrate:
+        try:
+            db.execute(text(f"SELECT company_id FROM {table} LIMIT 1"))
+        except Exception:
+            db.rollback()
+            logger.info(f"Adding company_id column to {table} table...")
+            db.execute(text(f"ALTER TABLE {table} ADD COLUMN company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE DEFAULT NULL"))
+            db.commit()
+
+    # 2. Seed default company
+    default_company = db.execute(select(models.Company).where(models.Company.name == "NetraID Demo")).scalar_one_or_none()
+    if not default_company:
+        logger.info("Seeding default company 'NetraID Demo'...")
+        default_company = models.Company(name="NetraID Demo", status="Active")
+        db.add(default_company)
+        db.commit()
+        db.refresh(default_company)
+
+    # 3. Bind existing orphaned data to default company
+    for table in tables_to_migrate:
+        try:
+            db.execute(text(f"UPDATE {table} SET company_id = :comp_id WHERE company_id IS NULL"), {"comp_id": default_company.id})
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.warning(f"Failed to update company_id on {table}: {e}")
+
     # Ensure HNSW index exists on PostgreSQL
     if db.bind.dialect.name == "postgresql":
         try:
@@ -91,10 +120,14 @@ def init_db(db: Session):
         {"name": "Night Shift", "start_time": time(23, 0), "end_time": time(7, 0), "grace_period_minutes": 15, "description": "Overnight shift"}
     ]
     for s in shifts_to_seed:
-        shift_record = db.execute(select(models.Shift).where(models.Shift.name == s["name"])).scalar_one_or_none()
+        # Check shift by name AND company_id
+        shift_record = db.execute(select(models.Shift).where(
+            models.Shift.name == s["name"],
+            models.Shift.company_id == default_company.id
+        )).scalar_one_or_none()
         if not shift_record:
             logger.info(f"Seeding shift: {s['name']}")
-            db_shift = models.Shift(**s)
+            db_shift = models.Shift(**s, company_id=default_company.id)
             db.add(db_shift)
     db.commit()
     
@@ -123,10 +156,14 @@ def init_db(db: Session):
         {"name": "Operations", "code": "OPS", "description": "Office administration and business facilities"}
     ]
     for d in departments:
-        dept = crud.get_department_by_code(db, d["code"])
+        # Check department by code AND company_id
+        dept = db.execute(select(models.Department).where(
+            models.Department.code == d["code"],
+            models.Department.company_id == default_company.id
+        )).scalar_one_or_none()
         if not dept:
             logger.info(f"Seeding department: {d['name']} ({d['code']})")
-            crud.create_department(db, schemas.DepartmentCreate(**d))
+            crud.create_department(db, schemas.DepartmentCreate(**d), company_id=default_company.id)
             
     # 3. Seed Default Settings
     default_settings = [
@@ -156,10 +193,10 @@ def init_db(db: Session):
     ]
     
     for s in default_settings:
-        setting = crud.get_setting_by_key(db, s["key"])
+        setting = crud.get_setting_by_key(db, s["key"], company_id=default_company.id)
         if not setting:
             logger.info(f"Seeding setting: {s['key']} = {s['value']}")
-            crud.set_setting(db, s["key"], s["value"], s["description"])
+            crud.set_setting(db, s["key"], s["value"], s["description"], company_id=default_company.id)
             
     # 3. Seed Initial Super Admin User
     admin_email = settings.INITIAL_ADMIN_EMAIL
@@ -171,10 +208,11 @@ def init_db(db: Session):
             password=settings.INITIAL_ADMIN_PASSWORD,
             role_id=db_roles["Super Admin"].id
         )
-        crud.create_user(db, admin_create)
+        crud.create_user(db, admin_create, company_id=default_company.id)
     else:
         logger.info(f"Super Admin user {admin_email} already exists. Syncing password with configuration...")
         admin_user.hashed_password = crud.get_password_hash(settings.INITIAL_ADMIN_PASSWORD)
+        admin_user.company_id = default_company.id
         db.commit()
         
     logger.info("Database initialization and seeding completed successfully.")

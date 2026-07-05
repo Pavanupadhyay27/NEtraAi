@@ -21,7 +21,7 @@ def read_departments(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(checker_view)
 ):
-    return crud.get_departments(db, skip=skip, limit=limit)
+    return crud.get_departments(db, company_id=current_user.company_id, skip=skip, limit=limit)
 
 @router.get("/{id}", response_model=schemas.DepartmentOut)
 def read_department(
@@ -30,7 +30,7 @@ def read_department(
     current_user: models.User = Depends(checker_view)
 ):
     db_dept = crud.get_department_by_id(db, department_id=id)
-    if not db_dept:
+    if not db_dept or db_dept.company_id != current_user.company_id:
         raise HTTPException(status_code=404, detail="Department not found")
     return db_dept
 
@@ -41,18 +41,19 @@ def create_department(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(checker_manage)
 ):
-    existing = crud.get_department_by_code(db, code=dept.code)
+    existing = crud.get_department_by_code(db, code=dept.code, company_id=current_user.company_id)
     if existing:
         raise HTTPException(status_code=400, detail="Department code already exists")
     
-    db_dept = crud.create_department(db, dept=dept)
+    db_dept = crud.create_department(db, dept=dept, company_id=current_user.company_id)
     crud.create_audit_log(
         db=db,
         user_id=current_user.id,
         action="Create Department",
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
-        details=f"Created department: {dept.name} ({dept.code})"
+        details=f"Created department: {dept.name} ({dept.code})",
+        company_id=current_user.company_id
     )
     return db_dept
 
@@ -64,6 +65,10 @@ def update_department(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(checker_manage)
 ):
+    db_dept = crud.get_department_by_id(db, id)
+    if not db_dept or db_dept.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Department not found")
+        
     updated = crud.update_department(db, department_id=id, dept=dept)
     if not updated:
         raise HTTPException(status_code=404, detail="Department not found")
@@ -74,7 +79,8 @@ def update_department(
         action="Update Department",
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
-        details=f"Updated department ID: {id}"
+        details=f"Updated department ID: {id}",
+        company_id=current_user.company_id
     )
     return updated
 
@@ -85,6 +91,10 @@ def delete_department(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(checker_manage)
 ):
+    db_dept = crud.get_department_by_id(db, id)
+    if not db_dept or db_dept.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Department not found")
+        
     success = crud.delete_department(db, department_id=id)
     if not success:
         raise HTTPException(status_code=404, detail="Department not found")
@@ -95,6 +105,7 @@ def delete_department(
         action="Delete Department",
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
-        details=f"Deleted department ID: {id}"
+        details=f"Deleted department ID: {id}",
+        company_id=current_user.company_id
     )
     return {"message": "Department deleted successfully"}

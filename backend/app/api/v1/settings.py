@@ -18,7 +18,7 @@ def read_settings(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(checker_manage)
 ):
-    return crud.get_settings(db)
+    return crud.get_settings(db, company_id=current_user.company_id)
 
 @router.put("/{key}", response_model=schemas.SettingOut)
 def update_setting(
@@ -28,12 +28,12 @@ def update_setting(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(checker_manage)
 ):
-    setting = crud.get_setting_by_key(db, key=key)
+    setting = crud.get_setting_by_key(db, key=key, company_id=current_user.company_id)
     if not setting:
         raise HTTPException(status_code=404, detail="Setting not found")
         
     old_value = setting.value
-    updated = crud.set_setting(db, key=key, value=payload.value)
+    updated = crud.set_setting(db, key=key, value=payload.value, company_id=current_user.company_id)
     
     # Dynamically restart RTSP processor if RTSP settings were updated
     if key in ["RTSP_STREAM_ENABLED", "RTSP_STREAM_URL"]:
@@ -52,6 +52,7 @@ def update_setting(
         action="Update Setting",
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
-        details=f"Updated setting '{key}' from '{old_value}' to '{payload.value}'"
+        details=f"Updated setting '{key}' from '{old_value}' to '{payload.value}'",
+        company_id=current_user.company_id
     )
     return updated
