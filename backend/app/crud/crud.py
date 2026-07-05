@@ -203,11 +203,12 @@ def delete_employee(db: Session, id: int) -> bool:
     return True
 
 # --- Face Enrollment & Embeddings CRUD ---
-def save_employee_image(db: Session, employee_id: int, file_path: str, pose_type: str):
+def save_employee_image(db: Session, employee_id: int, file_path: str, pose_type: str, image_bytes: bytes = None):
     db_img = models.EmployeeImage(
         employee_id=employee_id,
         file_path=file_path,
-        pose_type=pose_type
+        pose_type=pose_type,
+        image_bytes=image_bytes
     )
     db.add(db_img)
     db.commit()

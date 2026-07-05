@@ -114,7 +114,8 @@ async def upload_face_image(
         db=db,
         employee_id=employee.id,
         file_path=dest_path,
-        pose_type=pose_type
+        pose_type=pose_type,
+        image_bytes=contents
     )
     
     # Save FaceEmbedding (convert numpy array to python list)

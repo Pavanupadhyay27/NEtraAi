@@ -71,6 +71,18 @@ def init_db(db: Session):
         db.execute(text("ALTER TABLE employees ADD COLUMN allow_wfh BOOLEAN DEFAULT FALSE"))
         db.commit()
     
+    # Ensure image_bytes column exists in employee_images table
+    try:
+        db.execute(text("SELECT image_bytes FROM employee_images LIMIT 1"))
+    except Exception:
+        db.rollback()
+        logger.info("Adding image_bytes column to employee_images table...")
+        if db.bind.dialect.name == "postgresql":
+            db.execute(text("ALTER TABLE employee_images ADD COLUMN image_bytes BYTEA"))
+        else:
+            db.execute(text("ALTER TABLE employee_images ADD COLUMN image_bytes BLOB"))
+        db.commit()
+        
     # 0. Seed Shifts
     shifts_to_seed = [
         {"name": "Regular Day Shift", "start_time": time(9, 0), "end_time": time(17, 0), "grace_period_minutes": 15, "description": "Standard business hours"},

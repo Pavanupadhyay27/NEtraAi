@@ -2,8 +2,9 @@ import os
 import threading
 import time
 from datetime import datetime, timedelta
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 import logging
 from sqlalchemy import delete
 
@@ -27,8 +28,33 @@ app = FastAPI(
 )
 
 # Mount uploads directory as static files
-os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
+# Dynamic uploads endpoint: serves images from database (fallback to local disk)
+from app.core.database import get_db
+
+@app.get("/uploads/{employee_id}/{filename}")
+def get_upload_file(employee_id: str, filename: str, db: Session = Depends(get_db)):
+    # Parse pose type from filename (e.g. "front.jpg" -> "front")
+    pose_type = filename.split(".")[0].lower()
+    
+    # Query database for this employee and pose_type
+    db_img = db.query(models.EmployeeImage).join(models.Employee).filter(
+        models.Employee.employee_id == employee_id,
+        models.EmployeeImage.pose_type.ilike(pose_type)
+    ).first()
+    
+    if db_img and db_img.image_bytes:
+        return Response(content=db_img.image_bytes, media_type="image/jpeg")
+        
+    # Fallback to local file system if not in DB (e.g. legacy/development)
+    local_path = os.path.join(settings.UPLOAD_DIR, employee_id, filename)
+    if os.path.exists(local_path):
+        try:
+            with open(local_path, "rb") as f:
+                return Response(content=f.read(), media_type="image/jpeg")
+        except Exception:
+            pass
+            
+    raise HTTPException(status_code=404, detail="File not found")
 
 # CORS configuration
 app.add_middleware(

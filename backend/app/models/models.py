@@ -1,6 +1,6 @@
 import datetime
 import json
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Float, Text, Time, Interval, Enum
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Float, Text, Time, Interval, Enum, LargeBinary
 from sqlalchemy.types import TypeDecorator
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -117,6 +117,7 @@ class EmployeeImage(Base):
     employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False)
     file_path = Column(String(255), nullable=False)
     pose_type = Column(String(50), nullable=False)  # Front, Left, Right, Up, Down, Smile, Neutral, etc.
+    image_bytes = Column(LargeBinary, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     employee = relationship("Employee", back_populates="images")
