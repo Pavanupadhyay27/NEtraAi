@@ -1,6 +1,6 @@
 import datetime
 import json
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Float, Text, Time, Interval, Enum, LargeBinary
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Float, Text, Time, Interval, Enum, LargeBinary, UniqueConstraint
 from sqlalchemy.types import TypeDecorator
 from sqlalchemy.orm import relationship
 from app.core.database import Base
