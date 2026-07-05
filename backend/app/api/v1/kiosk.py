@@ -495,7 +495,7 @@ def scan_face(
             models.Attendance.date == now.date()
         )
     )
-    attendance_record = db.execute(stmt).scalar_one_or_none()
+    attendance_record = db.execute(stmt).scalars().first()
 
     if not attendance_record:
         # --- First scan of the day: Check-In ---
