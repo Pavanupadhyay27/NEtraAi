@@ -11,7 +11,8 @@ def test_read_employees(mock_get, authenticated_client):
         phone="9876543210",
         designation="Software Engineer",
         joining_date="2026-06-10",
-        status="Active"
+        status="Active",
+        allow_wfh=False
     )
     mock_get.return_value = [mock_employee]
     
@@ -46,7 +47,8 @@ def test_create_employee(mock_audit, mock_create, mock_get_phone, mock_get_name,
         name="Jane Smith",
         email="jane@netraid.ai",
         joining_date="2026-06-10",
-        status="Active"
+        status="Active",
+        allow_wfh=False
     )
     mock_create.return_value = mock_employee
     
