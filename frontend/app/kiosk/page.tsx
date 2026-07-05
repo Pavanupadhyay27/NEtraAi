@@ -60,6 +60,7 @@ export default function KioskPage() {
   const kioskActiveRef = useRef(false);
   const scanFunctionRef = useRef<(() => void) | undefined>(undefined);
   const startKioskRef = useRef<any>(null);
+  const scanningInProgressRef = useRef(false);
 
   useEffect(() => {
     statusRef.current = scanStatus;
@@ -263,7 +264,7 @@ export default function KioskPage() {
   }, []);
 
   const captureAndScan = async () => {
-    if (cooldownRef.current || !videoRef.current || !canvasRef.current) return;
+    if (scanningInProgressRef.current || cooldownRef.current || !videoRef.current || !canvasRef.current) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
@@ -332,6 +333,7 @@ export default function KioskPage() {
       return;
     }
 
+    scanningInProgressRef.current = true;
     setScanning(true);
     try {
       // Connect to the backend running at the configured URL
@@ -374,6 +376,7 @@ export default function KioskPage() {
       setFaceBbox(null);
     } finally {
       setScanning(false);
+      scanningInProgressRef.current = false;
     }
   };
 
@@ -414,7 +417,8 @@ export default function KioskPage() {
 
 
   const autoSubmitDirectQR = async (qrVal: string, frameImg: string) => {
-    if (cooldownRef.current || scanning) return;
+    if (cooldownRef.current || scanningInProgressRef.current) return;
+    scanningInProgressRef.current = true;
     setScanning(true);
     setQrError(null);
     try {
@@ -445,11 +449,13 @@ export default function KioskPage() {
       setQrDetectedData(null);
     } finally {
       setScanning(false);
+      scanningInProgressRef.current = false;
     }
   };
 
   const autoSubmitQR = async (employeeId: number, qrVal: string) => {
-    if (cooldownRef.current || scanning) return;
+    if (cooldownRef.current || scanningInProgressRef.current) return;
+    scanningInProgressRef.current = true;
     setScanning(true);
     setQrError(null);
     try {
@@ -479,6 +485,7 @@ export default function KioskPage() {
       setQrDetectedData(null);
     } finally {
       setScanning(false);
+      scanningInProgressRef.current = false;
     }
   };
 

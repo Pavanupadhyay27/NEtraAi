@@ -9,10 +9,16 @@ import asyncio
 from typing import List
 
 _subscribers: List[asyncio.Queue] = []
+_loop: asyncio.AbstractEventLoop = None
 
 
 def subscribe() -> asyncio.Queue:
     """Register a new SSE client and return its dedicated queue."""
+    global _loop
+    try:
+        _loop = asyncio.get_running_loop()
+    except RuntimeError:
+        pass
     q: asyncio.Queue = asyncio.Queue(maxsize=50)
     _subscribers.append(q)
     return q
@@ -29,9 +35,16 @@ def unsubscribe(q: asyncio.Queue) -> None:
 def publish_scan_event(payload: dict) -> None:
     """
     Broadcast a scan-event dict to all connected SSE clients.
-    Called from sync code (kiosk endpoint) — safe because Queue.put_nowait
-    is thread-safe in CPython and does not need an event loop reference.
+    Thread-safe implementation that dispatches to the main event loop.
     """
+    global _loop
+    if _loop is not None:
+        _loop.call_soon_threadsafe(_publish_to_all, payload)
+    else:
+        _publish_to_all(payload)
+
+
+def _publish_to_all(payload: dict) -> None:
     dead: List[asyncio.Queue] = []
     for q in _subscribers:
         try:

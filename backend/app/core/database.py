@@ -17,8 +17,8 @@ engine = create_engine(
     connect_args=connect_args,
     # Standard pool config for Postgres (SQLite doesn't support pool pre-ping/size attributes)
     **({
-        "pool_size": 20,
-        "max_overflow": 10,
+        "pool_size": 8,
+        "max_overflow": 2,
         "pool_recycle": 1800,
         "pool_pre_ping": True
     } if not is_sqlite else {})

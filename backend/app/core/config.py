@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     FORCE_MOCK_MODE: bool = False
     
     # Performance Optimizations
-    LOW_MEMORY_MODE: bool = True  # Set to False on VPS/Dedicated servers to run faster
+    LOW_MEMORY_MODE: bool = False  # Set to False on VPS/Dedicated servers to run faster
     ORT_INTRA_OP_NUM_THREADS: int = 0  # 0 = automatic core detection (faster)
     
     # Paths
