@@ -373,13 +373,23 @@ export default function EmployeesPage() {
                         </td>
                         <td className="py-3.5 px-5" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center gap-2">
-                            <Link
-                              href={`/enroll/${emp.id}`}
-                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10.5px] font-bold text-blue-400 bg-blue-500/8 hover:bg-blue-500/15 border border-blue-500/15 hover:border-blue-500/25 transition-all"
-                            >
-                              <Camera className="w-3.5 h-3.5" />
-                              Enroll
-                            </Link>
+                            {emp.images && emp.images.length > 0 ? (
+                              <Link
+                                href={`/enroll/${emp.id}`}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10.5px] font-bold text-emerald-500 bg-emerald-500/8 hover:bg-emerald-500/15 border border-emerald-500/15 hover:border-emerald-500/25 transition-all"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                Re-Enroll
+                              </Link>
+                            ) : (
+                              <Link
+                                href={`/enroll/${emp.id}`}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10.5px] font-bold text-blue-400 bg-blue-500/8 hover:bg-blue-500/15 border border-blue-500/15 hover:border-blue-500/25 transition-all"
+                              >
+                                <Camera className="w-3.5 h-3.5" />
+                                Enroll
+                              </Link>
+                            )}
                             <button
                               onClick={() => handleDelete(emp.id, emp.name)}
                               className="p-2 rounded-xl text-slate-600 hover:text-rose-400 hover:bg-rose-500/8 border border-transparent hover:border-rose-500/15 transition-all cursor-pointer"
