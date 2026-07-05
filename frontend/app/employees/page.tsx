@@ -175,6 +175,23 @@ export default function EmployeesPage() {
 
   const duplicateWarning = getDuplicateWarning();
 
+  const handleAvatarUpload = async (empId: number, file: File) => {
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    try {
+      await fetchApi(`/employees/${empId}/avatar`, { 
+        method: "POST", 
+        body: formData 
+      });
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      showToast.success("Profile photo uploaded successfully!");
+    } catch (err: any) {
+      showToast.error(err.message || "Failed to upload photo");
+    }
+  };
+
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -379,7 +396,7 @@ export default function EmployeesPage() {
                                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10.5px] font-bold text-emerald-500 bg-emerald-500/8 hover:bg-emerald-500/15 border border-emerald-500/15 hover:border-emerald-500/25 transition-all"
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5" />
-                                Re-Enroll
+                                Update Face ID
                               </Link>
                             ) : (
                               <Link
@@ -390,6 +407,27 @@ export default function EmployeesPage() {
                                 Enroll
                               </Link>
                             )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const el = document.getElementById(`avatar-upload-${emp.id}`);
+                                if (el) el.click();
+                              }}
+                              className="p-2 rounded-xl text-slate-600 hover:text-blue-400 hover:bg-blue-500/8 border border-transparent hover:border-blue-500/15 transition-all cursor-pointer"
+                              title="Upload Avatar Manually"
+                            >
+                              <Upload className="w-3.5 h-3.5" />
+                            </button>
+                            <input 
+                              type="file" 
+                              id={`avatar-upload-${emp.id}`}
+                              className="hidden" 
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleAvatarUpload(emp.id, file);
+                              }}
+                            />
                             <button
                               onClick={() => handleDelete(emp.id, emp.name)}
                               className="p-2 rounded-xl text-slate-600 hover:text-rose-400 hover:bg-rose-500/8 border border-transparent hover:border-rose-500/15 transition-all cursor-pointer"

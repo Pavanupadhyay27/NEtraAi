@@ -263,3 +263,57 @@ def import_csv(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to process CSV file: {str(e)}")
+
+@router.post("/{id}/avatar")
+async def upload_avatar(
+    id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(checker_manage)
+):
+    """
+    Manually upload a profile avatar for an employee without facial enrollment.
+    """
+    db_emp = crud.get_employee_by_id(db, id)
+    if not db_emp or db_emp.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Employee not found")
+        
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+        
+    image_bytes = await file.read()
+    
+    # Check if a Front image already exists
+    front_img = db.query(models.EmployeeImage).filter(
+        models.EmployeeImage.employee_id == db_emp.id,
+        models.EmployeeImage.pose_type == "Front"
+    ).first()
+    
+    if front_img:
+        front_img.image_bytes = image_bytes
+    else:
+        new_img = models.EmployeeImage(
+            employee_id=db_emp.id,
+            file_path=f"uploads/{db_emp.employee_id}/front.jpg", # virtual path
+            pose_type="Front",
+            image_bytes=image_bytes
+        )
+        db.add(new_img)
+        
+    db.commit()
+    
+    # Invalidate face cache in case this changes face embeddings
+    face_engine.invalidate_cache()
+    
+    crud.create_audit_log(
+        db=db,
+        user_id=current_user.id,
+        action="Manual Avatar Upload",
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+        details=f"Manually uploaded avatar for employee ID: {id}",
+        company_id=current_user.company_id
+    )
+    
+    return {"message": "Avatar uploaded successfully"}

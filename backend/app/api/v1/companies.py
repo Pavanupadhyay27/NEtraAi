@@ -23,10 +23,11 @@ class CompanyCreate(CompanyBase):
 class CompanyOut(CompanyBase):
     id: int
     status: str
+    active_employees: int = 0
     created_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 @router.get("/", response_model=List[CompanyOut])
 def get_companies(
@@ -39,7 +40,37 @@ def get_companies(
     Get all companies (Super Admin only).
     """
     companies = db.query(models.Company).offset(skip).limit(limit).all()
+    for c in companies:
+        c.active_employees = db.query(models.Employee).filter(
+            models.Employee.company_id == c.id,
+            models.Employee.status == "Active"
+        ).count()
     return companies
+
+@router.put("/{company_id}/limit", response_model=CompanyOut)
+def update_company_limit(
+    company_id: int,
+    max_employees: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(checker_super_admin)
+):
+    """
+    Update a company's maximum employees limit. (Super Admin only)
+    """
+    db_company = db.query(models.Company).filter(models.Company.id == company_id).first()
+    if not db_company:
+        raise HTTPException(status_code=404, detail="Company not found")
+        
+    db_company.max_employees = max_employees
+    db.commit()
+    db.refresh(db_company)
+    
+    db_company.active_employees = db.query(models.Employee).filter(
+        models.Employee.company_id == db_company.id,
+        models.Employee.status == "Active"
+    ).count()
+    
+    return db_company
 
 @router.post("/", response_model=CompanyOut, status_code=status.HTTP_201_CREATED)
 def create_company(
@@ -63,6 +94,7 @@ def create_company(
     db.add(new_company)
     db.commit()
     db.refresh(new_company)
+    new_company.active_employees = 0
     return new_company
 
 @router.put("/{company_id}/suspend", response_model=CompanyOut)
@@ -84,6 +116,10 @@ def suspend_company(
     db_company.status = "Suspended"
     db.commit()
     db.refresh(db_company)
+    db_company.active_employees = db.query(models.Employee).filter(
+        models.Employee.company_id == db_company.id,
+        models.Employee.status == "Active"
+    ).count()
     return db_company
 
 @router.put("/{company_id}/activate", response_model=CompanyOut)
@@ -102,4 +138,8 @@ def activate_company(
     db_company.status = "Active"
     db.commit()
     db.refresh(db_company)
+    db_company.active_employees = db.query(models.Employee).filter(
+        models.Employee.company_id == db_company.id,
+        models.Employee.status == "Active"
+    ).count()
     return db_company

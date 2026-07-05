@@ -17,7 +17,8 @@ import {
   Scan,
   History,
   Sun,
-  Moon
+  Moon,
+  Building2
 } from "lucide-react";
 import { getAccessToken, getUserProfile, clearTokens } from "@/app/utils/api";
 
@@ -246,6 +247,14 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
                 isCollapsed={isCollapsed}
               />
             ))}
+            
+            {user?.role === "Super Admin" && (
+              <NavLink
+                item={{ name: "Tenants", href: "/tenants", icon: Building2 }}
+                isActive={pathname.startsWith("/tenants")}
+                isCollapsed={isCollapsed}
+              />
+            )}
 
             {/* Separator */}
             <div className="my-3 border-t border-[var(--border-subtle)]" />
