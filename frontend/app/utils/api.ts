@@ -1,4 +1,4 @@
-const DEFAULT_BACKEND_URL = "http://localhost:8000/api/v1";
+const DEFAULT_BACKEND_URL = "https://pawankr007-netra.hf.space/api/v1";
 
 export function getBackendUrl(): string {
   // Check for environment variable configuration (e.g. on Vercel)
@@ -14,8 +14,17 @@ export function getBackendUrl(): string {
   }
   if (typeof window !== "undefined") {
     const host = window.location.hostname;
-    // If running in Docker or local network, resolve relative or localhost
-    return `http://${host}:8000/api/v1`;
+    // If running on localhost or a local private IP network, connect to local port 8000
+    if (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host.startsWith("192.168.") ||
+      host.startsWith("10.") ||
+      host.startsWith("172.") ||
+      host.endsWith(".local")
+    ) {
+      return `http://${host}:8000/api/v1`;
+    }
   }
   return DEFAULT_BACKEND_URL;
 }
