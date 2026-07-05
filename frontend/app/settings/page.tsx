@@ -7,7 +7,7 @@ import { fetchApi } from "@/app/utils/api";
 import { useToast } from "@/app/utils/toast";
 import { 
   Check, Loader2, CheckCircle2, AlertCircle, Sliders, Info,
-  Fingerprint, Clock, Volume2, Palette, Upload, Trash2, Camera, MapPin
+  Fingerprint, Clock, Volume2, Palette, Upload, Trash2, Camera, MapPin, WifiOff, RefreshCw
 } from "lucide-react";
 
 type SettingsTab = "biometrics" | "shift" | "voice" | "branding" | "location" | "advanced";
@@ -21,7 +21,7 @@ export default function SettingsPage() {
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [fetchingGps, setFetchingGps] = useState(false);
 
-  const { data: settings, isLoading } = useQuery({
+  const { data: settings, isLoading, isError, error } = useQuery({
     queryKey: ["settings"],
     queryFn: async () => {
       const data = await fetchApi("/settings/");
@@ -29,7 +29,8 @@ export default function SettingsPage() {
       data.forEach((s: any) => { valMap[s.key] = s.value; });
       setEditValues(valMap);
       return data;
-    }
+    },
+    retry: 2,
   });
 
   const saveMutation = useMutation({
@@ -397,6 +398,28 @@ export default function SettingsPage() {
                       <div className="skeleton h-9 w-36" />
                     </div>
                   ))}
+                </div>
+              ) : isError ? (
+                <div className="p-8 flex flex-col items-center justify-center gap-4 text-center">
+                  <div className="p-3 rounded-2xl bg-red-50 border border-red-200">
+                    <WifiOff className="w-6 h-6 text-red-500" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-bold text-slate-900">Connection Failed</h3>
+                    <p className="text-xs text-slate-500 max-w-xs">
+                      Could not load settings from the backend server. Please verify the backend is running and reachable.
+                    </p>
+                    <p className="text-[10px] font-mono text-red-400 mt-2 break-all max-w-sm">
+                      {(error as Error)?.message || "Unknown error"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => queryClient.invalidateQueries({ queryKey: ["settings"] })}
+                    className="mt-2 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-all cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Retry
+                  </button>
                 </div>
               ) : filteredSettings.length === 0 ? (
                 <div className="p-12 text-center text-slate-500 text-xs">
