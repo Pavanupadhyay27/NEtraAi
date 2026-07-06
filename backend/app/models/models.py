@@ -44,6 +44,8 @@ class Company(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), unique=True, nullable=False)
+    admin_email = Column(String(255), nullable=True)
+    max_employees = Column(Integer, default=100)
     status = Column(String(50), default="Active")  # Active, Suspended, Trial
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
