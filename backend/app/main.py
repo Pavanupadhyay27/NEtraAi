@@ -136,8 +136,26 @@ def startup_event():
                 conn.commit()
         except Exception:
             pass
-
         init_db(db)
+        
+        # Backfill settings for existing companies
+        try:
+            from app.models import models
+            from app.crud import crud
+            all_companies = db.query(models.Company).all()
+            base_company = db.query(models.Company).filter(models.Company.name == "NetraID Base").first()
+            if base_company:
+                base_settings = crud.get_settings(db, company_id=base_company.id)
+                for company in all_companies:
+                    if company.id == base_company.id:
+                        continue
+                    existing_settings = crud.get_settings(db, company_id=company.id)
+                    if not existing_settings:
+                        for s in base_settings:
+                            crud.set_setting(db, s.key, s.value, s.description, company_id=company.id)
+        except Exception as e:
+            logger.error(f"Error backfilling settings: {e}")
+            
         db_error = "Success"
         
         # Start background RTSP processor

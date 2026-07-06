@@ -111,8 +111,8 @@ export default function TenantDetailPage() {
         </button>
 
         <div className="flex items-center gap-5 mb-10">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-white/10 flex items-center justify-center shrink-0">
-            <span className="text-3xl font-extrabold text-white">{tenant.name.charAt(0).toUpperCase()}</span>
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-[0_0_30px_rgba(99,102,241,0.3)] flex items-center justify-center shrink-0">
+            <span className="text-3xl font-extrabold text-white shadow-sm">{tenant.name.charAt(0).toUpperCase()}</span>
           </div>
           <div>
             <h1 className="text-3xl font-extrabold text-[var(--text-primary)]">{tenant.name}</h1>
@@ -126,7 +126,7 @@ export default function TenantDetailPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {/* Tokens Card */}
-          <div className="glass-card p-6 rounded-3xl border border-white/6 flex flex-col gap-4">
+          <div className="glass-card p-6 rounded-3xl border border-white/6 flex flex-col gap-4 hover:-translate-y-1 hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-300">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
                 <Coins className="w-5 h-5 text-amber-400" />
@@ -143,7 +143,7 @@ export default function TenantDetailPage() {
           </div>
 
           {/* Employees Card */}
-          <div className="glass-card p-6 rounded-3xl border border-white/6 flex flex-col gap-4">
+          <div className="glass-card p-6 rounded-3xl border border-white/6 flex flex-col gap-4 hover:-translate-y-1 hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-300">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center">
                 <Users className="w-5 h-5 text-indigo-400" />
@@ -165,7 +165,7 @@ export default function TenantDetailPage() {
           </div>
 
           {/* Status Card */}
-          <div className="glass-card p-6 rounded-3xl border border-white/6 flex flex-col gap-4">
+          <div className="glass-card p-6 rounded-3xl border border-white/6 flex flex-col gap-4 hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-500/10 transition-all duration-300">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${tenant.status === 'Active' ? 'bg-emerald-500/10' : 'bg-rose-500/10'}`}>
                 <Activity className={`w-5 h-5 ${tenant.status === 'Active' ? 'text-emerald-400' : 'text-rose-400'}`} />
@@ -230,15 +230,16 @@ export default function TenantDetailPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {settings.filter((s: any) => s.value === "true" || s.value === "false").map((setting: any) => (
-                <div key={setting.key} className="flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 rounded-2xl hover:bg-white/[0.04] transition-colors">
-                  <div>
-                    <p className="text-sm font-bold text-white">{setting.key.replace(/_/g, " ")}</p>
-                    <p className="text-xs text-slate-400 mt-1">{setting.description}</p>
+                <div key={setting.key} className="flex items-center justify-between p-5 bg-white/[0.02] border border-white/5 rounded-2xl hover:bg-white/[0.06] hover:border-white/10 transition-all duration-300 group cursor-pointer" onClick={() => toggleSetting(setting)}>
+                  <div className="pr-4">
+                    <p className="text-[13px] font-bold text-white group-hover:text-indigo-400 transition-colors">
+                      {setting.key.replace(/_/g, " ")}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">{setting.description}</p>
                   </div>
                   <button 
-                    onClick={() => toggleSetting(setting)}
                     disabled={updateSettingMutation.isPending}
-                    className={`p-1 rounded-full transition-colors ${setting.value === "true" ? "text-emerald-400" : "text-slate-600"}`}
+                    className={`p-1 rounded-full transition-all duration-300 shrink-0 ${setting.value === "true" ? "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]" : "text-slate-600"}`}
                   >
                     {setting.value === "true" ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
                   </button>
