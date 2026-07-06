@@ -248,7 +248,7 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
               />
             ))}
             
-            {user?.role === "Super Admin" && (
+            {(user?.role === "Super Admin" || user?.role?.name === "Admin" || user?.role === "Admin") && (
               <NavLink
                 item={{ name: "Tenants", href: "/tenants", icon: Building2 }}
                 isActive={pathname.startsWith("/tenants")}
