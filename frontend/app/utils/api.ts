@@ -4,10 +4,7 @@ export function getBackendUrl(): string {
   // Check for environment variable configuration (e.g. on Vercel)
   if (process.env.NEXT_PUBLIC_API_URL) {
     let url = process.env.NEXT_PUBLIC_API_URL.trim();
-    // Dynamically auto-correct the Vercel environment variable typo
-    if (url.includes("pawankr007-netraai.hf.space") || url.includes("pawankr007-netra.hf.space")) {
-      url = url.replace(/pawankr007-netraai\.hf\.space|pawankr007-netra\.hf\.space/g, "netraai07-netra.hf.space");
-    }
+
     if (url.endsWith("/")) {
       url = url.slice(0, -1);
     }
