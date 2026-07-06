@@ -88,10 +88,11 @@ class RoleChecker:
         self,
         current_user: models.User = Depends(get_current_user)
     ) -> models.User:
-        if current_user.role.name not in self.allowed_roles:
+        role_name = current_user.role.name if current_user.role else "Employee"
+        if role_name not in self.allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"User role '{current_user.role.name}' does not have permission to access this resource. Allowed: {self.allowed_roles}"
+                detail=f"User role '{role_name}' does not have permission to access this resource. Allowed: {self.allowed_roles}"
             )
         return current_user
 
@@ -159,9 +160,10 @@ class RoleCheckerSSE:
         self,
         current_user: models.User = Depends(get_current_user_sse)
     ) -> models.User:
-        if current_user.role.name not in self.allowed_roles:
+        role_name = current_user.role.name if current_user.role else "Employee"
+        if role_name not in self.allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"User role '{current_user.role.name}' does not have permission to access this resource. Allowed: {self.allowed_roles}"
+                detail=f"User role '{role_name}' does not have permission to access this resource. Allowed: {self.allowed_roles}"
             )
         return current_user

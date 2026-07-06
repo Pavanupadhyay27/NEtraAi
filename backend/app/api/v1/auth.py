@@ -40,12 +40,13 @@ def login(
             detail="Inactive user account"
         )
         
+    role_name = user.role.name if user.role else "Employee"
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = security.create_access_token(
-        user.email, role=user.role.name, expires_delta=access_token_expires
+        user.email, role=role_name, expires_delta=access_token_expires
     )
     refresh_token = security.create_refresh_token(
-        user.email, role=user.role.name
+        user.email, role=role_name
     )
     
     # Audit log login
@@ -89,11 +90,12 @@ def refresh_token(
     if user is None or not user.is_active:
         raise credentials_exception
         
+    role_name = user.role.name if user.role else "Employee"
     access_token = security.create_access_token(
-        user.email, role=user.role.name
+        user.email, role=role_name
     )
     new_refresh_token = security.create_refresh_token(
-        user.email, role=user.role.name
+        user.email, role=role_name
     )
     
     return {
