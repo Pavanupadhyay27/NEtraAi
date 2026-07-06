@@ -127,6 +127,14 @@ def scan_face(
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         if img is None:
             raise ValueError()
+            
+        # Fast downscale for performance
+        scale_factor = 1.0
+        max_dim = 640
+        h, w = img.shape[:2]
+        if max(h, w) > max_dim:
+            scale_factor = max_dim / max(h, w)
+            img = cv2.resize(img, (int(w * scale_factor), int(h * scale_factor)), interpolation=cv2.INTER_AREA)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid Base64 image data")
 
@@ -189,7 +197,13 @@ def scan_face(
             
         face = faces[0]
         bbox = face["bbox"]
-        bbox_list = [float(x) for x in bbox]
+        
+        # Scale bbox back to original image size for frontend drawing
+        if scale_factor != 1.0:
+            bbox_list = [float(x) / scale_factor for x in bbox]
+        else:
+            bbox_list = [float(x) for x in bbox]
+            
         confidence = face["confidence"]
         landmarks = face["landmarks"]
         
