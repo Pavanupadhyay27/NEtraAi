@@ -280,21 +280,7 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
               )}
             </a>
 
-            {/* Admin Log Out */}
-            <button
-              onClick={handleLogout}
-              data-tooltip={isCollapsed ? "Admin Log Out" : undefined}
-              className={`group flex items-center ${isCollapsed ? "justify-center px-2" : "gap-3 px-3"} py-2.5 rounded-xl text-[var(--text-secondary)] hover:text-rose-600 hover:bg-rose-500/10 dark:hover:bg-rose-500/15 transition-all duration-200 w-full text-left cursor-pointer`}
-            >
-              <div className="w-8 h-8 rounded-lg bg-[var(--border-subtle)] flex items-center justify-center group-hover:bg-rose-600 transition-all">
-                <LogOut className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-white" />
-              </div>
-              {!isCollapsed && (
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Admin Log Out</p>
-                </div>
-              )}
-            </button>
+
           </nav>
 
           {/* User Profile Footer */}
