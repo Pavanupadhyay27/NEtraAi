@@ -102,6 +102,21 @@ def startup_event():
     # Initialize and Seed database
     db = SessionLocal()
     try:
+        from sqlalchemy import text
+        from app.core.database import engine
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE companies ADD COLUMN admin_email VARCHAR(255);"))
+                conn.commit()
+        except Exception:
+            pass
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE companies ADD COLUMN max_employees INTEGER DEFAULT 100;"))
+                conn.commit()
+        except Exception:
+            pass
+
         init_db(db)
         db_error = "Success"
         
