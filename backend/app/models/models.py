@@ -45,6 +45,8 @@ class Company(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), unique=True, nullable=False)
     admin_email = Column(String(255), nullable=True)
+    phone = Column(String(50), nullable=True)
+    address = Column(String(255), nullable=True)
     max_employees = Column(Integer, default=100)
     available_tokens = Column(Integer, default=1000)
     tokens_used = Column(Integer, default=0)

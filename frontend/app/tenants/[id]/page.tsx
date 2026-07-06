@@ -12,14 +12,18 @@ import {
   Database,
   Coins,
   Activity,
-  Plus
+  Plus,
+  ToggleRight,
+  ToggleLeft,
+  MapPin,
+  Phone
 } from "lucide-react";
 
 export default function TenantDetailPage() {
   const params = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const tenantId = params.id as str;
+  const tenantId = params.id as string;
 
   const [addTokensAmount, setAddTokensAmount] = useState("");
 
@@ -47,6 +51,28 @@ export default function TenantDetailPage() {
     if (!isNaN(amount) && amount > 0) {
       addTokensMutation.mutate(amount);
     }
+  };
+
+  const { data: settings, isLoading: isSettingsLoading } = useQuery({
+    queryKey: ["tenant_settings", tenantId],
+    queryFn: () => fetchApi(`/companies/${tenantId}/settings`),
+    enabled: !!tenant,
+  });
+
+  const updateSettingMutation = useMutation({
+    mutationFn: ({ key, value }: { key: string, value: string }) => 
+      fetchApi(`/companies/${tenantId}/settings/${key}`, { 
+        method: "PUT", 
+        body: JSON.stringify({ value }) 
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tenant_settings", tenantId] });
+    }
+  });
+
+  const toggleSetting = (setting: any) => {
+    const newValue = setting.value === "true" ? "false" : "true";
+    updateSettingMutation.mutate({ key: setting.key, value: newValue });
   };
 
   if (isLoading) {
@@ -90,7 +116,11 @@ export default function TenantDetailPage() {
           </div>
           <div>
             <h1 className="text-3xl font-extrabold text-[var(--text-primary)]">{tenant.name}</h1>
-            <p className="text-slate-400 font-mono mt-1">{tenant.admin_email || "No admin email setup"}</p>
+            <div className="flex items-center gap-4 mt-2">
+              <span className="text-slate-400 font-mono text-sm flex items-center gap-1.5"><Users className="w-3 h-3"/> {tenant.admin_email || "No admin email"}</span>
+              {tenant.phone && <span className="text-slate-400 font-mono text-sm flex items-center gap-1.5"><Phone className="w-3 h-3"/> {tenant.phone}</span>}
+              {tenant.address && <span className="text-slate-400 font-mono text-sm flex items-center gap-1.5"><MapPin className="w-3 h-3"/> {tenant.address}</span>}
+            </div>
           </div>
         </div>
 
@@ -182,6 +212,40 @@ export default function TenantDetailPage() {
           <p className="text-xs text-slate-500 mt-4">
             Tokens are deducted automatically when tenant's employees mark their attendance (1 scan = 1 token).
           </p>
+        </div>
+
+        {/* Permissions & Features */}
+        <div className="mt-8 glass-card p-8 rounded-3xl border border-white/6">
+          <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+            <ToggleRight className="w-5 h-5 text-indigo-400" />
+            Tenant Permissions & Features
+          </h2>
+          
+          {isSettingsLoading ? (
+            <div className="flex justify-center p-4">
+              <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : !settings || settings.length === 0 ? (
+            <p className="text-slate-400 text-sm">No permissions configured for this tenant. Try re-seeding or checking logs.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {settings.filter((s: any) => s.value === "true" || s.value === "false").map((setting: any) => (
+                <div key={setting.key} className="flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 rounded-2xl hover:bg-white/[0.04] transition-colors">
+                  <div>
+                    <p className="text-sm font-bold text-white">{setting.key.replace(/_/g, " ")}</p>
+                    <p className="text-xs text-slate-400 mt-1">{setting.description}</p>
+                  </div>
+                  <button 
+                    onClick={() => toggleSetting(setting)}
+                    disabled={updateSettingMutation.isPending}
+                    className={`p-1 rounded-full transition-colors ${setting.value === "true" ? "text-emerald-400" : "text-slate-600"}`}
+                  >
+                    {setting.value === "true" ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
       </div>

@@ -123,7 +123,13 @@ def startup_event():
                 conn.commit()
         except Exception:
             pass
-            
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE companies ADD COLUMN phone VARCHAR(50);"))
+                conn.execute(text("ALTER TABLE companies ADD COLUMN address VARCHAR(255);"))
+                conn.commit()
+        except Exception:
+            pass
         try:
             with engine.connect() as conn:
                 conn.execute(text("DELETE FROM companies WHERE name = 'NetraID Demo';"))

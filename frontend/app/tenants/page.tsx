@@ -32,6 +32,8 @@ export default function TenantsPage() {
   const [name, setName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [maxEmployees, setMaxEmployees] = useState("50");
   const [initialTokens, setInitialTokens] = useState("1000");
   const [newLimit, setNewLimit] = useState("");
@@ -79,6 +81,8 @@ export default function TenantsPage() {
     setName("");
     setAdminEmail("");
     setAdminPassword("");
+    setPhone("");
+    setAddress("");
     setMaxEmployees("50");
     setInitialTokens("1000");
     setErrorMsg("");
@@ -90,6 +94,8 @@ export default function TenantsPage() {
       name,
       admin_email: adminEmail || null,
       admin_password: adminPassword || null,
+      phone: phone || null,
+      address: address || null,
       max_employees: parseInt(maxEmployees) || 50,
       available_tokens: parseInt(initialTokens) || 1000
     });
@@ -332,6 +338,18 @@ export default function TenantsPage() {
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Admin Password</label>
                 <input type="password" required placeholder="Initial login password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} className={inputCls} />
+              </div>
+
+              <div className="flex gap-4">
+                <div className="space-y-1.5 flex-1">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mobile Number</label>
+                  <input type="text" placeholder="+1 234 567 8900" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} />
+                </div>
+                
+                <div className="space-y-1.5 flex-1">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Address</label>
+                  <input type="text" placeholder="123 Main St" value={address} onChange={(e) => setAddress(e.target.value)} className={inputCls} />
+                </div>
               </div>
 
               <div className="flex gap-4">

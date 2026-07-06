@@ -15,6 +15,8 @@ checker_super_admin = security.RoleChecker(["Super Admin"])
 class CompanyBase(BaseModel):
     name: str
     admin_email: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
     max_employees: int = 100
     available_tokens: int = 1000
 
@@ -92,6 +94,8 @@ def create_company(
     new_company = models.Company(
         name=company.name,
         admin_email=company.admin_email,
+        phone=company.phone,
+        address=company.address,
         max_employees=company.max_employees,
         available_tokens=company.available_tokens,
         status="Active"
@@ -100,6 +104,18 @@ def create_company(
     db.commit()
     db.refresh(new_company)
     
+    # Seed default settings from NetraID Base
+    try:
+        from app.crud import crud
+        default_company = db.query(models.Company).filter(models.Company.name == "NetraID Base").first()
+        if default_company:
+            base_settings = crud.get_settings(db, company_id=default_company.id)
+            for s in base_settings:
+                crud.set_setting(db, s.key, s.value, s.description, company_id=new_company.id)
+    except Exception as e:
+        import logging
+        logging.getLogger("CompaniesAPI").error(f"Failed to seed settings for new company: {e}")
+        
     if company.admin_email and company.admin_password:
         from app.crud import crud
         from app.schemas import schemas
@@ -191,3 +207,29 @@ def activate_company(
         models.Employee.status == "Active"
     ).count()
     return db_company
+
+from app.schemas.schemas import SettingOut, SettingUpdate
+@router.get("/{company_id}/settings", response_model=List[SettingOut])
+def get_company_settings(
+    company_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(checker_super_admin)
+):
+    from app.crud import crud
+    return crud.get_settings(db, company_id=company_id)
+
+@router.put("/{company_id}/settings/{key}", response_model=SettingOut)
+def update_company_setting(
+    company_id: int,
+    key: str,
+    payload: SettingUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(checker_super_admin)
+):
+    from app.crud import crud
+    setting = crud.get_setting_by_key(db, key=key, company_id=company_id)
+    if not setting:
+        raise HTTPException(status_code=404, detail="Setting not found")
+        
+    updated = crud.set_setting(db, key=key, value=payload.value, company_id=company_id)
+    return updated
