@@ -16,14 +16,16 @@ class CompanyBase(BaseModel):
     name: str
     admin_email: Optional[str] = None
     max_employees: int = 100
+    available_tokens: int = 1000
 
 class CompanyCreate(CompanyBase):
-    pass
+    admin_password: Optional[str] = None
 
 class CompanyOut(CompanyBase):
     id: int
     status: str
     active_employees: int = 0
+    tokens_used: int = 0
     created_at: datetime
     
     class Config:
@@ -39,7 +41,9 @@ def get_companies(
     """
     Get all companies (Super Admin only).
     """
-    companies = db.query(models.Company).offset(skip).limit(limit).all()
+    companies = db.query(models.Company).filter(
+        models.Company.name != "NetraID Base"
+    ).offset(skip).limit(limit).all()
     for c in companies:
         c.active_employees = db.query(models.Employee).filter(
             models.Employee.company_id == c.id,
@@ -89,13 +93,57 @@ def create_company(
         name=company.name,
         admin_email=company.admin_email,
         max_employees=company.max_employees,
+        available_tokens=company.available_tokens,
         status="Active"
     )
     db.add(new_company)
     db.commit()
     db.refresh(new_company)
+    
+    if company.admin_email and company.admin_password:
+        from app.crud import crud
+        from app.schemas import schemas
+        admin_role = crud.get_role_by_name(db, "Admin")
+        if admin_role:
+            existing_user = crud.get_user_by_email(db, company.admin_email)
+            if not existing_user:
+                user_create = schemas.UserCreate(
+                    email=company.admin_email,
+                    password=company.admin_password,
+                    role_id=admin_role.id
+                )
+                crud.create_user(db, user_create, company_id=new_company.id)
+
     new_company.active_employees = 0
     return new_company
+
+class TokenAdd(BaseModel):
+    amount: int
+
+@router.post("/{company_id}/add-tokens", response_model=CompanyOut)
+def add_tokens(
+    company_id: int,
+    payload: TokenAdd,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(checker_super_admin)
+):
+    """
+    Add tokens to a company. (Super Admin only)
+    """
+    db_company = db.query(models.Company).filter(models.Company.id == company_id).first()
+    if not db_company:
+        raise HTTPException(status_code=404, detail="Company not found")
+        
+    db_company.available_tokens += payload.amount
+    db.commit()
+    db.refresh(db_company)
+    
+    db_company.active_employees = db.query(models.Employee).filter(
+        models.Employee.company_id == db_company.id,
+        models.Employee.status == "Active"
+    ).count()
+    
+    return db_company
 
 @router.put("/{company_id}/suspend", response_model=CompanyOut)
 def suspend_company(

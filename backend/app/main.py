@@ -116,6 +116,20 @@ def startup_event():
                 conn.commit()
         except Exception:
             pass
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE companies ADD COLUMN available_tokens INTEGER DEFAULT 1000;"))
+                conn.execute(text("ALTER TABLE companies ADD COLUMN tokens_used INTEGER DEFAULT 0;"))
+                conn.commit()
+        except Exception:
+            pass
+            
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("DELETE FROM companies WHERE name = 'NetraID Demo';"))
+                conn.commit()
+        except Exception:
+            pass
 
         init_db(db)
         db_error = "Success"

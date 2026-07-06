@@ -33,10 +33,10 @@ def init_db(db: Session):
             db.commit()
 
     # 2. Seed default company
-    default_company = db.execute(select(models.Company).where(models.Company.name == "NetraID Demo")).scalar_one_or_none()
+    default_company = db.execute(select(models.Company).where(models.Company.name == "NetraID Base")).scalar_one_or_none()
     if not default_company:
-        logger.info("Seeding default company 'NetraID Demo'...")
-        default_company = models.Company(name="NetraID Demo", status="Active")
+        logger.info("Seeding default company 'NetraID Base'...")
+        default_company = models.Company(name="NetraID Base", status="Active", max_employees=1000, available_tokens=999999)
         db.add(default_company)
         db.commit()
         db.refresh(default_company)

@@ -31,7 +31,9 @@ export default function TenantsPage() {
   // Form states
   const [name, setName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
   const [maxEmployees, setMaxEmployees] = useState("50");
+  const [initialTokens, setInitialTokens] = useState("1000");
   const [newLimit, setNewLimit] = useState("");
   
   const [errorMsg, setErrorMsg] = useState("");
@@ -76,7 +78,9 @@ export default function TenantsPage() {
   const resetForm = () => {
     setName("");
     setAdminEmail("");
+    setAdminPassword("");
     setMaxEmployees("50");
+    setInitialTokens("1000");
     setErrorMsg("");
   };
 
@@ -85,7 +89,9 @@ export default function TenantsPage() {
     createMutation.mutate({
       name,
       admin_email: adminEmail || null,
-      max_employees: parseInt(maxEmployees) || 50
+      admin_password: adminPassword || null,
+      max_employees: parseInt(maxEmployees) || 50,
+      available_tokens: parseInt(initialTokens) || 1000
     });
   };
 
@@ -209,7 +215,11 @@ export default function TenantsPage() {
               if (usagePercent > 90) barColor = "bg-rose-500";
 
               return (
-                <div key={company.id} className={`glass-card relative overflow-hidden rounded-3xl border transition-all ${isSuspended ? "border-rose-500/30 opacity-75" : "border-white/6 hover:border-white/10"}`}>
+                <div 
+                  key={company.id} 
+                  onClick={() => router.push(`/tenants/${company.id}`)}
+                  className={`glass-card relative overflow-hidden rounded-3xl border transition-all cursor-pointer ${isSuspended ? "border-rose-500/30 opacity-75" : "border-white/6 hover:border-white/10 hover:-translate-y-1"}`}
+                >
                   
                   {isSuspended && (
                     <div className="absolute top-0 right-0 bg-rose-500/20 text-rose-400 text-[10px] font-bold px-3 py-1 rounded-bl-xl border-b border-l border-rose-500/30 flex items-center gap-1.5">
@@ -249,7 +259,7 @@ export default function TenantsPage() {
                         {company.id !== 1 && (
                           isSuspended ? (
                             <button 
-                              onClick={() => activateMutation.mutate(company.id)}
+                              onClick={(e) => { e.stopPropagation(); activateMutation.mutate(company.id); }}
                               disabled={activateMutation.isPending}
                               className="flex-1 btn-primary bg-emerald-500 hover:bg-emerald-600 text-white border-transparent h-8 text-[11px] flex items-center justify-center gap-1.5 rounded-xl cursor-pointer"
                             >
@@ -258,7 +268,7 @@ export default function TenantsPage() {
                             </button>
                           ) : (
                             <button 
-                              onClick={() => suspendMutation.mutate(company.id)}
+                              onClick={(e) => { e.stopPropagation(); suspendMutation.mutate(company.id); }}
                               disabled={suspendMutation.isPending}
                               className="flex-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-all h-8 text-[11px] font-semibold flex items-center justify-center gap-1.5 rounded-xl cursor-pointer"
                             >
@@ -268,7 +278,8 @@ export default function TenantsPage() {
                           )
                         )}
                         <button 
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setNewLimit(company.max_employees.toString());
                             setShowLimitDialog(company.id);
                           }}
@@ -319,8 +330,20 @@ export default function TenantsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Max Employees Limit</label>
-                <input type="number" min="1" required value={maxEmployees} onChange={(e) => setMaxEmployees(e.target.value)} className={inputCls} />
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Admin Password</label>
+                <input type="password" required placeholder="Initial login password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} className={inputCls} />
+              </div>
+
+              <div className="flex gap-4">
+                <div className="space-y-1.5 flex-1">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Max Employees</label>
+                  <input type="number" min="1" required value={maxEmployees} onChange={(e) => setMaxEmployees(e.target.value)} className={inputCls} />
+                </div>
+                
+                <div className="space-y-1.5 flex-1">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Initial Tokens</label>
+                  <input type="number" min="0" required value={initialTokens} onChange={(e) => setInitialTokens(e.target.value)} className={inputCls} />
+                </div>
               </div>
 
               <div className="pt-2">

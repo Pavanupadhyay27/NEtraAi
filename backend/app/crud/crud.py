@@ -443,6 +443,12 @@ def mark_kiosk_attendance(db: Session, employee_id: int, timestamp: datetime, ca
             status=status
         )
         db.add(db_attendance)
+        
+        # Deduct a token for this check-in
+        if employee.company and employee.company.available_tokens > 0:
+            employee.company.available_tokens -= 1
+            employee.company.tokens_used += 1
+            
         logger.info(f"Marked Check-In for employee {employee_id} at {timestamp}. Status: {status}")
     else:
         # Second scan of the day -> CHECK-OUT
