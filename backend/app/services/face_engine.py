@@ -322,8 +322,8 @@ class FaceEngine:
         src = np.array(landmarks, dtype=np.float32)
         
         # Estimate similarity transform matrix
-        # cv2.estimateAffinePartial2D finds a similarity transform (rotation, translation, scaling)
-        M, inliers = cv2.estimateAffinePartial2D(src, reference_landmarks)
+        # Disable RANSAC (method=0) to force a stable least-squares fit on all 5 points
+        M, inliers = cv2.estimateAffinePartial2D(src, reference_landmarks, method=0)
         if M is None:
             # Fallback
             return cv2.resize(image_np, (112, 112))
@@ -367,13 +367,9 @@ class FaceEngine:
             return vec / norm if norm > 0 else vec
 
         try:
-            # ArcFace input preprocessing:
-            # Face is 112x112, channel layout is BGR.
-            # Model expects RGB or BGR depending on export. w600k_r50 expects BGR or RGB (usually (pixel - 127.5) / 128.0)
-            # Let's process: (image - 127.5) / 128.0
-            # w600k_r50 ONNX from Insightface expects float32 input [1, 3, 112, 112]
-            blob = aligned_face.astype(np.float32)
-            # w600k_r50 usually expects BGR representation but normalized
+            # ArcFace expects RGB input! Convert BGR to RGB.
+            aligned_rgb = cv2.cvtColor(aligned_face, cv2.COLOR_BGR2RGB)
+            blob = aligned_rgb.astype(np.float32)
             blob = (blob - 127.5) / 128.0
             blob = np.transpose(blob, (2, 0, 1))
             blob = np.expand_dims(blob, axis=0)
