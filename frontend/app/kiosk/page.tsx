@@ -826,7 +826,7 @@ export default function KioskPage() {
           )}
 
           {/* Camera Frame Frame */}
-          <div className={`relative aspect-video rounded-2xl overflow-hidden bg-black border border-zinc-100 shadow-sm ${kioskActive ? "block" : "hidden"}`}>
+          <div className={`relative aspect-[3/4] md:aspect-video rounded-2xl overflow-hidden bg-black border border-zinc-100 shadow-sm ${kioskActive ? "block" : "hidden"}`}>
             
             {/* Native Video player (Centrally mounted) */}
             <video

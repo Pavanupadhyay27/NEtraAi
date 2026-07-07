@@ -365,69 +365,80 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
       </div>
 
       {/* ─── Mobile Drawer ─── */}
-      {sidebarOpen && (
-        <div
-          className="md:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-xs animate-fade-in no-print"
-          onClick={() => setSidebarOpen(false)}
+      <div
+        className={`md:hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300 no-print ${
+          sidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={() => setSidebarOpen(false)}
+      >
+        <aside
+          className={`fixed top-0 left-0 w-[280px] h-full bg-[var(--bg-surface)] shadow-2xl border-r border-[var(--border-subtle)] flex flex-col z-50 transform transition-transform duration-300 ease-out ${
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+          onClick={(e) => e.stopPropagation()}
         >
-          <aside
-            className="w-64 h-full bg-[var(--bg-surface)] border-r border-[var(--border-subtle)] p-4 flex flex-col relative"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3 px-1 py-3 mb-6 mt-14">
-              <div className="relative inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-900 border border-slate-700/80 shadow-[0_0_15px_rgba(6,182,212,0.25)] overflow-hidden shrink-0">
+          {/* Header inside Drawer */}
+          <div className="flex items-center justify-between p-5 border-b border-[var(--border-subtle)]">
+            <div className="flex items-center gap-3">
+              <div className="relative inline-flex items-center justify-center w-9 h-9 rounded-xl bg-slate-900 border border-slate-700/80 shadow-[0_0_15px_rgba(6,182,212,0.25)] overflow-hidden shrink-0">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.15)_0%,transparent_70%)] animate-pulse" />
                 <div className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 border border-white z-20" />
-                <svg viewBox="0 0 100 100" className="w-6 h-6 relative z-10 animate-fade-in" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="50" cy="50" r="45" stroke="#334155" strokeWidth="2" strokeDasharray="8 12" className="animate-rotate-ring" />
+                <svg viewBox="0 0 100 100" className="w-5 h-5 relative z-10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="50" cy="50" r="45" stroke="#334155" strokeWidth="2" strokeDasharray="8 12" />
                   <path d="M15 50 C 30 25, 70 25, 85 50 C 70 75, 30 75, 15 50 Z" stroke="#64748b" strokeWidth="2.5" />
-                  <g className="animate-eye-lid">
-                    <circle cx="50" cy="50" r="22" fill="#1e293b" stroke="#06b6d4" strokeWidth="2" />
-                    <circle cx="50" cy="50" r="7" fill="#22d3ee" className="animate-pupil" />
-                  </g>
-                  <line x1="15" y1="50" x2="85" y2="50" stroke="#22d3ee" strokeWidth="2" className="animate-laser" />
+                  <circle cx="50" cy="50" r="22" fill="#1e293b" stroke="#06b6d4" strokeWidth="2" />
+                  <circle cx="50" cy="50" r="7" fill="#22d3ee" />
                 </svg>
               </div>
-              <h1 className="font-extrabold text-[17px] text-[var(--text-primary)] tracking-tight">NetraID</h1>
+              <h1 className="font-extrabold text-[18px] text-[var(--text-primary)] tracking-tight">NetraID</h1>
             </div>
+            <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg text-[var(--text-muted)] hover:bg-[var(--border-subtle)] hover:text-[var(--text-primary)] transition-all">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-            <nav className="flex-1 space-y-0.5">
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.href}
-                  item={item}
-                  isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
-                  isCollapsed={false}
-                  onClick={() => setSidebarOpen(false)}
-                />
-              ))}
-              <div className="my-3 border-t border-[var(--border-subtle)]" />
-              <a
-                href="/kiosk"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--border-subtle)] transition-all"
-              >
-                <Monitor className="w-4 h-4 text-[var(--text-secondary)]" />
-                <span className="text-sm">Launch Kiosk</span>
-              </a>
-            </nav>
+          <nav className="flex-1 overflow-y-auto space-y-1 p-4">
+            <div className="mb-2 px-3 text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase">Menu</div>
+            {navItems.map((item) => (
+              <NavLink
+                key={item.href}
+                item={item}
+                isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
+                isCollapsed={false}
+                onClick={() => setSidebarOpen(false)}
+              />
+            ))}
+            
+            <div className="mt-6 mb-2 px-3 text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase">System</div>
+            <a
+              href="/kiosk"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 px-3 py-3 rounded-xl text-[var(--text-secondary)] hover:text-white hover:bg-slate-800 transition-all border border-transparent hover:border-slate-700 shadow-sm"
+            >
+              <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
+                <Monitor className="w-4 h-4 text-cyan-400" />
+              </div>
+              <span className="text-sm font-medium">Launch Kiosk</span>
+            </a>
+          </nav>
 
-            <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center gap-3 p-2">
-              <div className="w-8 h-8 rounded-full bg-[var(--text-primary)] flex items-center justify-center font-bold text-sm text-[var(--bg-base)]">
+          <div className="p-4 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--border-subtle)]/50 border border-[var(--border-subtle)]">
+              <div className="w-9 h-9 rounded-full bg-[var(--text-primary)] flex items-center justify-center font-bold text-sm text-[var(--bg-base)] shadow-md">
                 {initials}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{user?.role?.name}</p>
+                <p className="text-xs font-bold text-[var(--text-primary)] truncate">{user?.role?.name}</p>
                 <p className="text-[10px] text-[var(--text-muted)] truncate">{user?.email}</p>
               </div>
-              <button onClick={handleLogout} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-rose-600 hover:bg-rose-50 cursor-pointer">
+              <button onClick={handleLogout} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10 cursor-pointer transition-all">
                 <LogOut className="w-4 h-4" />
               </button>
             </div>
-          </aside>
-        </div>
-      )}
+          </div>
+        </aside>
+      </div>
 
       {/* ─── Main Content ─── */}
       <main className="flex-1 min-h-screen overflow-y-auto relative z-10 pt-14 md:pt-0">
