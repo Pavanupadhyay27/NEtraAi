@@ -145,6 +145,47 @@ export default function KioskPage() {
 
 
 
+  const playStatusBeep = (status: string) => {
+    if (typeof window !== "undefined") {
+      try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        const audioCtx = new AudioContextClass();
+        if (audioCtx.state === "suspended") audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        if (status === "success" || status === "ask_checkout") {
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.3);
+          gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+          osc.start(audioCtx.currentTime);
+          osc.stop(audioCtx.currentTime + 0.3);
+        } else if (status === "spoof" || status === "locked" || status === "spoof_detected") {
+          osc.type = "sawtooth";
+          osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+          osc.frequency.setValueAtTime(150, audioCtx.currentTime + 0.4);
+          gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+          osc.start(audioCtx.currentTime);
+          osc.stop(audioCtx.currentTime + 0.4);
+        } else if (status === "unknown" || status === "needs_qr" || status === "location_error" || status === "maintenance" || status === "no_employees") {
+          osc.type = "square";
+          osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+          osc.start(audioCtx.currentTime);
+          osc.stop(audioCtx.currentTime + 0.2);
+        }
+      } catch (err) {
+        console.error("Audio beep failed:", err);
+      }
+    }
+  };
+
   // Fetch engine state dynamically on mount
   useEffect(() => {
     const checkEngine = async () => {
@@ -496,26 +537,19 @@ export default function KioskPage() {
     } else {
       setFaceBbox(null);
     }
+    
+    if (voiceEnabled) {
+      playStatusBeep(data.status);
+    }
+
     if (data.status === "success") {
       setProfileImageError(false);
       setScanStatus("success"); setScanResult(data);
       setMatchTime(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }));
       triggerCooldown(4500);
-      if (voiceEnabled && data.tts_url) {
-        const backendBaseUrl = getBackendUrl().replace("/api/v1", "");
-        new Audio(`${backendBaseUrl}${data.tts_url}`).play().catch((err) => {
-          console.error("Autoplay voice greeting failed:", err);
-        });
-      }
     } else if (data.status === "ask_checkout") {
       setProfileImageError(false);
       setScanStatus("ask_checkout"); setScanResult(data);
-      if (voiceEnabled && data.tts_url) {
-        const backendBaseUrl = getBackendUrl().replace("/api/v1", "");
-        new Audio(`${backendBaseUrl}${data.tts_url}`).play().catch((err) => {
-          console.error("Autoplay voice greeting failed:", err);
-        });
-      }
     } else if (data.status === "needs_qr") {
       setQrCodeVal("");
       setQrError(null);

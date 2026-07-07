@@ -30,7 +30,7 @@ class VoiceAssistant:
                 self.engine_available = True
                 logger.info("pyttsx3 Voice Assistant initialized successfully.")
             except Exception as e:
-                logger.warning(f"Failed to initialize pyttsx3 (common on headless servers): {e}. Using pure-python WAV fallback.")
+                logger.debug(f"pyttsx3 not initialized (headless server): {e}. Using pure-python WAV fallback.")
 
     def generate_speech_file(self, text: str) -> str:
         """
