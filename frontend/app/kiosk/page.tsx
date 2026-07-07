@@ -112,6 +112,17 @@ export default function KioskPage() {
     if (coords.latitude !== null && coords.longitude !== null && !kioskAddress) {
       const fetchAddress = async () => {
         try {
+          // First check for global configured address
+          const configRes = await fetch(`${getBackendUrl().replace('/api/v1', '')}/api/v1/kiosk/config`);
+          if (configRes.ok) {
+             const configData = await configRes.json();
+             if (configData.location_address && configData.location_address.trim().length > 0) {
+                 setKioskAddress(configData.location_address);
+                 return;
+             }
+          }
+          
+          // Fallback to dynamic reverse geocoding
           const url = `${getBackendUrl().replace('/api/v1', '')}/api/v1/kiosk/reverse-geocode?lat=${coords.latitude}&lng=${coords.longitude}`;
           const res = await fetch(url);
           if (res.ok) {
