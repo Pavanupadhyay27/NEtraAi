@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import SidebarLayout from "@/components/SidebarLayout";
-import { fetchApi } from "@/app/utils/api";
+import { fetchApi, getBackendUrl } from "@/app/utils/api";
 import { useToast } from "@/app/utils/toast";
 import { 
   Check, Loader2, CheckCircle2, AlertCircle, Sliders, Info,
@@ -26,7 +26,15 @@ export default function SettingsPage() {
     queryFn: async () => {
       const data = await fetchApi("/settings/");
       const valMap: Record<string, string> = {};
-      data.forEach((s: any) => { valMap[s.key] = s.value; });
+      let hasAddress = false;
+      data.forEach((s: any) => { 
+        valMap[s.key] = s.value; 
+        if(s.key === "LOCATION_ADDRESS") hasAddress = true;
+      });
+      if (!hasAddress) {
+        data.push({ id: "virtual-addr", key: "LOCATION_ADDRESS", value: "", description: "Office Location Address (e.g. Patrapada, Bhubaneswar)" });
+        valMap["LOCATION_ADDRESS"] = "";
+      }
       setEditValues(valMap);
       return data;
     },
@@ -98,6 +106,45 @@ export default function SettingsPage() {
     } else {
       toast.error("Geolocation is not supported by your browser.");
     }
+  };
+
+  const handleGeocodeAddress = async (address: string) => {
+    if (!address.trim()) return;
+    setFetchingGps(true);
+    setUpdatingKey("LOCATION_ADDRESS");
+    try {
+      const url = `${getBackendUrl().replace('/api/v1', '')}/api/v1/kiosk/geocode?address=${encodeURIComponent(address)}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.lat && data.lng) {
+          const lat = data.lat.toString();
+          const lon = data.lng.toString();
+          
+          setEditValues(prev => ({
+            ...prev,
+            LOCATION_LATITUDE: lat,
+            LOCATION_LONGITUDE: lon,
+            LOCATION_ADDRESS: address
+          }));
+          
+          saveMutation.mutate({ key: "LOCATION_LATITUDE", value: lat });
+          saveMutation.mutate({ key: "LOCATION_LONGITUDE", value: lon });
+          saveMutation.mutate({ key: "LOCATION_ADDRESS", value: address });
+          
+          toast.success("Location locked to the provided address!");
+        } else {
+           toast.error("Could not find coordinates for this address.");
+        }
+      } else {
+        toast.error("Failed to geocode address.");
+      }
+    } catch (err) {
+      console.error("Geocoding error", err);
+      toast.error("Error geocoding address.");
+    }
+    setFetchingGps(false);
+    setUpdatingKey(null);
   };
 
   // Group settings by keys for our tabs
@@ -552,7 +599,13 @@ export default function SettingsPage() {
 
                               {setting.key !== "COMPANY_LOGO" && setting.key !== "BADGE_THEME_COLOR" && setting.key !== "BADGE_PATTERN_TYPE" && (
                                 <button
-                                  onClick={() => handleSave(setting.key)}
+                                  onClick={() => {
+                                    if (setting.key === "LOCATION_ADDRESS") {
+                                      handleGeocodeAddress(editValues[setting.key] || "");
+                                    } else {
+                                      handleSave(setting.key);
+                                    }
+                                  }}
                                   disabled={isUpdating || !isDirty}
                                   className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${
                                     isSuccess
@@ -604,6 +657,30 @@ export default function SettingsPage() {
                         )}
                         Set to Current GPS Location
                       </button>
+                    </div>
+                  )}
+
+                  {/* Map Display */}
+                  {activeTab === "location" && (
+                    <div className="px-6 py-5 border-t border-slate-100/80 bg-slate-50/20">
+                      <h3 className="text-sm font-semibold text-slate-800 mb-4">Location Preview</h3>
+                      {editValues["LOCATION_LATITUDE"] && editValues["LOCATION_LONGITUDE"] ? (
+                        <div className="w-full h-64 rounded-xl overflow-hidden border border-slate-200 shadow-sm relative">
+                          <iframe 
+                            width="100%" 
+                            height="100%" 
+                            frameBorder="0" 
+                            scrolling="no" 
+                            marginHeight={0} 
+                            marginWidth={0} 
+                            src={`https://www.openstreetmap.org/export/embed.html?bbox=${parseFloat(editValues["LOCATION_LONGITUDE"]) - 0.01}%2C${parseFloat(editValues["LOCATION_LATITUDE"]) - 0.01}%2C${parseFloat(editValues["LOCATION_LONGITUDE"]) + 0.01}%2C${parseFloat(editValues["LOCATION_LATITUDE"]) + 0.01}&layer=mapnik&marker=${editValues["LOCATION_LATITUDE"]}%2C${editValues["LOCATION_LONGITUDE"]}`}
+                          ></iframe>
+                        </div>
+                      ) : (
+                        <div className="w-full h-64 rounded-xl border border-dashed border-slate-300 flex items-center justify-center bg-slate-50 text-slate-400 text-xs">
+                          Map preview not available. Please save a valid location.
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
