@@ -668,7 +668,7 @@ export default function KioskPage() {
           </div>
           <div>
             <h1 className="font-bold text-[15px] tracking-tight text-[var(--text-primary)] leading-none">NetraID Kiosk</h1>
-            <p className="text-[9px] text-[var(--text-muted)] font-mono mt-0.5 uppercase tracking-wider">{cameraLabel}</p>
+            <p className="text-[9px] font-bold text-slate-500 font-mono mt-0.5 uppercase tracking-wider">{cameraLabel}</p>
           </div>
         </div>
 
@@ -678,8 +678,8 @@ export default function KioskPage() {
             {currentTime || "00:00:00"}
           </p>
           {coords.latitude !== null && (
-            <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg border border-slate-750/30 bg-slate-950/80 text-[8.5px] font-mono text-slate-450 select-none animate-fadeIn flex-row shrink-0">
-              <span className="w-1.2 h-1.2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg border border-slate-700/50 bg-slate-900 text-[8.5px] font-mono text-slate-300 select-none animate-fadeIn flex-row shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
               <span>GPS ACTIVE: {coords.latitude.toFixed(4)}, {coords.longitude?.toFixed(4)}</span>
             </div>
           )}
@@ -802,7 +802,7 @@ export default function KioskPage() {
                     <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-zinc-950 rounded-br-xl" />
                     
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <span className="text-[9px] text-[var(--text-primary)] font-mono font-bold tracking-wider uppercase bg-[var(--bg-surface)] px-3 py-1.5 rounded border border-[var(--border-medium)] shadow-2xs">
+                      <span className="text-[9px] text-white font-mono font-bold tracking-wider uppercase bg-slate-900 px-3 py-1.5 rounded border border-slate-700 shadow-md">
                         {scanFeedback || (scanning ? "Processing..." : "Center Face")}
                       </span>
                     </div>
@@ -1247,16 +1247,16 @@ export default function KioskPage() {
 
           {/* Active bottom status bar indicators */}
           {kioskActive && (
-            <div className="flex items-center justify-center gap-5 text-[9px] font-mono text-slate-400 font-bold uppercase tracking-wider">
+            <div className="flex items-center justify-center gap-5 text-[9px] font-mono text-slate-500 font-bold uppercase tracking-wider mt-2">
               <div className="flex items-center gap-1.5">
-                <div className={`w-1.5 h-1.5 rounded-full ${scanning ? "bg-zinc-950 animate-pulse" : "bg-zinc-350"}`} />
+                <div className={`w-1.5 h-1.5 rounded-full ${scanning ? "bg-slate-800 animate-pulse" : "bg-slate-400"}`} />
                 <span>{scanning ? "Scanning" : "Standby"}</span>
               </div>
-              <span className="text-zinc-200">|</span>
+              <span className="text-slate-300">|</span>
               <div className="flex items-center gap-1">
                 <span>Anti-Spoof Active</span>
               </div>
-              <span className="text-zinc-200">|</span>
+              <span className="text-slate-300">|</span>
               <div className="flex items-center gap-1">
                 <span>Auto-indexing</span>
               </div>
@@ -1266,8 +1266,8 @@ export default function KioskPage() {
       </main>
 
       {/* ─── Footer ─── */}
-      <footer className="relative z-10 h-10 border-t border-[var(--border-medium)] flex items-center justify-center kiosk-footer">
-        <p className="text-[9.5px] font-mono font-bold text-[var(--text-muted)] tracking-wider">
+      <footer className="relative z-10 h-10 border-t border-[var(--border-medium)] flex items-center justify-center kiosk-footer mt-auto">
+        <p className="text-[9.5px] font-mono font-bold text-slate-500 tracking-wider">
           NETRAID SECURE TERMINAL GATEWAY v1.0.0 · {engineMode}
         </p>
       </footer>
