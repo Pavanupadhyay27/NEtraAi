@@ -1,6 +1,11 @@
 import os
 import threading
 import time
+
+# Enforce IST Timezone for all attendance date calculations (important for HuggingFace / UTC cloud servers)
+os.environ["TZ"] = "Asia/Kolkata"
+if hasattr(time, "tzset"):
+    time.tzset()
 from datetime import datetime, timedelta
 from fastapi import FastAPI, Depends, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
