@@ -37,6 +37,7 @@ export default function KioskPage() {
   const [scanning, setScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState<"idle" | "success" | "spoof" | "unknown" | "maintenance" | "no_employees" | "ask_checkout" | "locked" | "needs_qr" | "location_error">("idle");
   const [coords, setCoords] = useState<{ latitude: number | null; longitude: number | null }>({ latitude: null, longitude: null });
+  const [kioskAddress, setKioskAddress] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<any>(null);
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
   const [cameraLabel] = useState("Main Entrance");
@@ -106,6 +107,25 @@ export default function KioskPage() {
       return () => navigator.geolocation.clearWatch(geoId);
     }
   }, []);
+
+  useEffect(() => {
+    if (coords.latitude !== null && coords.longitude !== null && !kioskAddress) {
+      const fetchAddress = async () => {
+        try {
+          const url = `${getBackendUrl().replace('/api/v1', '')}/api/v1/kiosk/reverse-geocode?lat=${coords.latitude}&lng=${coords.longitude}`;
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.address) {
+              const parts = data.address.split(",");
+              setKioskAddress(parts.length > 1 ? `${parts[0].trim()}, ${parts[1].trim()}` : data.address);
+            }
+          }
+        } catch (err) {}
+      };
+      fetchAddress();
+    }
+  }, [coords.latitude, coords.longitude, kioskAddress]);
 
   const playQrChime = () => {
     if (typeof window !== "undefined") {
@@ -571,7 +591,7 @@ export default function KioskPage() {
       triggerCooldown(4000);
     } else if (data.status === "location_error") {
       setScanStatus("location_error"); setScanResult(data);
-      triggerCooldown(5000);
+      triggerCooldown(1500);
     }
   };
 
@@ -712,9 +732,9 @@ export default function KioskPage() {
             {currentTime || "00:00:00"}
           </p>
           {coords.latitude !== null && (
-            <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg border border-slate-700/50 bg-slate-900 text-[8.5px] font-mono text-slate-300 select-none animate-fadeIn flex-row shrink-0">
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg border border-slate-700/50 bg-slate-900 text-[8.5px] font-mono text-slate-300 select-none animate-fadeIn flex-row shrink-0" title={`${coords.latitude.toFixed(6)}, ${coords.longitude?.toFixed(6)}`}>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <span>GPS ACTIVE: {coords.latitude.toFixed(4)}, {coords.longitude?.toFixed(4)}</span>
+              <span className="max-w-[200px] truncate">GPS: {kioskAddress || `${coords.latitude.toFixed(4)}, ${coords.longitude?.toFixed(4)}`}</span>
             </div>
           )}
         </div>

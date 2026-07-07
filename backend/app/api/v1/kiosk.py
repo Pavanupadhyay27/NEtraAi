@@ -88,6 +88,11 @@ class KioskScanRequest(BaseModel):
     longitude: Optional[float] = Field(None, description="Longitude of the kiosk/device marking attendance")
 
 
+@router.get("/reverse-geocode")
+def get_reverse_geocode(lat: float, lng: float):
+    address = geocoding.reverse_geocode(lat, lng)
+    return {"address": address}
+
 @router.post("/scan")
 def scan_face(
     request: Request,

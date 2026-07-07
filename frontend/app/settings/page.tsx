@@ -57,7 +57,7 @@ export default function SettingsPage() {
     if (typeof window !== "undefined" && navigator.geolocation) {
       setFetchingGps(true);
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
           const lat = position.coords.latitude.toString();
           const lon = position.coords.longitude.toString();
           
@@ -70,6 +70,20 @@ export default function SettingsPage() {
           // Save both settings
           saveMutation.mutate({ key: "LOCATION_LATITUDE", value: lat });
           saveMutation.mutate({ key: "LOCATION_LONGITUDE", value: lon });
+          
+          try {
+            const url = `${getBackendUrl().replace('/api/v1', '')}/api/v1/kiosk/reverse-geocode?lat=${lat}&lng=${lon}`;
+            const res = await fetch(url);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.address) {
+                setEditValues(prev => ({ ...prev, LOCATION_ADDRESS: data.address }));
+                saveMutation.mutate({ key: "LOCATION_ADDRESS", value: data.address });
+              }
+            }
+          } catch (err) {
+            console.error("Failed to fetch address", err);
+          }
           
           toast.success("Coordinates updated to current location!");
           setFetchingGps(false);
