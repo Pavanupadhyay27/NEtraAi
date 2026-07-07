@@ -259,7 +259,7 @@ export default function EmployeeDetailPage() {
         toast.error("Failed to get current location. Ensure GPS permission is granted.");
         setWfhGeocoding(false);
       },
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
     );
   };
 

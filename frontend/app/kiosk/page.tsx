@@ -102,7 +102,7 @@ export default function KioskPage() {
         (err) => {
           console.error("Kiosk geolocation error:", err);
         },
-        { enableHighAccuracy: true, timeout: 10000 }
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
       );
       return () => navigator.geolocation.clearWatch(geoId);
     }

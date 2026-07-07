@@ -102,7 +102,7 @@ export default function SettingsPage() {
           toast.error("Failed to get current location. Ensure GPS permission is granted.");
           setFetchingGps(false);
         },
-        { enableHighAccuracy: true }
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
       );
     } else {
       toast.error("Geolocation is not supported by your browser.");
