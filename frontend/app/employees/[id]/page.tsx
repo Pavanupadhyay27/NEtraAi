@@ -194,6 +194,7 @@ export default function EmployeeDetailPage() {
   const [wfhLat, setWfhLat] = useState<number | null>(null);
   const [wfhLng, setWfhLng] = useState<number | null>(null);
   const [wfhGeocoding, setWfhGeocoding] = useState(false);
+  const skipNextGeocodeRef = useRef(false);
 
   useEffect(() => {
     if (employee) {
@@ -231,6 +232,7 @@ export default function EmployeeDetailPage() {
           if (res.ok) {
             const data = await res.json();
             const address = data.display_name;
+            skipNextGeocodeRef.current = true;
             setWfhAddress(address);
             setWfhLat(lat);
             setWfhLng(lon);
@@ -265,6 +267,10 @@ export default function EmployeeDetailPage() {
       return;
     }
     if (wfhAddress === employee.wfh_address) return;
+    if (skipNextGeocodeRef.current) {
+      skipNextGeocodeRef.current = false;
+      return;
+    }
     
     const delay = setTimeout(async () => {
       setWfhGeocoding(true);
