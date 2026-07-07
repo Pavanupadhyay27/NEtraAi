@@ -168,9 +168,13 @@ def startup_event():
                     existing_settings = crud.get_settings(db, company_id=company.id)
                     if not existing_settings:
                         for s in base_settings:
-                            crud.set_setting(db, s.key, s.value, s.description, company_id=company.id)
+                            try:
+                                crud.set_setting(db, s.key, s.value, s.description, company_id=company.id)
+                            except Exception as e:
+                                db.rollback()
+                                logger.warning(f"Silently skipping setting backfill {s.key} for company {company.id}: {e}")
         except Exception as e:
-            logger.error(f"Error backfilling settings: {e}")
+            logger.error(f"Error in backfilling settings loop: {e}")
             
         db_error = "Success"
         

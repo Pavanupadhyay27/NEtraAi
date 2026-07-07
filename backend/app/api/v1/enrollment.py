@@ -35,18 +35,23 @@ async def upload_face_image(
     # Read file bytes
     try:
         contents = await file.read()
+        if not contents:
+            raise HTTPException(status_code=400, detail="Received empty file. No image data was sent.")
         nparr = np.frombuffer(contents, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         if img is None:
-            raise ValueError()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid image file")
+            raise HTTPException(status_code=400, detail="OpenCV failed to decode the image. The format might be unsupported.")
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Image decode failed: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid image file format: {str(e)}")
 
     # Detect faces
     faces = face_engine.detect_faces(img)
     if not faces:
         logger.error("No face detected in the image.")
-        raise HTTPException(status_code=400, detail="No face detected in the image. Please try again.")
+        raise HTTPException(status_code=400, detail="No face detected in the captured image. Please ensure your face is clearly visible and well-lit.")
     if len(faces) > 1:
         logger.error("Multiple faces detected in the image.")
         raise HTTPException(status_code=400, detail="Multiple faces detected. Please ensure only one person is in the frame.")
@@ -64,7 +69,7 @@ async def upload_face_image(
     quality = face_engine.validate_image_quality(img)
     if not quality["is_valid"]:
         logger.error(f"Image quality validation failed: {quality['reason']}")
-        raise HTTPException(status_code=400, detail=quality["reason"])
+        raise HTTPException(status_code=400, detail=f"Image Quality Error: {quality['reason']}")
 
     # Optional liveness check on enrollment (preventing enroll spoofing)
     liveness_enabled_setting = crud.get_setting_by_key(db, "ENROLLMENT_LIVENESS_CHECK")
