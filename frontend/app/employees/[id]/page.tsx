@@ -1,6 +1,6 @@
 "use client";
   
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import SidebarLayout from "@/components/SidebarLayout";
@@ -9,7 +9,7 @@ import { useToast } from "@/app/utils/toast";
 import { 
   ChevronLeft, Printer, Download, Mail, Phone, Calendar, 
   Briefcase, CheckCircle2, AlertCircle, Palette, Upload, Trash2,
-  Camera, Shield, Award, Clock, Edit, X, Loader2
+  Camera, Shield, Award, Clock, Edit, X, Loader2, MapPin
 } from "lucide-react";
 import AttendanceHeatmap from "@/components/AttendanceHeatmap";
 
@@ -189,6 +189,64 @@ export default function EmployeeDetailPage() {
     setUpdatingWfh(true);
     toggleWfhMutation.mutate(!employee.allow_wfh);
   };
+
+  const [wfhAddress, setWfhAddress] = useState("");
+  const [wfhLat, setWfhLat] = useState<number | null>(null);
+  const [wfhLng, setWfhLng] = useState<number | null>(null);
+  const [wfhGeocoding, setWfhGeocoding] = useState(false);
+
+  useEffect(() => {
+    if (employee) {
+      setWfhAddress(employee.wfh_address || "");
+      setWfhLat(employee.wfh_lat || null);
+      setWfhLng(employee.wfh_lng || null);
+    }
+  }, [employee?.wfh_address, employee?.wfh_lat, employee?.wfh_lng]);
+
+  const updateWfhDetailsMutation = useMutation({
+    mutationFn: (payload: any) =>
+      fetchApi(`/employees/${employeeId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload)
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employee", employeeId] });
+    }
+  });
+
+  useEffect(() => {
+    if (!employee?.allow_wfh || !wfhAddress || wfhAddress.trim().length < 5) {
+      return;
+    }
+    if (wfhAddress === employee.wfh_address) return;
+    
+    const delay = setTimeout(async () => {
+      setWfhGeocoding(true);
+      try {
+        const url = `${getBackendUrl().replace('/api/v1', '')}/api/v1/kiosk/geocode?address=${encodeURIComponent(wfhAddress)}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.lat !== null && data.lng !== null) {
+            setWfhLat(data.lat);
+            setWfhLng(data.lng);
+            updateWfhDetailsMutation.mutate({
+              wfh_address: wfhAddress,
+              wfh_lat: data.lat,
+              wfh_lng: data.lng
+            });
+            toast.success("WFH Location auto-detected and locked!");
+          }
+        }
+      } catch (e) {
+        console.error("Geocoding failed", e);
+      } finally {
+        setWfhGeocoding(false);
+      }
+    }, 800);
+    
+    return () => clearTimeout(delay);
+  }, [wfhAddress, employee?.allow_wfh, employee?.wfh_address]);
 
   // Departments query for dropdown list
   const { data: departments } = useQuery({
@@ -764,25 +822,62 @@ export default function EmployeeDetailPage() {
                 </div>
 
                 {/* WFH Permission Toggle */}
-                <div className="flex items-center justify-between border-t border-slate-100 dark:border-white/5 pt-4 mt-4 text-xs">
-                  <div className="space-y-0.5">
-                    <span className="font-bold text-slate-550 dark:text-slate-400 uppercase tracking-wider text-[9.5px]">Work From Home (WFH) Permission</span>
-                    <p className="text-[10px] text-slate-450 dark:text-slate-500 font-semibold leading-none">Bypasses geofencing restrictions for this employee</p>
+                <div className="flex flex-col border-t border-slate-100 dark:border-white/5 pt-4 mt-4 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <span className="font-bold text-slate-550 dark:text-slate-400 uppercase tracking-wider text-[9.5px]">Work From Home (WFH) Permission</span>
+                      <p className="text-[10px] text-slate-450 dark:text-slate-500 font-semibold leading-none">Bypasses geofencing restrictions for this employee</p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={updatingWfh}
+                      onClick={handleToggleWfh}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        employee.allow_wfh ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800"
+                      } ${updatingWfh ? "opacity-60 cursor-not-allowed" : ""}`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs transition duration-200 ease-in-out ${
+                          employee.allow_wfh ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    disabled={updatingWfh}
-                    onClick={handleToggleWfh}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      employee.allow_wfh ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800"
-                    } ${updatingWfh ? "opacity-60 cursor-not-allowed" : ""}`}
+                  
+                  {/* Animated WFH Address Input */}
+                  <div 
+                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                      employee.allow_wfh ? "max-h-[300px] opacity-100 mt-3" : "max-h-0 opacity-0 mt-0"
+                    }`}
                   >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs transition duration-200 ease-in-out ${
-                        employee.allow_wfh ? "translate-x-4" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
+                    <div className="p-3.5 rounded-xl bg-indigo-500/5 border border-indigo-500/10 space-y-2.5">
+                      <div className="space-y-1.5">
+                        <label className="block text-[9.5px] font-bold text-slate-500 uppercase tracking-wider">
+                          Home Address (For WFH GPS Lock) <span className="text-blue-400">*</span>
+                        </label>
+                        <textarea 
+                          rows={2}
+                          placeholder="e.g., 123 Main St, Springfield. Be specific for accurate GPS geocoding." 
+                          value={wfhAddress}
+                          onChange={(e) => setWfhAddress(e.target.value)} 
+                          className="w-full text-[11.5px] bg-white border-slate-200 focus:border-indigo-400 text-slate-900 rounded-lg p-2.5 outline-none transition-all resize-none shadow-sm"
+                        />
+                      </div>
+                      
+                      <div className="text-[10px] flex items-center justify-between border-t border-indigo-500/10 pt-2">
+                        {wfhGeocoding ? (
+                          <span className="text-indigo-400 animate-pulse font-medium">Autodetecting coordinates...</span>
+                        ) : wfhLat && wfhLng ? (
+                          <span className="text-emerald-600 font-mono font-bold flex items-center gap-1.5 uppercase tracking-wider">
+                            <MapPin className="w-3 h-3" />
+                            GPS Locked: {wfhLat.toFixed(5)}, {wfhLng.toFixed(5)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 font-medium">Enter full address to lock GPS</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Attendance Rate Progress Block */}
