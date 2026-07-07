@@ -45,8 +45,10 @@ async def upload_face_image(
     # Detect faces
     faces = face_engine.detect_faces(img)
     if not faces:
+        logger.error("No face detected in the image.")
         raise HTTPException(status_code=400, detail="No face detected in the image. Please try again.")
     if len(faces) > 1:
+        logger.error("Multiple faces detected in the image.")
         raise HTTPException(status_code=400, detail="Multiple faces detected. Please ensure only one person is in the frame.")
         
     # Process face
@@ -55,11 +57,13 @@ async def upload_face_image(
     
     # Check if confidence is high enough
     if confidence < 0.5:
+        logger.error(f"Face detection confidence too low: {confidence:.2f}")
         raise HTTPException(status_code=400, detail=f"Face detection confidence too low ({confidence:.2f}). Please upload a clearer image.")
 
     # Image Quality Validation
     quality = face_engine.validate_image_quality(img)
     if not quality["is_valid"]:
+        logger.error(f"Image quality validation failed: {quality['reason']}")
         raise HTTPException(status_code=400, detail=quality["reason"])
 
     # Optional liveness check on enrollment (preventing enroll spoofing)

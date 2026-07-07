@@ -141,8 +141,16 @@ def startup_event():
             with engine.connect() as conn:
                 conn.execute(text("ALTER TABLE settings DROP CONSTRAINT IF EXISTS settings_key_key;"))
                 conn.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Could not drop settings_key_key constraint: {e}")
+            
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("DROP INDEX IF EXISTS settings_key_key;"))
+                conn.execute(text("DROP INDEX IF EXISTS ix_settings_key;"))
+                conn.commit()
+        except Exception as e:
+            logger.warning(f"Could not drop settings_key_key index: {e}")
             
         init_db(db)
         
