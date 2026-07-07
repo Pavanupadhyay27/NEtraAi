@@ -165,13 +165,13 @@ export default function KioskPage() {
           osc.start(audioCtx.currentTime);
           osc.stop(audioCtx.currentTime + 0.3);
         } else if (status === "spoof" || status === "locked" || status === "spoof_detected") {
-          osc.type = "sawtooth";
-          osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-          osc.frequency.setValueAtTime(150, audioCtx.currentTime + 0.4);
-          gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+          osc.type = "square";
+          osc.frequency.setValueAtTime(250, audioCtx.currentTime);
+          osc.frequency.setValueAtTime(220, audioCtx.currentTime + 0.3);
+          gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
           osc.start(audioCtx.currentTime);
-          osc.stop(audioCtx.currentTime + 0.4);
+          osc.stop(audioCtx.currentTime + 0.3);
         } else if (status === "unknown" || status === "needs_qr" || status === "location_error" || status === "maintenance" || status === "no_employees") {
           osc.type = "square";
           osc.frequency.setValueAtTime(400, audioCtx.currentTime);
