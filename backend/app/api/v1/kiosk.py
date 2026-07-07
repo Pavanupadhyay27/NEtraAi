@@ -528,6 +528,14 @@ def scan_face(
             office_lon = 0.0
             allowed_radius = 50.0
 
+        if office_lat == 0.0 and office_lon == 0.0:
+            # Auto-lock global office coordinates on first valid scan if unconfigured!
+            crud.set_setting(db, "LOCATION_LATITUDE", str(payload.latitude), "Auto-locked Global Office Latitude")
+            crud.set_setting(db, "LOCATION_LONGITUDE", str(payload.longitude), "Auto-locked Global Office Longitude")
+            office_lat = payload.latitude
+            office_lon = payload.longitude
+            logger.info(f"Auto-locked Global Office Coordinates to {payload.latitude}, {payload.longitude}")
+
         dist = calculate_distance_meters(payload.latitude, payload.longitude, office_lat, office_lon)
         if dist > allowed_radius:
             log_entry = crud.create_attendance_log(
