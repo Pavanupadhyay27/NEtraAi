@@ -238,6 +238,7 @@ export default function EmployeeDetailPage() {
             setWfhLng(lon);
             
             updateWfhDetailsMutation.mutate({
+              allow_wfh: true,
               wfh_address: address,
               wfh_lat: lat,
               wfh_lng: lon

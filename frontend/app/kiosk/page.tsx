@@ -836,7 +836,7 @@ export default function KioskPage() {
           
           {/* Pre-start offline glass card */}
           {!kioskActive && (
-            <div className="w-full max-w-2xl mx-auto glass-overlay border border-[var(--border-medium)] rounded-3xl text-center p-12 aspect-video flex flex-col items-center justify-center space-y-6 animate-fadeInUp shadow-[0_8px_32px_rgba(0,0,0,0.03)] relative overflow-hidden">
+            <div className="w-full max-w-2xl mx-auto glass-overlay border border-[var(--border-medium)] rounded-3xl text-center p-12 aspect-[3/4] md:aspect-video flex flex-col items-center justify-center space-y-6 animate-fadeInUp shadow-[0_8px_32px_rgba(0,0,0,0.03)] relative overflow-hidden">
               <div className="relative flex flex-col items-center">
                 {/* Status Badge */}
                 <div className="mb-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-600 font-mono text-[9px] font-bold uppercase tracking-wider">
