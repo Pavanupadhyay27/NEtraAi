@@ -20,6 +20,7 @@ export default function SettingsPage() {
   const [successKey, setSuccessKey] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [fetchingGps, setFetchingGps] = useState(false);
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
 
   const { data: settings, isLoading, isError, error } = useQuery({
     queryKey: ["settings"],
@@ -131,7 +132,7 @@ export default function SettingsPage() {
           saveMutation.mutate({ key: "LOCATION_LATITUDE", value: lat });
           saveMutation.mutate({ key: "LOCATION_LONGITUDE", value: lon });
           saveMutation.mutate({ key: "LOCATION_ADDRESS", value: address });
-          
+          setIsEditingAddress(false);
           toast.success("Location locked to the provided address!");
         } else {
            toast.error("Could not find coordinates for this address.");
@@ -350,6 +351,31 @@ export default function SettingsPage() {
                 }}
               />
             </label>
+          )}
+        </div>
+      );
+    }
+
+    if (key === "LOCATION_ADDRESS") {
+      const isSaved = val.trim() !== "";
+      return (
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={val}
+            disabled={isUpdating || (isSaved && !isEditingAddress)}
+            placeholder="e.g. Patrapada, Bhubaneswar"
+            onChange={(e) => setEditValues(prev => ({ ...prev, [key]: e.target.value }))}
+            className={`input-field h-9 text-[12px] w-56 bg-white border-slate-200 rounded-xl px-3 focus:border-slate-800 transition-all ${isSaved && !isEditingAddress ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
+          />
+          {isSaved && !isEditingAddress && (
+             <button
+                type="button"
+                onClick={() => setIsEditingAddress(true)}
+                className="text-[10px] font-bold text-slate-500 hover:text-slate-800 px-2 py-1 border border-slate-200 rounded-lg cursor-pointer transition-all"
+             >
+               Edit
+             </button>
           )}
         </div>
       );
