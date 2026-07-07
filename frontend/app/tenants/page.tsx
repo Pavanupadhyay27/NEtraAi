@@ -253,79 +253,96 @@ export default function TenantsPage() {
                 <div 
                   key={company.id} 
                   onClick={() => router.push(`/tenants/${company.id}`)}
-                  className={`glass-card relative overflow-hidden rounded-3xl border transition-all cursor-pointer ${isSuspended ? "border-rose-500/30 opacity-75" : "border-white/6 hover:border-white/10 hover:-translate-y-1"}`}
+                  className={`glass-card group relative overflow-hidden rounded-3xl border transition-all duration-300 cursor-pointer ${isSuspended ? "border-rose-500/30 bg-rose-500/[0.02]" : "border-[var(--border-medium)] hover:border-indigo-500/30 hover:shadow-[0_8px_30px_rgba(99,102,241,0.12)] hover:-translate-y-1"}`}
                 >
                   
                   {isSuspended && (
-                    <div className="absolute top-0 right-0 bg-rose-500/20 text-rose-400 text-[10px] font-bold px-3 py-1 rounded-bl-xl border-b border-l border-rose-500/30 flex items-center gap-1.5">
+                    <div className="absolute top-0 right-0 bg-rose-500 text-white text-[9px] font-bold px-3 py-1 rounded-bl-xl shadow-sm flex items-center gap-1.5 z-10">
                       <Lock className="w-3 h-3" /> SUSPENDED
                     </div>
                   )}
 
-                  <div className="p-6">
-                    <div className="flex items-start gap-4 mb-6">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-white/10 flex items-center justify-center shrink-0">
-                        <span className="text-lg font-extrabold text-white">{company.name.charAt(0).toUpperCase()}</span>
-                      </div>
-                      <div className="flex-1 min-w-0 pt-0.5">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-[15px] font-bold text-white truncate">{company.name}</h3>
-                          {renderTierBadge(company.subscription_tier)}
+                  {/* Gradient flair at top */}
+                  <div className={`absolute top-0 left-0 right-0 h-1 ${isSuspended ? "bg-rose-500/50" : "bg-gradient-to-r from-indigo-500/50 to-purple-500/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500"}`} />
+
+                  <div className="p-6 relative">
+                    {/* Top Section: Avatar & Details & Actions */}
+                    <div className="flex justify-between items-start mb-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-md flex items-center justify-center shrink-0">
+                          <span className="text-lg font-extrabold text-white">{company.name.charAt(0).toUpperCase()}</span>
                         </div>
-                        <p className="text-[11px] text-slate-400 font-mono mt-1 truncate">{company.admin_email || "No admin email"}</p>
+                        <div className="flex-1 min-w-0 pt-0.5">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-[16px] font-extrabold text-[var(--text-primary)] truncate">{company.name}</h3>
+                            {renderTierBadge(company.subscription_tier)}
+                          </div>
+                          <p className="text-[12px] text-[var(--text-muted)] mt-0.5 truncate">{company.admin_email || "No admin email"}</p>
+                        </div>
+                      </div>
+                      
+                      {/* Subtle Action Icons */}
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                        {company.id !== 1 && (
+                          isSuspended ? (
+                            <button 
+                              onClick={() => activateMutation.mutate(company.id)}
+                              disabled={activateMutation.isPending}
+                              className="p-2 rounded-xl text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors"
+                              title="Activate Tenant"
+                            >
+                              <Unlock className="w-3.5 h-3.5" />
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => suspendMutation.mutate(company.id)}
+                              disabled={suspendMutation.isPending}
+                              className="p-2 rounded-xl text-rose-500 bg-rose-500/10 hover:bg-rose-500/20 transition-colors"
+                              title="Suspend Tenant"
+                            >
+                              <Lock className="w-3.5 h-3.5" />
+                            </button>
+                          )
+                        )}
+                        <button 
+                          onClick={() => {
+                            setNewLimit(company.max_employees.toString());
+                            setShowLimitDialog(company.id);
+                          }}
+                          className="p-2 rounded-xl text-[var(--text-primary)] bg-[var(--bg-elevated)] hover:bg-slate-200 dark:hover:bg-white/10 transition-colors border border-[var(--border-medium)]"
+                          title="Update Employee Limit"
+                        >
+                          <TrendingUp className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-5">
+                      {/* Token Balance */}
+                      <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-medium)]">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-md bg-amber-500/10 flex items-center justify-center">
+                            <Activity className="w-3.5 h-3.5 text-amber-500" />
+                          </div>
+                          <span className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Tokens</span>
+                        </div>
+                        <span className="text-sm font-bold font-mono text-amber-500">{company.available_tokens}</span>
+                      </div>
+
                       {/* Usage Bar */}
                       <div>
                         <div className="flex justify-between items-center mb-2">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Employee Usage</span>
-                          <span className="text-[11px] font-mono font-medium text-slate-300">
-                            {company.active_employees} <span className="text-slate-500">/ {company.max_employees}</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Employee Usage</span>
+                          <span className="text-[11px] font-mono font-medium text-[var(--text-primary)]">
+                            {company.active_employees} <span className="text-[var(--text-muted)]">/ {company.max_employees}</span>
                           </span>
                         </div>
-                        <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                        <div className="h-2 w-full bg-[var(--border-medium)] rounded-full overflow-hidden">
                           <div 
                             className={`h-full ${barColor} rounded-full transition-all duration-1000`} 
                             style={{ width: `${usagePercent}%` }} 
                           />
                         </div>
-                      </div>
-
-                      <div className="pt-4 border-t border-white/5 flex items-center gap-2">
-                        {company.id !== 1 && (
-                          isSuspended ? (
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); activateMutation.mutate(company.id); }}
-                              disabled={activateMutation.isPending}
-                              className="flex-1 btn-primary bg-emerald-500 hover:bg-emerald-600 text-white border-transparent h-8 text-[11px] flex items-center justify-center gap-1.5 rounded-xl cursor-pointer"
-                            >
-                              <Unlock className="w-3 h-3" />
-                              Activate
-                            </button>
-                          ) : (
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); suspendMutation.mutate(company.id); }}
-                              disabled={suspendMutation.isPending}
-                              className="flex-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-all h-8 text-[11px] font-semibold flex items-center justify-center gap-1.5 rounded-xl cursor-pointer"
-                            >
-                              <Lock className="w-3 h-3" />
-                              Suspend
-                            </button>
-                          )
-                        )}
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setNewLimit(company.max_employees.toString());
-                            setShowLimitDialog(company.id);
-                          }}
-                          className="flex-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-all h-8 text-[11px] font-semibold flex items-center justify-center gap-1.5 rounded-xl cursor-pointer"
-                        >
-                          <TrendingUp className="w-3 h-3" />
-                          Update Limit
-                        </button>
                       </div>
                     </div>
                   </div>
