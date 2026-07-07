@@ -7,7 +7,7 @@ import { fetchApi, getBackendUrl, parseDateTime, getLocalDateString } from "@/ap
 import { 
   Plus, Search, Trash2, Camera, Upload, FileSpreadsheet,
   X, Users, CheckCircle2, XCircle, ChevronDown, UserCheck, ShieldAlert,
-  Download, Mail, Phone, Calendar, Briefcase, Clock, TrendingUp
+  Download, Mail, Phone, Calendar, Briefcase, Clock, TrendingUp, MapPin
 } from "lucide-react";
 import { useToast } from "@/app/utils/toast";
 import Link from "next/link";
@@ -94,6 +94,9 @@ export default function EmployeesPage() {
   const [password, setPassword] = useState("");
   const [allowWfh, setAllowWfh] = useState(false);
   const [wfhAddress, setWfhAddress] = useState("");
+  const [wfhLat, setWfhLat] = useState<number | null>(null);
+  const [wfhLng, setWfhLng] = useState<number | null>(null);
+  const [wfhGeocoding, setWfhGeocoding] = useState(false);
 
   const { data: departments } = useQuery({
     queryKey: ["departments"],
@@ -140,10 +143,41 @@ export default function EmployeesPage() {
     setEmpId(""); setName(""); setEmail(""); setPhone(""); setDesignation("");
     setJoiningDate(getLocalDateString()); setStatusVal("Active");
     setDeptId(""); setCreateUserLogin(false); setPassword("");
-    setAllowWfh(false); setWfhAddress("");
+    setAllowWfh(false); setWfhAddress(""); setWfhLat(null); setWfhLng(null);
     setPhoneError(null);
     setSubmissionError(null);
   };
+
+  // Auto-detect WFH coordinates when typing address
+  useEffect(() => {
+    if (!allowWfh || !wfhAddress || wfhAddress.trim().length < 5) {
+      setWfhLat(null); setWfhLng(null);
+      return;
+    }
+    
+    const delay = setTimeout(async () => {
+      setWfhGeocoding(true);
+      try {
+        const url = `${getBackendUrl().replace('/api/v1', '')}/api/v1/kiosk/geocode?address=${encodeURIComponent(wfhAddress)}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.lat !== null && data.lng !== null) {
+            setWfhLat(data.lat);
+            setWfhLng(data.lng);
+          } else {
+            setWfhLat(null); setWfhLng(null);
+          }
+        }
+      } catch (e) {
+        console.error("Geocoding failed", e);
+      } finally {
+        setWfhGeocoding(false);
+      }
+    }, 800);
+    
+    return () => clearTimeout(delay);
+  }, [wfhAddress, allowWfh]);
 
   // Live duplicate checking against loaded employees
   const getDuplicateWarning = () => {
@@ -211,7 +245,9 @@ export default function EmployeesPage() {
       status: statusVal, department_id: deptId ? parseInt(deptId) : null,
       create_user_login: createUserLogin,
       allow_wfh: allowWfh,
-      wfh_address: allowWfh ? wfhAddress : null
+      wfh_address: allowWfh ? wfhAddress : null,
+      wfh_lat: allowWfh ? wfhLat : null,
+      wfh_lng: allowWfh ? wfhLng : null
     };
     if (createUserLogin) payload.password = password;
     createMutation.mutate(payload);
@@ -594,11 +630,15 @@ export default function EmployeesPage() {
               </div>
 
               {/* WFH Address Input */}
-              {allowWfh && (
-                <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10">
-                  <InputField label="Home Address (For WFH GPS Lock)" required>
+              <div 
+                className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                  allowWfh ? "max-h-[300px] opacity-100 mt-3" : "max-h-0 opacity-0 mt-0"
+                }`}
+              >
+                <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 space-y-3">
+                  <InputField label="Home Address (For WFH GPS Lock)" required={allowWfh}>
                     <textarea 
-                      required 
+                      required={allowWfh}
                       rows={2}
                       placeholder="e.g., 123 Main St, Springfield. Be specific for accurate GPS geocoding." 
                       value={wfhAddress}
@@ -606,8 +646,22 @@ export default function EmployeesPage() {
                       className={`${inputCls} h-auto py-2`} 
                     />
                   </InputField>
+                  
+                  {/* Show detected coords or loading */}
+                  <div className="text-[10px] flex items-center justify-between border-t border-indigo-500/10 pt-2">
+                     {wfhGeocoding ? (
+                       <span className="text-indigo-400 animate-pulse font-medium">Autodetecting coordinates...</span>
+                     ) : wfhLat && wfhLng ? (
+                       <span className="text-emerald-500 font-mono font-bold flex items-center gap-1.5 uppercase tracking-wider">
+                         <MapPin className="w-3 h-3" />
+                         GPS Locked: {wfhLat.toFixed(5)}, {wfhLng.toFixed(5)}
+                       </span>
+                     ) : (
+                       <span className="text-slate-500 font-medium">Enter full address to lock GPS</span>
+                     )}
+                  </div>
                 </div>
-              )}
+              </div>
 
               <div className="flex justify-end gap-2.5 pt-3 border-t border-white/5">
                 <button 

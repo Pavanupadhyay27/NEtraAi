@@ -93,6 +93,11 @@ def get_reverse_geocode(lat: float, lng: float):
     address = geocoding.reverse_geocode(lat, lng)
     return {"address": address}
 
+@router.get("/geocode")
+def get_geocode(address: str):
+    lat, lng = geocoding.geocode_address(address)
+    return {"lat": lat, "lng": lng}
+
 @router.post("/scan")
 def scan_face(
     request: Request,
