@@ -26,12 +26,24 @@ def init_db(db: Session):
 
     # Ensure subscription_tier column exists in companies table BEFORE any Company queries
     try:
-        db.execute(text("SELECT subscription_tier FROM companies LIMIT 1"))
+        db.execute(text("SELECT max_employees FROM companies LIMIT 1"))
     except Exception:
         db.rollback()
-        logger.info("Adding subscription_tier column to companies table...")
-        db.execute(text("ALTER TABLE companies ADD COLUMN subscription_tier VARCHAR(50) DEFAULT 'Free'"))
-        db.commit()
+        logger.info("Adding missing columns to companies table...")
+        for col, col_def in [
+            ("subscription_tier", "VARCHAR(50) DEFAULT 'Free'"),
+            ("admin_email", "VARCHAR(255) DEFAULT NULL"),
+            ("phone", "VARCHAR(20) DEFAULT NULL"),
+            ("address", "TEXT DEFAULT NULL"),
+            ("max_employees", "INTEGER DEFAULT 100"),
+            ("available_tokens", "INTEGER DEFAULT 1000"),
+            ("tokens_used", "INTEGER DEFAULT 0")
+        ]:
+            try:
+                db.execute(text(f"ALTER TABLE companies ADD COLUMN {col} {col_def}"))
+                db.commit()
+            except Exception:
+                db.rollback()
     for table in tables_to_migrate:
         try:
             db.execute(text(f"SELECT company_id FROM {table} LIMIT 1"))
@@ -40,6 +52,27 @@ def init_db(db: Session):
             logger.info(f"Adding company_id column to {table} table...")
             db.execute(text(f"ALTER TABLE {table} ADD COLUMN company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE DEFAULT NULL"))
             db.commit()
+
+    # 1.5 Add WFH and Location tracking columns
+    try:
+        db.execute(text("SELECT wfh_address FROM employees LIMIT 1"))
+    except Exception:
+        db.rollback()
+        logger.info("Adding WFH location columns to employees table...")
+        db.execute(text("ALTER TABLE employees ADD COLUMN wfh_address VARCHAR(255) DEFAULT NULL"))
+        db.execute(text("ALTER TABLE employees ADD COLUMN wfh_lat FLOAT DEFAULT NULL"))
+        db.execute(text("ALTER TABLE employees ADD COLUMN wfh_lng FLOAT DEFAULT NULL"))
+        db.commit()
+
+    try:
+        db.execute(text("SELECT location_text FROM attendance_logs LIMIT 1"))
+    except Exception:
+        db.rollback()
+        logger.info("Adding location columns to attendance_logs table...")
+        db.execute(text("ALTER TABLE attendance_logs ADD COLUMN location_text VARCHAR(255) DEFAULT NULL"))
+        db.execute(text("ALTER TABLE attendance_logs ADD COLUMN latitude FLOAT DEFAULT NULL"))
+        db.execute(text("ALTER TABLE attendance_logs ADD COLUMN longitude FLOAT DEFAULT NULL"))
+        db.commit()
 
     # 2. Seed default company
     default_company = db.execute(select(models.Company).where(models.Company.name == "NetraID Base")).scalar_one_or_none()

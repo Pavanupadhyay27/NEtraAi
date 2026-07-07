@@ -137,6 +137,9 @@ class Employee(Base):
     shift_id = Column(Integer, ForeignKey("shifts.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, unique=True)
     allow_wfh = Column(Boolean, default=False)
+    wfh_address = Column(String(255), nullable=True)
+    wfh_lat = Column(Float, nullable=True)
+    wfh_lng = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
@@ -204,6 +207,9 @@ class AttendanceLog(Base):
     is_spoof = Column(Boolean, default=False)
     status = Column(String(50), nullable=False)  # Match Success, Spoof Rejected, Unknown Person, Low Confidence
     image_path = Column(String(255), nullable=True)
+    location_text = Column(String(255), nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
 
     employee = relationship("Employee", back_populates="attendance_logs")
 

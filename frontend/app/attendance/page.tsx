@@ -323,19 +323,20 @@ export default function AttendancePage() {
                     <th className="text-left py-3.5 px-5 whitespace-nowrap">Terminal</th>
                     <th className="text-left py-3.5 px-5 whitespace-nowrap">Confidence</th>
                     <th className="text-left py-3.5 px-5 whitespace-nowrap">Liveness</th>
+                    <th className="text-left py-3.5 px-5 whitespace-nowrap">Location</th>
                     <th className="text-left py-3.5 px-5 whitespace-nowrap">Result</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loadingLogs ? (
                     Array.from({ length: 5 }).map((_, i) => (
-                      <tr key={i}>{Array.from({ length: 6 }).map((_, j) => (
+                      <tr key={i}>{Array.from({ length: 7 }).map((_, j) => (
                         <td key={j} className="py-4 px-5"><div className="skeleton h-4 w-20" /></td>
                       ))}</tr>
                     ))
                   ) : rawLogs?.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-20 text-center">
+                      <td colSpan={7} className="py-20 text-center">
                         <div className="flex flex-col items-center gap-3 max-w-xs mx-auto">
                           <div className="w-12 h-12 rounded-2xl bg-white/4 flex items-center justify-center">
                             <Activity className="w-5 h-5 text-slate-600" />
@@ -422,6 +423,16 @@ export default function AttendancePage() {
                                     style={{ width: `${log.liveness_score * 100}%` }}
                                   />
                                 </div>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 italic">—</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-5 whitespace-nowrap text-[11px] text-slate-500 max-w-[200px] truncate" title={log.location_text || ""}>
+                            {log.location_text ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                                <span className="truncate">{log.location_text}</span>
                               </div>
                             ) : (
                               <span className="text-slate-400 italic">—</span>

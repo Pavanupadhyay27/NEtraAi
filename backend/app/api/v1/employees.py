@@ -11,6 +11,7 @@ from app.crud import crud
 from app.schemas import schemas
 from app.models import models
 from app.services.singletons import face_engine
+from app.services import geocoding
 
 router = APIRouter()
 
@@ -103,6 +104,14 @@ def create_employee(
         db_user = crud.create_user(db, user_in, company_id=current_user.company_id)
         user_id = db_user.id
         
+    if emp.allow_wfh and emp.wfh_address:
+        lat, lng = geocoding.geocode_address(emp.wfh_address)
+        emp.wfh_lat = lat
+        emp.wfh_lng = lng
+    else:
+        emp.wfh_lat = None
+        emp.wfh_lng = None
+        
     db_emp = crud.create_employee(db, emp=emp, user_id=user_id, company_id=current_user.company_id)
     
     crud.create_audit_log(
@@ -128,6 +137,17 @@ def update_employee(
     if not db_emp or db_emp.company_id != current_user.company_id:
         raise HTTPException(status_code=404, detail="Employee not found")
         
+    if emp.allow_wfh is not None:
+        if emp.allow_wfh and emp.wfh_address:
+            lat, lng = geocoding.geocode_address(emp.wfh_address)
+            emp.wfh_lat = lat
+            emp.wfh_lng = lng
+        elif not emp.allow_wfh:
+            # Clear location if wfh disabled
+            emp.wfh_address = None
+            emp.wfh_lat = None
+            emp.wfh_lng = None
+            
     updated = crud.update_employee(db, id=id, emp=emp)
     if not updated:
         raise HTTPException(status_code=404, detail="Employee not found")

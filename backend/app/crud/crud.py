@@ -191,7 +191,10 @@ def create_employee(db: Session, emp: schemas.EmployeeCreate, user_id: int = Non
         shift_id=emp.shift_id,
         company_id=company_id,
         user_id=user_id,
-        allow_wfh=emp.allow_wfh
+        allow_wfh=emp.allow_wfh,
+        wfh_address=emp.wfh_address,
+        wfh_lat=emp.wfh_lat,
+        wfh_lng=emp.wfh_lng
     )
     db.add(db_emp)
     db.commit()
@@ -299,7 +302,7 @@ def set_setting(db: Session, key: str, value: str, description: str = None, comp
     return db_setting
 
 # --- Attendance Logs CRUD ---
-def create_attendance_log(db: Session, employee_id: int, camera: str, confidence: float, liveness_score: float, is_spoof: bool, status: str, timestamp: datetime = None, image_path: str = None):
+def create_attendance_log(db: Session, employee_id: int, camera: str, confidence: float, liveness_score: float, is_spoof: bool, status: str, timestamp: datetime = None, image_path: str = None, location_text: str = None, latitude: float = None, longitude: float = None):
     if not timestamp:
         timestamp = datetime.now()
     log = models.AttendanceLog(
@@ -310,7 +313,10 @@ def create_attendance_log(db: Session, employee_id: int, camera: str, confidence
         is_spoof=is_spoof,
         status=status,
         timestamp=timestamp,
-        image_path=image_path
+        image_path=image_path,
+        location_text=location_text,
+        latitude=latitude,
+        longitude=longitude
     )
     db.add(log)
     db.commit()

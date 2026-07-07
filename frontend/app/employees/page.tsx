@@ -93,6 +93,7 @@ export default function EmployeesPage() {
   const [createUserLogin, setCreateUserLogin] = useState(false);
   const [password, setPassword] = useState("");
   const [allowWfh, setAllowWfh] = useState(false);
+  const [wfhAddress, setWfhAddress] = useState("");
 
   const { data: departments } = useQuery({
     queryKey: ["departments"],
@@ -139,7 +140,7 @@ export default function EmployeesPage() {
     setEmpId(""); setName(""); setEmail(""); setPhone(""); setDesignation("");
     setJoiningDate(getLocalDateString()); setStatusVal("Active");
     setDeptId(""); setCreateUserLogin(false); setPassword("");
-    setAllowWfh(false);
+    setAllowWfh(false); setWfhAddress("");
     setPhoneError(null);
     setSubmissionError(null);
   };
@@ -209,7 +210,8 @@ export default function EmployeesPage() {
       designation: designation || null, joining_date: joiningDate,
       status: statusVal, department_id: deptId ? parseInt(deptId) : null,
       create_user_login: createUserLogin,
-      allow_wfh: allowWfh
+      allow_wfh: allowWfh,
+      wfh_address: allowWfh ? wfhAddress : null
     };
     if (createUserLogin) payload.password = password;
     createMutation.mutate(payload);
@@ -590,6 +592,22 @@ export default function EmployeesPage() {
                   />
                 </button>
               </div>
+
+              {/* WFH Address Input */}
+              {allowWfh && (
+                <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10">
+                  <InputField label="Home Address (For WFH GPS Lock)" required>
+                    <textarea 
+                      required 
+                      rows={2}
+                      placeholder="e.g., 123 Main St, Springfield. Be specific for accurate GPS geocoding." 
+                      value={wfhAddress}
+                      onChange={(e) => setWfhAddress(e.target.value)} 
+                      className={`${inputCls} h-auto py-2`} 
+                    />
+                  </InputField>
+                </div>
+              )}
 
               <div className="flex justify-end gap-2.5 pt-3 border-t border-white/5">
                 <button 

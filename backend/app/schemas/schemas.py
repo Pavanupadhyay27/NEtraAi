@@ -96,6 +96,9 @@ class EmployeeBase(BaseModel):
     department_id: Optional[int] = None
     shift_id: Optional[int] = None
     allow_wfh: bool = False
+    wfh_address: Optional[str] = None
+    wfh_lat: Optional[float] = None
+    wfh_lng: Optional[float] = None
 
     @field_validator('phone')
     @classmethod
@@ -122,6 +125,9 @@ class EmployeeUpdate(BaseModel):
     department_id: Optional[int] = None
     shift_id: Optional[int] = None
     allow_wfh: Optional[bool] = None
+    wfh_address: Optional[str] = None
+    wfh_lat: Optional[float] = None
+    wfh_lng: Optional[float] = None
 
 class EmployeeImageOut(BaseModel):
     id: int
@@ -184,6 +190,9 @@ class AttendanceLogOut(BaseModel):
     is_spoof: bool
     status: str
     image_path: Optional[str] = None
+    location_text: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     employee: Optional[EmployeeOut] = None
     model_config = ConfigDict(from_attributes=True)
 

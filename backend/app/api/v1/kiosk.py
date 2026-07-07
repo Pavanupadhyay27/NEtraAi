@@ -16,7 +16,8 @@ from app.core import event_bus
 from app.crud import crud
 from app.schemas import schemas
 from app.models import models
-from app.services.singletons import face_engine, voice_assistant
+from app.services.singletons import face_engine
+from app.services import geocoding, voice_assistant
 
 logger = logging.getLogger("Kiosk")
 router = APIRouter()
@@ -219,7 +220,10 @@ def scan_face(
                 liveness_score=liveness_score,
                 is_spoof=True,
                 status="Spoof Rejected",
-                timestamp=now
+                timestamp=now,
+            location_text=location_text if \'location_text\' in locals() else None,
+            latitude=payload.latitude if hasattr(payload, \'latitude\') else None,
+            longitude=payload.longitude if hasattr(payload, \'longitude\') else None
             )
             _publish_log(log_entry)
             
@@ -312,7 +316,10 @@ def scan_face(
                 liveness_score=liveness_score,
                 is_spoof=False,
                 status="Empty Vector Index",
-                timestamp=now
+                timestamp=now,
+            location_text=location_text if \'location_text\' in locals() else None,
+            latitude=payload.latitude if hasattr(payload, \'latitude\') else None,
+            longitude=payload.longitude if hasattr(payload, \'longitude\') else None
             )
             _publish_log(log_entry)
             return {
@@ -358,7 +365,10 @@ def scan_face(
                 liveness_score=liveness_score,
                 is_spoof=False,
                 status="Unknown Person",
-                timestamp=now
+                timestamp=now,
+            location_text=location_text if \'location_text\' in locals() else None,
+            latitude=payload.latitude if hasattr(payload, \'latitude\') else None,
+            longitude=payload.longitude if hasattr(payload, \'longitude\') else None
             )
             _publish_log(log_entry)
             return {
@@ -382,7 +392,10 @@ def scan_face(
             liveness_score=liveness_score,
             is_spoof=False,
             status="Inactive Employee Swiped",
-            timestamp=now
+            timestamp=now,
+            location_text=location_text if \'location_text\' in locals() else None,
+            latitude=payload.latitude if hasattr(payload, \'latitude\') else None,
+            longitude=payload.longitude if hasattr(payload, \'longitude\') else None
         )
         _publish_log(log_entry, employee)
         
@@ -411,11 +424,50 @@ def scan_face(
             "bbox": bbox_list
         }
         
-    # Geofencing validation check
+    # Geofencing validation check & Reverse Geocoding
     loc_enabled_setting = crud.get_setting_by_key(db, "LOCATION_RESTRICTION_ENABLED")
     loc_enabled = loc_enabled_setting.value.lower() == "true" if loc_enabled_setting else False
+    
+    location_text = None
+    if payload.latitude is not None and payload.longitude is not None:
+        location_text = geocoding.reverse_geocode(payload.latitude, payload.longitude)
 
-    if loc_enabled and not getattr(employee, "allow_wfh", False):
+    # 1. WFH Check
+    if getattr(employee, "allow_wfh", False):
+        if payload.latitude is None or payload.longitude is None:
+            log_entry = crud.create_attendance_log(
+                db=db, employee_id=employee.id, camera=payload.camera,
+                confidence=similarity if 'similarity' in locals() else 1.0,
+                liveness_score=liveness_score if 'liveness_score' in locals() else 1.0,
+                is_spoof=False, status="WFH Location Missing", timestamp=now,
+                location_text=location_text, latitude=payload.latitude, longitude=payload.longitude
+            )
+            _publish_log(log_entry, employee)
+            return {
+                "status": "location_error",
+                "message": "GPS coordinates are required to mark WFH attendance.",
+                "should_retry": False, "bbox": bbox_list
+            }
+            
+        if employee.wfh_lat and employee.wfh_lng:
+            dist = calculate_distance_meters(payload.latitude, payload.longitude, employee.wfh_lat, employee.wfh_lng)
+            if dist > 500.0:  # 500m threshold
+                log_entry = crud.create_attendance_log(
+                    db=db, employee_id=employee.id, camera=payload.camera,
+                    confidence=similarity if 'similarity' in locals() else 1.0,
+                    liveness_score=liveness_score if 'liveness_score' in locals() else 1.0,
+                    is_spoof=False, status="Outside WFH Bounds", timestamp=now,
+                    location_text=location_text, latitude=payload.latitude, longitude=payload.longitude
+                )
+                _publish_log(log_entry, employee)
+                return {
+                    "status": "location_error",
+                    "message": f"Outside allowed WFH area. Distance: {dist:.1f}m. Max radius: 500m.",
+                    "should_retry": False, "bbox": bbox_list
+                }
+    
+    # 2. Office Check (if not WFH)
+    elif loc_enabled:
         if payload.latitude is None or payload.longitude is None:
             log_entry = crud.create_attendance_log(
                 db=db,
@@ -425,7 +477,8 @@ def scan_face(
                 liveness_score=liveness_score if 'liveness_score' in locals() else 1.0,
                 is_spoof=False,
                 status="Location Missing",
-                timestamp=now
+                timestamp=now,
+                location_text=location_text, latitude=payload.latitude, longitude=payload.longitude
             )
             _publish_log(log_entry, employee)
             return {
@@ -458,7 +511,8 @@ def scan_face(
                 liveness_score=liveness_score if 'liveness_score' in locals() else 1.0,
                 is_spoof=False,
                 status="Outside Office Bounds",
-                timestamp=now
+                timestamp=now,
+                location_text=location_text, latitude=payload.latitude, longitude=payload.longitude
             )
             _publish_log(log_entry, employee)
             return {
@@ -539,7 +593,10 @@ def scan_face(
             liveness_score=liveness_score,
             is_spoof=False,
             status=log_status_success,
-            timestamp=now
+            timestamp=now,
+            location_text=location_text,
+            latitude=payload.latitude,
+            longitude=payload.longitude
         )
         _publish_log(log_entry, employee)
 
@@ -605,7 +662,10 @@ def scan_face(
                     liveness_score=liveness_score,
                     is_spoof=False,
                     status=log_status_success,
-                    timestamp=now
+                    timestamp=now,
+            location_text=location_text if \'location_text\' in locals() else None,
+            latitude=payload.latitude if hasattr(payload, \'latitude\') else None,
+            longitude=payload.longitude if hasattr(payload, \'longitude\') else None
                 )
                 _publish_log(log_entry, employee)
 
@@ -660,7 +720,10 @@ def scan_face(
                     liveness_score=liveness_score,
                     is_spoof=False,
                     status="Attendance Locked",
-                    timestamp=now
+                    timestamp=now,
+            location_text=location_text if \'location_text\' in locals() else None,
+            latitude=payload.latitude if hasattr(payload, \'latitude\') else None,
+            longitude=payload.longitude if hasattr(payload, \'longitude\') else None
                 )
                 _publish_log(log_entry, employee)
 
@@ -747,7 +810,10 @@ def scan_face(
                     liveness_score=liveness_score,
                     is_spoof=False,
                     status=log_status_success,
-                    timestamp=now
+                    timestamp=now,
+            location_text=location_text if \'location_text\' in locals() else None,
+            latitude=payload.latitude if hasattr(payload, \'latitude\') else None,
+            longitude=payload.longitude if hasattr(payload, \'longitude\') else None
                 )
                 _publish_log(log_entry, employee)
 
@@ -903,7 +969,10 @@ def confirm_qr(
         liveness_score=1.0,
         is_spoof=False,
         status="Match Success (QR Verified)",
-        timestamp=now
+        timestamp=now,
+            location_text=location_text if \'location_text\' in locals() else None,
+            latitude=payload.latitude if hasattr(payload, \'latitude\') else None,
+            longitude=payload.longitude if hasattr(payload, \'longitude\') else None
     )
     _publish_log(log_entry, employee)
     
