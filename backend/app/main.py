@@ -136,6 +136,14 @@ def startup_event():
                 conn.commit()
         except Exception:
             pass
+            
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE settings DROP CONSTRAINT IF EXISTS settings_key_key;"))
+                conn.commit()
+        except Exception:
+            pass
+            
         init_db(db)
         
         # Backfill settings for existing companies
