@@ -467,6 +467,15 @@ def scan_face(
                 "should_retry": False, "bbox": bbox_list
             }
             
+        if not employee.wfh_lat or not employee.wfh_lng:
+            # Auto-lock their first known GPS coordinates as their WFH location!
+            employee.wfh_lat = payload.latitude
+            employee.wfh_lng = payload.longitude
+            employee.wfh_address = location_text or "Auto-locked WFH Location"
+            db.commit()
+            db.refresh(employee)
+            logger.info(f"Auto-locked WFH coordinates for Employee {employee.employee_id} at {payload.latitude}, {payload.longitude}")
+
         if employee.wfh_lat and employee.wfh_lng:
             dist = calculate_distance_meters(payload.latitude, payload.longitude, employee.wfh_lat, employee.wfh_lng)
             if dist > 500.0:  # 500m threshold

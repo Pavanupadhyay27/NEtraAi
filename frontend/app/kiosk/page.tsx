@@ -345,7 +345,8 @@ export default function KioskPage() {
     // Check if the video is actually ready and playing
     if (video.readyState < 2) return;
 
-    canvas.width = 640; canvas.height = 360;
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 360;
     ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     
@@ -895,10 +896,10 @@ export default function KioskPage() {
               <div 
                 className="absolute pointer-events-none z-20"
                 style={{
-                  left: `${((640 - faceBbox[2]) / 640) * 100}%`,
-                  top: `${(faceBbox[1] / 360) * 100}%`,
-                  width: `${((faceBbox[2] - faceBbox[0]) / 640) * 100}%`,
-                  height: `${((faceBbox[3] - faceBbox[1]) / 360) * 100}%`,
+                  left: `${(((videoRef.current?.videoWidth || 640) - faceBbox[2]) / (videoRef.current?.videoWidth || 640)) * 100}%`,
+                  top: `${(faceBbox[1] / (videoRef.current?.videoHeight || 360)) * 100}%`,
+                  width: `${((faceBbox[2] - faceBbox[0]) / (videoRef.current?.videoWidth || 640)) * 100}%`,
+                  height: `${((faceBbox[3] - faceBbox[1]) / (videoRef.current?.videoHeight || 360)) * 100}%`,
                   transition: "all 0.2s ease-out",
                 }}
               >
