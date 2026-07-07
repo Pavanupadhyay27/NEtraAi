@@ -23,6 +23,15 @@ def init_db(db: Session):
 
     # 1. Add company_id columns if they don't exist
     tables_to_migrate = ["users", "employees", "departments", "shifts", "settings", "audit_logs"]
+
+    # Ensure subscription_tier column exists in companies table BEFORE any Company queries
+    try:
+        db.execute(text("SELECT subscription_tier FROM companies LIMIT 1"))
+    except Exception:
+        db.rollback()
+        logger.info("Adding subscription_tier column to companies table...")
+        db.execute(text("ALTER TABLE companies ADD COLUMN subscription_tier VARCHAR(50) DEFAULT 'Free'"))
+        db.commit()
     for table in tables_to_migrate:
         try:
             db.execute(text(f"SELECT company_id FROM {table} LIMIT 1"))
@@ -97,15 +106,6 @@ def init_db(db: Session):
         db.rollback()
         logger.info("Adding shift_id column to employees table...")
         db.execute(text("ALTER TABLE employees ADD COLUMN shift_id INTEGER REFERENCES shifts(id) DEFAULT NULL"))
-        db.commit()
-
-    # Ensure subscription_tier column exists in companies table
-    try:
-        db.execute(text("SELECT subscription_tier FROM companies LIMIT 1"))
-    except Exception:
-        db.rollback()
-        logger.info("Adding subscription_tier column to companies table...")
-        db.execute(text("ALTER TABLE companies ADD COLUMN subscription_tier VARCHAR(50) DEFAULT 'Free'"))
         db.commit()
 
     # Ensure allow_wfh column exists in employees table
