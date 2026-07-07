@@ -727,7 +727,7 @@ export default function KioskPage() {
             className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
               voiceEnabled
                 ? "bg-zinc-950 border-zinc-950 text-white"
-                : "bg-slate-55 border-slate-200 text-slate-400"
+                : "bg-slate-50 border-slate-200 text-slate-400"
             }`}
           >
             {voiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
@@ -735,7 +735,7 @@ export default function KioskPage() {
           <button
             onClick={toggleFullscreen}
             title="Fullscreen toggle"
-            className="p-1.5 rounded-lg bg-slate-55 border border-slate-200 text-slate-500 hover:text-slate-800 transition-all cursor-pointer"
+            className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-500 hover:text-slate-800 transition-all cursor-pointer"
           >
             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
           </button>
@@ -921,7 +921,7 @@ export default function KioskPage() {
                   {/* Working Hours (Only visible on Checkout success) */}
                   {scanResult?.attendance?.working_hours > 0 && (
                     <div className="w-full bg-slate-900/60 border border-slate-800/80 rounded-xl p-2.5 max-w-[280px]">
-                      <span className="text-[8.5px] text-slate-450 font-bold uppercase tracking-wider block">Time Logged Today</span>
+                      <span className="text-[8.5px] text-slate-400 font-bold uppercase tracking-wider block">Time Logged Today</span>
                       <span className="text-xs font-bold text-emerald-400 font-mono mt-0.5 block">{scanResult.attendance.working_hours.toFixed(2)} hours</span>
                     </div>
                   )}
@@ -929,8 +929,8 @@ export default function KioskPage() {
                   {/* Biometric Scores Info */}
                   {scanResult?.confidence && (
                     <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-slate-900/40 text-[9px] text-slate-500 font-mono border border-slate-800/60">
-                      <span>Conf: <strong className="text-slate-355">{(scanResult.confidence * 100).toFixed(0)}%</strong></span>
-                      <span className="w-1 h-1 rounded-full bg-slate-805" />
+                      <span>Conf: <strong className="text-slate-300">{(scanResult.confidence * 100).toFixed(0)}%</strong></span>
+                      <span className="w-1 h-1 rounded-full bg-slate-800" />
                       <span>Liveness: <strong className="text-emerald-500/80">{(scanResult.liveness_score * 100).toFixed(0)}%</strong></span>
                     </div>
                   )}
@@ -991,14 +991,14 @@ export default function KioskPage() {
                     <h2 className="text-xl font-extrabold text-white tracking-tight leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
                       {scanResult?.employee?.name || "Employee"}
                     </h2>
-                    <p className="text-[11.5px] text-slate-350 font-medium">
+                    <p className="text-[11.5px] text-slate-300 font-medium">
                       Already checked in today at <span className="font-mono font-bold text-cyan-400">{formatTime12h(scanResult?.attendance?.check_in)}</span>
                     </p>
                   </div>
 
                   {/* Working Hours Box */}
                   <div className="w-full bg-slate-900/60 border border-slate-800/80 rounded-xl p-2.5 max-w-[280px]">
-                    <span className="text-[8.5px] text-slate-505 font-bold uppercase tracking-wider block">Working Hours So Far</span>
+                    <span className="text-[8.5px] text-slate-500 font-bold uppercase tracking-wider block">Working Hours So Far</span>
                     <span className="text-sm font-extrabold text-white font-mono tracking-tight mt-0.5 block">
                       {scanResult?.working_hours_so_far?.toFixed(2)} hours
                     </span>
@@ -1027,7 +1027,7 @@ export default function KioskPage() {
                           resetToIdleWithCooldown(1500);
                         }}
                         disabled={scanning}
-                        className="flex-1 px-4 py-2.5 rounded-xl bg-transparent hover:bg-slate-900 text-slate-300 text-xs font-bold uppercase tracking-wider border border-slate-850 cursor-pointer active:scale-[0.97] transition-all disabled:opacity-50"
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-transparent hover:bg-slate-900 text-slate-300 text-xs font-bold uppercase tracking-wider border border-slate-800 cursor-pointer active:scale-[0.97] transition-all disabled:opacity-50"
                       >
                         No, Stay
                       </button>
@@ -1071,7 +1071,7 @@ export default function KioskPage() {
                   <div className="space-y-1">
                     <h2 className="text-lg font-bold text-white tracking-tight">Scan Employee Badge</h2>
                     {scanResult?.employee?.name && (
-                      <p className="text-[11.5px] text-slate-350 font-medium animate-fadeIn">
+                      <p className="text-[11.5px] text-slate-300 font-medium animate-fadeIn">
                         Matched: <span className="font-bold text-amber-400">{scanResult.employee.name}</span>
                       </p>
                     )}
@@ -1081,7 +1081,7 @@ export default function KioskPage() {
                   </div>
 
                   {qrError && (
-                    <p className="text-[10px] text-rose-455 font-mono font-bold uppercase tracking-wider bg-rose-500/10 py-1 px-3 rounded border border-rose-500/20">{qrError}</p>
+                    <p className="text-[10px] text-rose-400 font-mono font-bold uppercase tracking-wider bg-rose-500/10 py-1 px-3 rounded border border-rose-500/20">{qrError}</p>
                   )}
 
                   <div className="flex flex-col items-center gap-2 pt-2 w-full max-w-[240px]">
@@ -1117,7 +1117,7 @@ export default function KioskPage() {
                     <h2 className="text-lg font-bold text-white tracking-tight">Attendance Locked</h2>
                     <p className="text-[9.5px] text-rose-400 font-mono font-bold uppercase tracking-wider">Security Restriction</p>
                   </div>
-                  <p className="text-xs text-slate-355 leading-relaxed font-medium bg-slate-900/60 p-3 rounded-xl border border-slate-850 max-w-[260px]">
+                  <p className="text-xs text-slate-300 leading-relaxed font-medium bg-slate-900/60 p-3 rounded-xl border border-slate-800 max-w-[260px]">
                     {scanResult?.message || "Your attendance logging is locked for today. Re-entry must be authorized by an administrator."}
                   </p>
                 </div>
@@ -1142,11 +1142,11 @@ export default function KioskPage() {
                     <p className="text-[9.5px] text-rose-400 font-mono font-bold uppercase tracking-wider">Anti-Spoofing Alarm</p>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-xs text-rose-355 leading-relaxed font-semibold">
+                    <p className="text-xs text-rose-300 leading-relaxed font-semibold">
                       {scanResult?.message || "Liveness verification failed. Presentation attack suspected."}
                     </p>
                     {scanResult?.liveness_score !== undefined && (
-                      <p className="text-[9px] text-slate-500 font-mono bg-slate-900/50 py-1 px-3 rounded-lg border border-slate-855 inline-block">
+                      <p className="text-[9px] text-slate-500 font-mono bg-slate-900/50 py-1 px-3 rounded-lg border border-slate-800 inline-block">
                         Liveness Score: <strong className="text-rose-400">{scanResult.liveness_score.toFixed(3)}</strong>
                       </p>
                     )}
@@ -1172,7 +1172,7 @@ export default function KioskPage() {
                     <h2 className="text-lg font-bold text-white tracking-tight">Not Recognized</h2>
                     <p className="text-[9.5px] text-slate-500 font-mono font-bold uppercase tracking-wider text-center">Identity Unknown</p>
                   </div>
-                  <p className="text-xs text-slate-400 leading-relaxed font-medium bg-slate-900/60 p-3 rounded-xl border border-slate-855 max-w-[260px]">
+                  <p className="text-xs text-slate-400 leading-relaxed font-medium bg-slate-900/60 p-3 rounded-xl border border-slate-800 max-w-[260px]">
                     {scanResult?.message || "Biometric pattern does not match any registered employee records."}
                   </p>
                 </div>
@@ -1189,14 +1189,14 @@ export default function KioskPage() {
                 <div className="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-slate-500/40 rounded-br-md" />
 
                 <div className="space-y-4 max-w-xs animate-fade-in flex flex-col items-center">
-                  <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-450 shadow-md">
+                  <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 shadow-md">
                     <ShieldAlert className="w-6 h-6" />
                   </div>
                   <div className="space-y-1">
                     <h2 className="text-lg font-bold text-white tracking-tight">Kiosk Offline</h2>
                     <p className="text-[9.5px] text-slate-500 font-mono font-bold uppercase tracking-wider">Maintenance Mode</p>
                   </div>
-                  <p className="text-xs text-slate-400 leading-relaxed font-medium bg-slate-900/60 p-3 rounded-xl border border-slate-855 max-w-[260px]">
+                  <p className="text-xs text-slate-400 leading-relaxed font-medium bg-slate-900/60 p-3 rounded-xl border border-slate-800 max-w-[260px]">
                     {scanResult?.message || "Biometric scans are temporarily suspended for system database syncing."}
                   </p>
                 </div>
@@ -1213,14 +1213,14 @@ export default function KioskPage() {
                 <div className="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-amber-500/70 rounded-br-md" />
 
                 <div className="space-y-4 max-w-xs animate-fade-in flex flex-col items-center">
-                  <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-555 shadow-md">
+                  <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500 shadow-md">
                     <UserCheck className="w-6 h-6 animate-pulse" />
                   </div>
                   <div className="space-y-1">
                     <h2 className="text-lg font-bold text-white tracking-tight">Setup Required</h2>
                     <p className="text-[9.5px] text-amber-400 font-mono font-bold uppercase tracking-wider">Empty Database</p>
                   </div>
-                  <p className="text-xs text-slate-400 leading-relaxed font-medium bg-slate-900/60 p-3 rounded-xl border border-slate-855 max-w-[260px]">
+                  <p className="text-xs text-slate-400 leading-relaxed font-medium bg-slate-900/60 p-3 rounded-xl border border-slate-800 max-w-[260px]">
                     {scanResult?.message || "Please enroll employees in the dashboard before attempting kiosk logging."}
                   </p>
                 </div>
