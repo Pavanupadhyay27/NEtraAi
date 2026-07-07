@@ -348,6 +348,41 @@ export default function KioskPage() {
     canvas.width = 640; canvas.height = 360;
     ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    // Auto-Flash: Calculate brightness and boost if too dark
+    try {
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      let colorSum = 0;
+      for (let i = 0; i < data.length; i += 16) { // Sample every 4th pixel
+        colorSum += (data[i] + data[i+1] + data[i+2]) / 3;
+      }
+      const brightness = colorSum / (data.length / 16);
+      
+      const track = streamRef.current?.getVideoTracks()[0];
+      if (brightness < 60) {
+        if (track) {
+          try {
+             if (track.getCapabilities && (track.getCapabilities() as any).torch) {
+                track.applyConstraints({ advanced: [{ torch: true } as any] });
+             }
+          } catch(e) {}
+        }
+        // Apply software brightness boost to help facial recognition
+        ctx.filter = "brightness(1.8) contrast(1.2)";
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        ctx.filter = "none";
+      } else {
+        if (track) {
+          try {
+             if (track.getCapabilities && (track.getCapabilities() as any).torch) {
+                track.applyConstraints({ advanced: [{ torch: false } as any] });
+             }
+          } catch(e) {}
+        }
+      }
+    } catch (err) {}
+
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     const base64 = canvas.toDataURL("image/jpeg", 0.82);
@@ -565,6 +600,26 @@ export default function KioskPage() {
     setQrDetectedData(null);
     if (data.bbox) {
       setFaceBbox(data.bbox);
+      
+      // Auto-Zoom: Zoom in if face is far away, zoom out if too close
+      try {
+        const faceWidth = data.bbox[2] - data.bbox[0];
+        const track = streamRef.current?.getVideoTracks()[0];
+        if (track && track.getCapabilities) {
+          const caps: any = track.getCapabilities();
+          if (caps.zoom) {
+            const currentZoom = track.getSettings().zoom || 1;
+            if (faceWidth < 120 && currentZoom < (caps.zoom.max || 3)) {
+               // Too far - zoom in
+               track.applyConstraints({ advanced: [{ zoom: Math.min(currentZoom + 0.3, caps.zoom.max || 3) }] });
+            } else if (faceWidth > 250 && currentZoom > (caps.zoom.min || 1)) {
+               // Too close - zoom out
+               track.applyConstraints({ advanced: [{ zoom: Math.max(currentZoom - 0.3, caps.zoom.min || 1) }] });
+            }
+          }
+        }
+      } catch (err) {}
+      
     } else {
       setFaceBbox(null);
     }
