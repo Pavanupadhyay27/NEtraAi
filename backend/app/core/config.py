@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     INITIAL_ADMIN_PASSWORD: str = "Admin@NetraID2026"
     
     # Face recognition & liveness detection parameters
-    KIOSK_FACE_THRESHOLD: float = 0.60
+    KIOSK_FACE_THRESHOLD: float = 0.45
     KIOSK_LIVENESS_THRESHOLD: float = 0.55
     FORCE_MOCK_MODE: bool = False
     
