@@ -100,9 +100,9 @@ export default function TenantDetailPage() {
     return (
       <SidebarLayout>
         <div className="p-8">
-          <h1 className="text-xl font-bold text-white mb-4">Tenant not found</h1>
+          <h1 className="text-xl font-bold text-white mb-4">Organization not found</h1>
           <button onClick={() => router.push("/tenants")} className="btn-primary rounded-xl px-4 py-2 flex items-center gap-2 w-fit cursor-pointer">
-            <ArrowLeft className="w-4 h-4" /> Back to Tenants
+            <ArrowLeft className="w-4 h-4" /> Back to Organizations
           </button>
         </div>
       </SidebarLayout>
@@ -140,7 +140,7 @@ export default function TenantDetailPage() {
           onClick={() => router.push("/tenants")} 
           className="text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center gap-2 text-sm font-medium transition-colors cursor-pointer"
         >
-          <ArrowLeft className="w-4 h-4" /> Back to Tenants
+          <ArrowLeft className="w-4 h-4" /> Back to Organizations
         </button>
 
         {/* Hero Header */}
@@ -315,7 +315,7 @@ export default function TenantDetailPage() {
               </button>
             </form>
             <p className="text-xs text-slate-500 mt-4 leading-relaxed">
-              Tokens are deducted automatically when tenant's employees mark their attendance (1 scan = 1 token). Top up to ensure continuous operation.
+              Tokens are deducted automatically when organization's employees mark their attendance (1 scan = 1 token). Top up to ensure continuous operation.
             </p>
           </div>
 
@@ -330,7 +330,7 @@ export default function TenantDetailPage() {
                 <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
               </div>
             ) : !settings || settings.length === 0 ? (
-              <p className="text-[var(--text-muted)] text-sm">No permissions configured for this tenant. Try re-seeding or checking logs.</p>
+              <p className="text-[var(--text-muted)] text-sm">No permissions configured for this organization. Try re-seeding or checking logs.</p>
             ) : (
               <div className="flex flex-col">
                 {settings.filter((s: any) => s.value === "true" || s.value === "false").map((setting: any) => (
@@ -388,7 +388,7 @@ function TenantActivityLog({ tenantId }: { tenantId: string }) {
           <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : !logs || logs.length === 0 ? (
-        <p className="text-[var(--text-muted)] text-sm">No recent activity found for this tenant.</p>
+        <p className="text-[var(--text-muted)] text-sm">No recent activity found for this organization.</p>
       ) : (
         <div className="space-y-4">
           {logs.map((log: any) => (

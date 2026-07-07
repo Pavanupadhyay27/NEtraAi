@@ -142,7 +142,7 @@ export default function TenantsPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-white/5">
           <div>
-            <h1 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">Tenant Control Panel</h1>
+            <h1 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">Organization Control Panel</h1>
             <p className="text-[12px] text-[var(--text-secondary)] mt-1.5 font-medium flex items-center gap-2">
               <ShieldAlert className="w-3.5 h-3.5 text-emerald-500" />
               Super Admin SaaS Management
@@ -168,7 +168,7 @@ export default function TenantsPage() {
               className="btn-primary text-[12px] h-9.5 px-4 flex items-center gap-2 rounded-xl cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              Onboard Tenant
+              Onboard Organization
             </button>
           </div>
         </div>
@@ -180,7 +180,7 @@ export default function TenantsPage() {
               <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
                 <Building2 className="w-4 h-4 text-blue-400" />
               </div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Tenants</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Organizations</p>
             </div>
             <p className="text-2xl font-bold text-[var(--text-primary)]">{totalTenants}</p>
           </div>
@@ -190,7 +190,7 @@ export default function TenantsPage() {
               <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
               </div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active Tenants</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active Organizations</p>
             </div>
             <p className="text-2xl font-bold text-[var(--text-primary)]">{activeTenants}</p>
           </div>
@@ -221,7 +221,7 @@ export default function TenantsPage() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
           <input
             type="text"
-            placeholder="Search tenants..."
+            placeholder="Search organizations..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className={`${inputCls} !pl-10 h-10 bg-white/[0.015] border-white/5 text-white`}
@@ -237,7 +237,7 @@ export default function TenantsPage() {
           </div>
         ) : filteredCompanies?.length === 0 ? (
           <div className="py-20 text-center glass-card rounded-3xl border border-white/5">
-            <p className="text-slate-400">No tenants found.</p>
+            <p className="text-slate-400">No organizations found.</p>
           </div>
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
@@ -289,7 +289,7 @@ export default function TenantsPage() {
                               onClick={() => activateMutation.mutate(company.id)}
                               disabled={activateMutation.isPending}
                               className="p-2 rounded-xl text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors"
-                              title="Activate Tenant"
+                              title="Activate Organization"
                             >
                               <Unlock className="w-3.5 h-3.5" />
                             </button>
@@ -298,7 +298,7 @@ export default function TenantsPage() {
                               onClick={() => suspendMutation.mutate(company.id)}
                               disabled={suspendMutation.isPending}
                               className="p-2 rounded-xl text-rose-500 bg-rose-500/10 hover:bg-rose-500/20 transition-colors"
-                              title="Suspend Tenant"
+                              title="Suspend Organization"
                             >
                               <Lock className="w-3.5 h-3.5" />
                             </button>
@@ -426,7 +426,7 @@ export default function TenantsPage() {
                                 <button 
                                   onClick={(e) => { e.stopPropagation(); activateMutation.mutate(company.id); }}
                                   className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
-                                  title="Activate Tenant"
+                                  title="Activate Organization"
                                 >
                                   <Unlock className="w-3.5 h-3.5" />
                                 </button>
@@ -434,7 +434,7 @@ export default function TenantsPage() {
                                 <button 
                                   onClick={(e) => { e.stopPropagation(); suspendMutation.mutate(company.id); }}
                                   className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-colors"
-                                  title="Suspend Tenant"
+                                  title="Suspend Organization"
                                 >
                                   <Lock className="w-3.5 h-3.5" />
                                 </button>
@@ -457,7 +457,7 @@ export default function TenantsPage() {
         <div className="modal-backdrop z-50">
           <div className="modal-content max-w-lg">
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/5">
-              <h3 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">Onboard New Tenant</h3>
+              <h3 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">Onboard New Organization</h3>
               <button 
                 onClick={() => { setShowAddDialog(false); resetForm(); }} 
                 className="p-2 rounded-xl hover:bg-white/6 text-slate-500 transition-all cursor-pointer"

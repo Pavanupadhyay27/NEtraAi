@@ -249,7 +249,7 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
             ))}
             
             <NavLink
-              item={{ name: "Tenants", href: "/tenants", icon: Building2 }}
+              item={{ name: "Organizations", href: "/tenants", icon: Building2 }}
               isActive={pathname.startsWith("/tenants")}
               isCollapsed={isCollapsed}
             />
