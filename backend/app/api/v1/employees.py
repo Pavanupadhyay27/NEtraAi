@@ -139,9 +139,10 @@ def update_employee(
         
     if emp.allow_wfh is not None:
         if emp.allow_wfh and emp.wfh_address:
-            lat, lng = geocoding.geocode_address(emp.wfh_address)
-            emp.wfh_lat = lat
-            emp.wfh_lng = lng
+            if emp.wfh_lat is None or emp.wfh_lng is None:
+                lat, lng = geocoding.geocode_address(emp.wfh_address)
+                emp.wfh_lat = lat
+                emp.wfh_lng = lng
         elif not emp.allow_wfh:
             # Clear location if wfh disabled
             emp.wfh_address = None
