@@ -19,6 +19,7 @@ class CompanyBase(BaseModel):
     address: Optional[str] = None
     max_employees: int = 100
     available_tokens: int = 1000
+    subscription_tier: str = "Free"
 
 class CompanyCreate(CompanyBase):
     admin_password: Optional[str] = None
@@ -78,6 +79,31 @@ def update_company_limit(
     
     return db_company
 
+@router.put("/{company_id}/tier", response_model=CompanyOut)
+def update_company_tier(
+    company_id: int,
+    subscription_tier: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(checker_super_admin)
+):
+    """
+    Update a company's subscription tier. (Super Admin only)
+    """
+    db_company = db.query(models.Company).filter(models.Company.id == company_id).first()
+    if not db_company:
+        raise HTTPException(status_code=404, detail="Company not found")
+        
+    db_company.subscription_tier = subscription_tier
+    db.commit()
+    db.refresh(db_company)
+    
+    db_company.active_employees = db.query(models.Employee).filter(
+        models.Employee.company_id == db_company.id,
+        models.Employee.status == "Active"
+    ).count()
+    
+    return db_company
+
 @router.post("/", response_model=CompanyOut, status_code=status.HTTP_201_CREATED)
 def create_company(
     company: CompanyCreate,
@@ -98,6 +124,7 @@ def create_company(
         address=company.address,
         max_employees=company.max_employees,
         available_tokens=company.available_tokens,
+        subscription_tier=company.subscription_tier,
         status="Active"
     )
     db.add(new_company)

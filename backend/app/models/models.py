@@ -50,6 +50,7 @@ class Company(Base):
     max_employees = Column(Integer, default=100)
     available_tokens = Column(Integer, default=1000)
     tokens_used = Column(Integer, default=0)
+    subscription_tier = Column(String(50), default="Free") # Free, Basic, Pro, Enterprise
     status = Column(String(50), default="Active")  # Active, Suspended, Trial
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 

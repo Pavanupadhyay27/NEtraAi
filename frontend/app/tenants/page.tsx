@@ -17,7 +17,9 @@ import {
   Unlock,
   AlertTriangle,
   TrendingUp,
-  Activity
+  Activity,
+  LayoutGrid,
+  List
 } from "lucide-react";
 
 export default function TenantsPage() {
@@ -25,6 +27,7 @@ export default function TenantsPage() {
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showLimitDialog, setShowLimitDialog] = useState<number | null>(null);
 
@@ -36,6 +39,7 @@ export default function TenantsPage() {
   const [address, setAddress] = useState("");
   const [maxEmployees, setMaxEmployees] = useState("50");
   const [initialTokens, setInitialTokens] = useState("1000");
+  const [subscriptionTier, setSubscriptionTier] = useState("Free");
   const [newLimit, setNewLimit] = useState("");
   
   const [errorMsg, setErrorMsg] = useState("");
@@ -85,6 +89,7 @@ export default function TenantsPage() {
     setAddress("");
     setMaxEmployees("50");
     setInitialTokens("1000");
+    setSubscriptionTier("Free");
     setErrorMsg("");
   };
 
@@ -97,7 +102,8 @@ export default function TenantsPage() {
       phone: phone || null,
       address: address || null,
       max_employees: parseInt(maxEmployees) || 50,
-      available_tokens: parseInt(initialTokens) || 1000
+      available_tokens: parseInt(initialTokens) || 1000,
+      subscription_tier: subscriptionTier
     });
   };
 
@@ -110,7 +116,8 @@ export default function TenantsPage() {
 
   const filteredCompanies = companies?.filter((c: any) => 
     c.name.toLowerCase().includes(search.toLowerCase()) || 
-    (c.admin_email && c.admin_email.toLowerCase().includes(search.toLowerCase()))
+    (c.admin_email && c.admin_email.toLowerCase().includes(search.toLowerCase())) ||
+    (c.subscription_tier && c.subscription_tier.toLowerCase().includes(search.toLowerCase()))
   );
 
   const totalTenants = companies?.length || 0;
@@ -120,6 +127,14 @@ export default function TenantsPage() {
   const totalEmployeesAcrossTenants = companies?.reduce((acc: number, c: any) => acc + (c.active_employees || 0), 0) || 0;
 
   const inputCls = "input-field h-9.5 text-[12.5px] bg-white border-slate-200 focus:border-slate-800 text-slate-900 rounded-xl transition-all w-full";
+
+  const renderTierBadge = (tier: string) => {
+    let color = "bg-slate-500/10 text-slate-400 border-slate-500/20";
+    if (tier === "Basic") color = "bg-blue-500/10 text-blue-400 border-blue-500/20";
+    if (tier === "Pro") color = "bg-indigo-500/10 text-indigo-400 border-indigo-500/20";
+    if (tier === "Enterprise") color = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+    return <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-md border ${color}`}>{tier || "Free"}</span>;
+  };
 
   return (
     <SidebarLayout>
@@ -134,6 +149,20 @@ export default function TenantsPage() {
             </p>
           </div>
           <div className="flex items-center gap-2.5 shrink-0">
+            <div className="flex items-center bg-white/5 p-1 rounded-xl border border-white/10">
+              <button 
+                onClick={() => setViewMode("grid")}
+                className={`p-1.5 rounded-lg transition-all ${viewMode === "grid" ? "bg-white/10 text-white" : "text-slate-400 hover:text-white"}`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => setViewMode("table")}
+                className={`p-1.5 rounded-lg transition-all ${viewMode === "table" ? "bg-white/10 text-white" : "text-slate-400 hover:text-white"}`}
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
             <button
               onClick={() => setShowAddDialog(true)}
               className="btn-primary text-[12px] h-9.5 px-4 flex items-center gap-2 rounded-xl cursor-pointer"
@@ -199,7 +228,7 @@ export default function TenantsPage() {
           />
         </div>
 
-        {/* Tenants Grid */}
+        {/* Tenants Display */}
         {isLoading ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
              {Array.from({length: 3}).map((_, i) => (
@@ -207,10 +236,10 @@ export default function TenantsPage() {
              ))}
           </div>
         ) : filteredCompanies?.length === 0 ? (
-          <div className="py-20 text-center">
+          <div className="py-20 text-center glass-card rounded-3xl border border-white/5">
             <p className="text-slate-400">No tenants found.</p>
           </div>
-        ) : (
+        ) : viewMode === "grid" ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
             {filteredCompanies?.map((company: any) => {
               const usagePercent = Math.min(100, Math.round((company.active_employees / (company.max_employees || 1)) * 100));
@@ -239,7 +268,10 @@ export default function TenantsPage() {
                         <span className="text-lg font-extrabold text-white">{company.name.charAt(0).toUpperCase()}</span>
                       </div>
                       <div className="flex-1 min-w-0 pt-0.5">
-                        <h3 className="text-[15px] font-bold text-white truncate">{company.name}</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-[15px] font-bold text-white truncate">{company.name}</h3>
+                          {renderTierBadge(company.subscription_tier)}
+                        </div>
                         <p className="text-[11px] text-slate-400 font-mono mt-1 truncate">{company.admin_email || "No admin email"}</p>
                       </div>
                     </div>
@@ -301,13 +333,112 @@ export default function TenantsPage() {
               );
             })}
           </div>
+        ) : (
+          <div className="glass-card rounded-3xl border border-white/5 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-white/5 bg-white/[0.02]">
+                    <th className="p-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider pl-6">Company</th>
+                    <th className="p-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tier</th>
+                    <th className="p-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Usage</th>
+                    <th className="p-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tokens</th>
+                    <th className="p-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Status</th>
+                    <th className="p-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-right pr-6">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {filteredCompanies?.map((company: any) => {
+                    const usagePercent = Math.min(100, Math.round((company.active_employees / (company.max_employees || 1)) * 100));
+                    const isSuspended = company.status === "Suspended";
+                    
+                    let barColor = "bg-emerald-500";
+                    if (usagePercent > 75) barColor = "bg-amber-400";
+                    if (usagePercent > 90) barColor = "bg-rose-500";
+
+                    return (
+                      <tr 
+                        key={company.id}
+                        onClick={() => router.push(`/tenants/${company.id}`)}
+                        className="hover:bg-white/[0.02] transition-colors cursor-pointer group"
+                      >
+                        <td className="p-4 pl-6">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-white/10 flex items-center justify-center shrink-0">
+                              <span className="text-xs font-extrabold text-white">{company.name.charAt(0).toUpperCase()}</span>
+                            </div>
+                            <div>
+                              <p className="text-[13px] font-bold text-white group-hover:text-indigo-400 transition-colors">{company.name}</p>
+                              <p className="text-[11px] text-slate-400 font-mono mt-0.5">{company.admin_email || "N/A"}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          {renderTierBadge(company.subscription_tier)}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                              <div className={`h-full ${barColor} rounded-full`} style={{ width: `${usagePercent}%` }} />
+                            </div>
+                            <span className="text-[11px] font-mono text-slate-300">
+                              {company.active_employees}/{company.max_employees}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <span className="text-[12px] font-mono font-medium text-amber-400">
+                            {company.available_tokens}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          {isSuspended ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 text-[10px] font-bold uppercase">
+                              <Lock className="w-3 h-3" /> Suspended
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold uppercase">
+                              <CheckCircle2 className="w-3 h-3" /> Active
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-4 pr-6 text-right">
+                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {company.id !== 1 && (
+                              isSuspended ? (
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); activateMutation.mutate(company.id); }}
+                                  className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                                  title="Activate Tenant"
+                                >
+                                  <Unlock className="w-3.5 h-3.5" />
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); suspendMutation.mutate(company.id); }}
+                                  className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-colors"
+                                  title="Suspend Tenant"
+                                >
+                                  <Lock className="w-3.5 h-3.5" />
+                                </button>
+                              )
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
       </div>
 
       {/* Add Tenant Modal */}
       {showAddDialog && (
-        <div className="modal-backdrop">
-          <div className="modal-content max-w-md">
+        <div className="modal-backdrop z-50">
+          <div className="modal-content max-w-lg">
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/5">
               <h3 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">Onboard New Tenant</h3>
               <button 
@@ -325,46 +456,64 @@ export default function TenantsPage() {
                 </div>
               )}
               
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Company Name</label>
-                <input type="text" required placeholder="Acme Corp" value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
-              </div>
-              
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Admin Email</label>
-                <input type="email" required placeholder="admin@acme.com" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} className={inputCls} />
-              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5 col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Company Name</label>
+                  <input type="text" required placeholder="Acme Corp" value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
+                </div>
+                
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Admin Email</label>
+                  <input type="email" required placeholder="admin@acme.com" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} className={inputCls} />
+                </div>
 
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Admin Password</label>
-                <input type="password" required placeholder="Initial login password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} className={inputCls} />
-              </div>
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Admin Password</label>
+                  <input type="password" required placeholder="Initial login password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} className={inputCls} />
+                </div>
 
-              <div className="flex gap-4">
-                <div className="space-y-1.5 flex-1">
+                <div className="space-y-1.5">
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mobile Number</label>
                   <input type="text" placeholder="+1 234 567 8900" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} />
                 </div>
                 
-                <div className="space-y-1.5 flex-1">
+                <div className="space-y-1.5">
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Address</label>
                   <input type="text" placeholder="123 Main St" value={address} onChange={(e) => setAddress(e.target.value)} className={inputCls} />
                 </div>
-              </div>
 
-              <div className="flex gap-4">
-                <div className="space-y-1.5 flex-1">
+                <div className="space-y-1.5 col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Subscription Tier</label>
+                  <select 
+                    value={subscriptionTier} 
+                    onChange={(e) => {
+                      setSubscriptionTier(e.target.value);
+                      if (e.target.value === "Free") setMaxEmployees("10");
+                      if (e.target.value === "Basic") setMaxEmployees("50");
+                      if (e.target.value === "Pro") setMaxEmployees("250");
+                      if (e.target.value === "Enterprise") setMaxEmployees("1000");
+                    }} 
+                    className={`${inputCls} bg-slate-900 border-white/10 text-white`}
+                  >
+                    <option value="Free">Free (10 Users)</option>
+                    <option value="Basic">Basic (50 Users)</option>
+                    <option value="Pro">Pro (250 Users)</option>
+                    <option value="Enterprise">Enterprise (1000+ Users)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Max Employees</label>
                   <input type="number" min="1" required value={maxEmployees} onChange={(e) => setMaxEmployees(e.target.value)} className={inputCls} />
                 </div>
                 
-                <div className="space-y-1.5 flex-1">
+                <div className="space-y-1.5">
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Initial Tokens</label>
                   <input type="number" min="0" required value={initialTokens} onChange={(e) => setInitialTokens(e.target.value)} className={inputCls} />
                 </div>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-4">
                 <button type="submit" disabled={createMutation.isPending} className="btn-primary w-full h-10 rounded-xl font-bold cursor-pointer">
                   {createMutation.isPending ? "Onboarding..." : "Register Tenant"}
                 </button>
@@ -376,7 +525,7 @@ export default function TenantsPage() {
 
       {/* Update Limit Modal */}
       {showLimitDialog !== null && (
-        <div className="modal-backdrop">
+        <div className="modal-backdrop z-50">
           <div className="modal-content max-w-sm">
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/5">
               <h3 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">Update Usage Limit</h3>
@@ -406,3 +555,4 @@ export default function TenantsPage() {
     </SidebarLayout>
   );
 }
+

@@ -99,6 +99,15 @@ def init_db(db: Session):
         db.execute(text("ALTER TABLE employees ADD COLUMN shift_id INTEGER REFERENCES shifts(id) DEFAULT NULL"))
         db.commit()
 
+    # Ensure subscription_tier column exists in companies table
+    try:
+        db.execute(text("SELECT subscription_tier FROM companies LIMIT 1"))
+    except Exception:
+        db.rollback()
+        logger.info("Adding subscription_tier column to companies table...")
+        db.execute(text("ALTER TABLE companies ADD COLUMN subscription_tier VARCHAR(50) DEFAULT 'Free'"))
+        db.commit()
+
     # Ensure allow_wfh column exists in employees table
     try:
         db.execute(text("SELECT allow_wfh FROM employees LIMIT 1"))
