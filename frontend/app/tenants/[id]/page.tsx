@@ -332,20 +332,27 @@ export default function TenantDetailPage() {
             ) : !settings || settings.length === 0 ? (
               <p className="text-[var(--text-muted)] text-sm">No permissions configured for this tenant. Try re-seeding or checking logs.</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex flex-col">
                 {settings.filter((s: any) => s.value === "true" || s.value === "false").map((setting: any) => (
-                  <div key={setting.key} className="flex items-center justify-between p-4 bg-slate-100 dark:bg-white/[0.02] border border-[var(--border-medium)] rounded-2xl hover:bg-white/[0.06] hover:border-[var(--border-medium)] transition-all duration-300 group cursor-pointer" onClick={() => toggleSetting(setting)}>
-                    <div className="pr-4">
-                      <p className="text-[12px] font-bold text-[var(--text-primary)] group-hover:text-indigo-400 transition-colors">
+                  <div 
+                    key={setting.key} 
+                    className="flex items-center justify-between p-4 hover:bg-[var(--bg-elevated)] border-b border-[var(--border-medium)] last:border-0 transition-all duration-200 cursor-pointer group" 
+                    onClick={() => toggleSetting(setting)}
+                  >
+                    <div className="pr-6 flex-1">
+                      <p className="text-[13px] font-bold text-[var(--text-primary)] transition-colors group-hover:text-indigo-500 dark:group-hover:text-indigo-400">
                         {setting.key.replace(/_/g, " ")}
                       </p>
-                      <p className="text-[10px] text-[var(--text-muted)] mt-1 leading-relaxed line-clamp-2" title={setting.description}>{setting.description}</p>
+                      <p className="text-[11px] text-[var(--text-muted)] mt-1 leading-relaxed">
+                        {setting.description}
+                      </p>
                     </div>
+                    
                     <button 
                       disabled={updateSettingMutation.isPending}
-                      className={`p-1 rounded-full transition-all duration-300 shrink-0 ${setting.value === "true" ? "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]" : "text-slate-600"}`}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 ease-in-out ${setting.value === "true" ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
                     >
-                      {setting.value === "true" ? <ToggleRight className="w-7 h-7" /> : <ToggleLeft className="w-7 h-7" />}
+                      <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-300 ease-in-out ${setting.value === "true" ? 'translate-x-4' : 'translate-x-0'}`} />
                     </button>
                   </div>
                 ))}
