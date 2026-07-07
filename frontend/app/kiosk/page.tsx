@@ -1013,11 +1013,18 @@ export default function KioskPage() {
                         disabled={scanning}
                         className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-extrabold uppercase tracking-wider shadow-[0_0_15px_rgba(6,182,212,0.35)] cursor-pointer hover:scale-[1.03] active:scale-[0.97] transition-all disabled:opacity-50"
                       >
-                        Yes, Check Out
+                        {scanning ? (
+                          <div className="flex items-center justify-center gap-2">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Processing</span>
+                          </div>
+                        ) : (
+                          "Yes, Check Out"
+                        )}
                       </button>
                       <button
                         onClick={() => {
-                          resetToIdleWithCooldown(5000);
+                          resetToIdleWithCooldown(1500);
                         }}
                         disabled={scanning}
                         className="flex-1 px-4 py-2.5 rounded-xl bg-transparent hover:bg-slate-900 text-slate-300 text-xs font-bold uppercase tracking-wider border border-slate-850 cursor-pointer active:scale-[0.97] transition-all disabled:opacity-50"
