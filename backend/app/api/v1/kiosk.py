@@ -221,9 +221,9 @@ def scan_face(
                 is_spoof=True,
                 status="Spoof Rejected",
                 timestamp=now,
-            location_text=location_text if \'location_text\' in locals() else None,
-            latitude=payload.latitude if hasattr(payload, \'latitude\') else None,
-            longitude=payload.longitude if hasattr(payload, \'longitude\') else None
+            location_text=location_text if 'location_text' in locals() else None,
+            latitude=payload.latitude if hasattr(payload, 'latitude') else None,
+            longitude=payload.longitude if hasattr(payload, 'longitude') else None
             )
             _publish_log(log_entry)
             
@@ -317,9 +317,9 @@ def scan_face(
                 is_spoof=False,
                 status="Empty Vector Index",
                 timestamp=now,
-            location_text=location_text if \'location_text\' in locals() else None,
-            latitude=payload.latitude if hasattr(payload, \'latitude\') else None,
-            longitude=payload.longitude if hasattr(payload, \'longitude\') else None
+            location_text=location_text if 'location_text' in locals() else None,
+            latitude=payload.latitude if hasattr(payload, 'latitude') else None,
+            longitude=payload.longitude if hasattr(payload, 'longitude') else None
             )
             _publish_log(log_entry)
             return {
@@ -366,9 +366,9 @@ def scan_face(
                 is_spoof=False,
                 status="Unknown Person",
                 timestamp=now,
-            location_text=location_text if \'location_text\' in locals() else None,
-            latitude=payload.latitude if hasattr(payload, \'latitude\') else None,
-            longitude=payload.longitude if hasattr(payload, \'longitude\') else None
+            location_text=location_text if 'location_text' in locals() else None,
+            latitude=payload.latitude if hasattr(payload, 'latitude') else None,
+            longitude=payload.longitude if hasattr(payload, 'longitude') else None
             )
             _publish_log(log_entry)
             return {
@@ -393,9 +393,9 @@ def scan_face(
             is_spoof=False,
             status="Inactive Employee Swiped",
             timestamp=now,
-            location_text=location_text if \'location_text\' in locals() else None,
-            latitude=payload.latitude if hasattr(payload, \'latitude\') else None,
-            longitude=payload.longitude if hasattr(payload, \'longitude\') else None
+            location_text=location_text if 'location_text' in locals() else None,
+            latitude=payload.latitude if hasattr(payload, 'latitude') else None,
+            longitude=payload.longitude if hasattr(payload, 'longitude') else None
         )
         _publish_log(log_entry, employee)
         
@@ -663,9 +663,9 @@ def scan_face(
                     is_spoof=False,
                     status=log_status_success,
                     timestamp=now,
-            location_text=location_text if \'location_text\' in locals() else None,
-            latitude=payload.latitude if hasattr(payload, \'latitude\') else None,
-            longitude=payload.longitude if hasattr(payload, \'longitude\') else None
+            location_text=location_text if 'location_text' in locals() else None,
+            latitude=payload.latitude if hasattr(payload, 'latitude') else None,
+            longitude=payload.longitude if hasattr(payload, 'longitude') else None
                 )
                 _publish_log(log_entry, employee)
 
@@ -721,9 +721,9 @@ def scan_face(
                     is_spoof=False,
                     status="Attendance Locked",
                     timestamp=now,
-            location_text=location_text if \'location_text\' in locals() else None,
-            latitude=payload.latitude if hasattr(payload, \'latitude\') else None,
-            longitude=payload.longitude if hasattr(payload, \'longitude\') else None
+            location_text=location_text if 'location_text' in locals() else None,
+            latitude=payload.latitude if hasattr(payload, 'latitude') else None,
+            longitude=payload.longitude if hasattr(payload, 'longitude') else None
                 )
                 _publish_log(log_entry, employee)
 
@@ -811,9 +811,9 @@ def scan_face(
                     is_spoof=False,
                     status=log_status_success,
                     timestamp=now,
-            location_text=location_text if \'location_text\' in locals() else None,
-            latitude=payload.latitude if hasattr(payload, \'latitude\') else None,
-            longitude=payload.longitude if hasattr(payload, \'longitude\') else None
+            location_text=location_text if 'location_text' in locals() else None,
+            latitude=payload.latitude if hasattr(payload, 'latitude') else None,
+            longitude=payload.longitude if hasattr(payload, 'longitude') else None
                 )
                 _publish_log(log_entry, employee)
 
@@ -970,9 +970,9 @@ def confirm_qr(
         is_spoof=False,
         status="Match Success (QR Verified)",
         timestamp=now,
-            location_text=location_text if \'location_text\' in locals() else None,
-            latitude=payload.latitude if hasattr(payload, \'latitude\') else None,
-            longitude=payload.longitude if hasattr(payload, \'longitude\') else None
+            location_text=location_text if 'location_text' in locals() else None,
+            latitude=payload.latitude if hasattr(payload, 'latitude') else None,
+            longitude=payload.longitude if hasattr(payload, 'longitude') else None
     )
     _publish_log(log_entry, employee)
     
