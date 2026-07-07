@@ -138,16 +138,16 @@ export default function TenantDetailPage() {
       <div className="p-8 max-w-6xl mx-auto space-y-8">
         <button 
           onClick={() => router.push("/tenants")} 
-          className="text-slate-400 hover:text-white flex items-center gap-2 text-sm font-medium transition-colors cursor-pointer"
+          className="text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center gap-2 text-sm font-medium transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Tenants
         </button>
 
         {/* Hero Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-white/5">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-[var(--border-medium)]">
           <div className="flex items-center gap-5">
             <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-[0_0_30px_rgba(99,102,241,0.3)] flex items-center justify-center shrink-0">
-              <span className="text-4xl font-extrabold text-white shadow-sm">{tenant.name.charAt(0).toUpperCase()}</span>
+              <span className="text-4xl font-extrabold text-[var(--text-primary)] shadow-sm">{tenant.name.charAt(0).toUpperCase()}</span>
             </div>
             <div>
               <div className="flex items-center gap-3">
@@ -155,9 +155,9 @@ export default function TenantDetailPage() {
                 {renderTierBadge(tenant.subscription_tier)}
               </div>
               <div className="flex flex-wrap items-center gap-4 mt-3">
-                <span className="text-slate-400 font-mono text-sm flex items-center gap-1.5"><Users className="w-3.5 h-3.5"/> {tenant.admin_email || "No admin email"}</span>
-                {tenant.phone && <span className="text-slate-400 font-mono text-sm flex items-center gap-1.5"><Phone className="w-3.5 h-3.5"/> {tenant.phone}</span>}
-                {tenant.address && <span className="text-slate-400 font-mono text-sm flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5"/> {tenant.address}</span>}
+                <span className="text-[var(--text-muted)] font-mono text-sm flex items-center gap-1.5"><Users className="w-3.5 h-3.5"/> {tenant.admin_email || "No admin email"}</span>
+                {tenant.phone && <span className="text-[var(--text-muted)] font-mono text-sm flex items-center gap-1.5"><Phone className="w-3.5 h-3.5"/> {tenant.phone}</span>}
+                {tenant.address && <span className="text-[var(--text-muted)] font-mono text-sm flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5"/> {tenant.address}</span>}
               </div>
             </div>
           </div>
@@ -167,7 +167,7 @@ export default function TenantDetailPage() {
               value={tenant.subscription_tier || "Free"}
               onChange={(e) => updateTierMutation.mutate(e.target.value)}
               disabled={updateTierMutation.isPending}
-              className="h-10 bg-white/5 border border-white/10 rounded-xl px-4 text-sm text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
+              className="h-10 bg-[var(--bg-elevated)] border border-[var(--border-medium)] rounded-xl px-4 text-sm text-[var(--text-primary)] focus:outline-none focus:border-indigo-500 cursor-pointer"
             >
               <option value="Free">Free Tier</option>
               <option value="Basic">Basic Tier</option>
@@ -180,36 +180,36 @@ export default function TenantDetailPage() {
         {/* Quick Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Tokens Card */}
-          <div className="glass-card p-6 rounded-3xl border border-white/6 flex flex-col gap-4">
+          <div className="glass-card p-6 rounded-3xl border border-[var(--border-medium)] flex flex-col gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
                 <Coins className="w-5 h-5 text-amber-400" />
               </div>
               <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Available Tokens</p>
-                <p className="text-2xl font-bold text-white">{tenant.available_tokens}</p>
+                <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Available Tokens</p>
+                <p className="text-2xl font-bold text-[var(--text-primary)]">{tenant.available_tokens}</p>
               </div>
             </div>
-            <div className="pt-4 border-t border-white/5 flex justify-between items-center text-sm">
-              <span className="text-slate-400">Tokens Used:</span>
-              <span className="font-mono text-white">{tenant.tokens_used}</span>
+            <div className="pt-4 border-t border-[var(--border-medium)] flex justify-between items-center text-sm">
+              <span className="text-[var(--text-muted)]">Tokens Used:</span>
+              <span className="font-mono text-[var(--text-primary)]">{tenant.tokens_used}</span>
             </div>
           </div>
 
           {/* Employees Card */}
-          <div className="glass-card p-6 rounded-3xl border border-white/6 flex flex-col gap-4">
+          <div className="glass-card p-6 rounded-3xl border border-[var(--border-medium)] flex flex-col gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center">
                 <Users className="w-5 h-5 text-indigo-400" />
               </div>
               <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active Employees</p>
-                <p className="text-2xl font-bold text-white">{tenant.active_employees}</p>
+                <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Active Employees</p>
+                <p className="text-2xl font-bold text-[var(--text-primary)]">{tenant.active_employees}</p>
               </div>
             </div>
-            <div className="pt-4 border-t border-white/5">
+            <div className="pt-4 border-t border-[var(--border-medium)]">
               <div className="flex justify-between items-center mb-2 text-xs">
-                <span className="text-slate-400">Limit: {tenant.max_employees}</span>
+                <span className="text-[var(--text-muted)]">Limit: {tenant.max_employees}</span>
                 <span className="text-slate-300 font-mono">{usagePercent}%</span>
               </div>
               <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
@@ -219,27 +219,27 @@ export default function TenantDetailPage() {
           </div>
 
           {/* Status Card */}
-          <div className="glass-card p-6 rounded-3xl border border-white/6 flex flex-col gap-4">
+          <div className="glass-card p-6 rounded-3xl border border-[var(--border-medium)] flex flex-col gap-4">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${tenant.status === 'Active' ? 'bg-emerald-500/10' : 'bg-rose-500/10'}`}>
                 <Activity className={`w-5 h-5 ${tenant.status === 'Active' ? 'text-emerald-400' : 'text-rose-400'}`} />
               </div>
               <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</p>
+                <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Status</p>
                 <p className={`text-2xl font-bold ${tenant.status === 'Active' ? 'text-emerald-400' : 'text-rose-400'}`}>{tenant.status}</p>
               </div>
             </div>
-            <div className="pt-4 border-t border-white/5 flex justify-between items-center text-sm">
-              <span className="text-slate-400">Created At:</span>
-              <span className="font-mono text-white text-xs">{new Date(tenant.created_at).toLocaleDateString()}</span>
+            <div className="pt-4 border-t border-[var(--border-medium)] flex justify-between items-center text-sm">
+              <span className="text-[var(--text-muted)]">Created At:</span>
+              <span className="font-mono text-[var(--text-primary)] text-xs">{new Date(tenant.created_at).toLocaleDateString()}</span>
             </div>
           </div>
         </div>
 
         {/* Analytics Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="glass-card p-6 rounded-3xl border border-white/6">
-            <h3 className="text-sm font-bold text-white mb-6 uppercase tracking-wider flex items-center gap-2">
+          <div className="glass-card p-6 rounded-3xl border border-[var(--border-medium)]">
+            <h3 className="text-sm font-bold text-[var(--text-primary)] mb-6 uppercase tracking-wider flex items-center gap-2">
               <Zap className="w-4 h-4 text-amber-400" />
               Token Consumption (30 Days)
             </h3>
@@ -265,8 +265,8 @@ export default function TenantDetailPage() {
             </div>
           </div>
 
-          <div className="glass-card p-6 rounded-3xl border border-white/6">
-            <h3 className="text-sm font-bold text-white mb-6 uppercase tracking-wider flex items-center gap-2">
+          <div className="glass-card p-6 rounded-3xl border border-[var(--border-medium)]">
+            <h3 className="text-sm font-bold text-[var(--text-primary)] mb-6 uppercase tracking-wider flex items-center gap-2">
               <Briefcase className="w-4 h-4 text-indigo-400" />
               Employee Onboarding Trend
             </h3>
@@ -290,8 +290,8 @@ export default function TenantDetailPage() {
         {/* Tokens Issue & Settings */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          <div className="lg:col-span-1 glass-card p-8 rounded-3xl border border-white/6 flex flex-col justify-center">
-            <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+          <div className="lg:col-span-1 glass-card p-8 rounded-3xl border border-[var(--border-medium)] flex flex-col justify-center">
+            <h2 className="text-lg font-bold text-[var(--text-primary)] mb-6 flex items-center gap-2">
               <Coins className="w-5 h-5 text-amber-400" />
               Issue Tokens
             </h2>
@@ -303,7 +303,7 @@ export default function TenantDetailPage() {
                 placeholder="Amount (e.g. 500)"
                 value={addTokensAmount}
                 onChange={(e) => setAddTokensAmount(e.target.value)}
-                className="w-full h-12 bg-white/[0.015] border border-white/5 rounded-xl px-4 text-white text-sm focus:outline-none focus:border-indigo-500/50 focus:bg-white/[0.03] transition-all"
+                className="w-full h-12 bg-slate-50 dark:bg-white/[0.015] border border-[var(--border-medium)] rounded-xl px-4 text-[var(--text-primary)] text-sm focus:outline-none focus:border-indigo-500/50 focus:bg-slate-200 dark:bg-white/[0.03] transition-all"
               />
               <button 
                 type="submit" 
@@ -319,8 +319,8 @@ export default function TenantDetailPage() {
             </p>
           </div>
 
-          <div className="lg:col-span-2 glass-card p-8 rounded-3xl border border-white/6">
-            <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+          <div className="lg:col-span-2 glass-card p-8 rounded-3xl border border-[var(--border-medium)]">
+            <h2 className="text-lg font-bold text-[var(--text-primary)] mb-6 flex items-center gap-2">
               <Shield className="w-5 h-5 text-emerald-400" />
               Feature Flags & Permissions
             </h2>
@@ -330,16 +330,16 @@ export default function TenantDetailPage() {
                 <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
               </div>
             ) : !settings || settings.length === 0 ? (
-              <p className="text-slate-400 text-sm">No permissions configured for this tenant. Try re-seeding or checking logs.</p>
+              <p className="text-[var(--text-muted)] text-sm">No permissions configured for this tenant. Try re-seeding or checking logs.</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {settings.filter((s: any) => s.value === "true" || s.value === "false").map((setting: any) => (
-                  <div key={setting.key} className="flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 rounded-2xl hover:bg-white/[0.06] hover:border-white/10 transition-all duration-300 group cursor-pointer" onClick={() => toggleSetting(setting)}>
+                  <div key={setting.key} className="flex items-center justify-between p-4 bg-slate-100 dark:bg-white/[0.02] border border-[var(--border-medium)] rounded-2xl hover:bg-white/[0.06] hover:border-[var(--border-medium)] transition-all duration-300 group cursor-pointer" onClick={() => toggleSetting(setting)}>
                     <div className="pr-4">
-                      <p className="text-[12px] font-bold text-white group-hover:text-indigo-400 transition-colors">
+                      <p className="text-[12px] font-bold text-[var(--text-primary)] group-hover:text-indigo-400 transition-colors">
                         {setting.key.replace(/_/g, " ")}
                       </p>
-                      <p className="text-[10px] text-slate-400 mt-1 leading-relaxed line-clamp-2" title={setting.description}>{setting.description}</p>
+                      <p className="text-[10px] text-[var(--text-muted)] mt-1 leading-relaxed line-clamp-2" title={setting.description}>{setting.description}</p>
                     </div>
                     <button 
                       disabled={updateSettingMutation.isPending}
@@ -370,8 +370,8 @@ function TenantActivityLog({ tenantId }: { tenantId: string }) {
   });
 
   return (
-    <div className="glass-card p-8 rounded-3xl border border-white/6">
-      <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+    <div className="glass-card p-8 rounded-3xl border border-[var(--border-medium)]">
+      <h2 className="text-lg font-bold text-[var(--text-primary)] mb-6 flex items-center gap-2">
         <Activity className="w-5 h-5 text-indigo-400" />
         Recent Activity Logs
       </h2>
@@ -381,14 +381,14 @@ function TenantActivityLog({ tenantId }: { tenantId: string }) {
           <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : !logs || logs.length === 0 ? (
-        <p className="text-slate-400 text-sm">No recent activity found for this tenant.</p>
+        <p className="text-[var(--text-muted)] text-sm">No recent activity found for this tenant.</p>
       ) : (
         <div className="space-y-4">
           {logs.map((log: any) => (
-            <div key={log.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white/[0.02] border border-white/5 rounded-2xl">
+            <div key={log.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-100 dark:bg-white/[0.02] border border-[var(--border-medium)] rounded-2xl">
               <div>
-                <p className="text-sm font-bold text-white">{log.action}</p>
-                {log.details && <p className="text-[11px] text-slate-400 mt-1">{log.details}</p>}
+                <p className="text-sm font-bold text-[var(--text-primary)]">{log.action}</p>
+                {log.details && <p className="text-[11px] text-[var(--text-muted)] mt-1">{log.details}</p>}
                 <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-500 font-mono uppercase tracking-wider">
                   <span>{new Date(log.timestamp).toLocaleString()}</span>
                   {log.user_id && <span>User ID: {log.user_id}</span>}
