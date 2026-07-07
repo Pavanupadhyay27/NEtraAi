@@ -322,8 +322,8 @@ class FaceEngine:
         src = np.array(landmarks, dtype=np.float32)
         
         # Estimate similarity transform matrix
-        # Disable RANSAC (method=0) to force a stable least-squares fit on all 5 points
-        M, inliers = cv2.estimateAffinePartial2D(src, reference_landmarks, method=0)
+        # Use default RANSAC (method=0 was failing in OpenCV 5.0.0)
+        M, inliers = cv2.estimateAffinePartial2D(src, reference_landmarks)
         if M is None:
             # Fallback
             return cv2.resize(image_np, (112, 112))
