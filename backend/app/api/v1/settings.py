@@ -29,10 +29,7 @@ def update_setting(
     current_user: models.User = Depends(checker_manage)
 ):
     setting = crud.get_setting_by_key(db, key=key, company_id=current_user.company_id)
-    if not setting:
-        raise HTTPException(status_code=404, detail="Setting not found")
-        
-    old_value = setting.value
+    old_value = setting.value if setting else None
     updated = crud.set_setting(db, key=key, value=payload.value, company_id=current_user.company_id)
     
     # Dynamically restart RTSP processor if RTSP settings were updated

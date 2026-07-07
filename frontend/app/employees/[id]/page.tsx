@@ -214,6 +214,52 @@ export default function EmployeeDetailPage() {
     }
   });
 
+  const handleSetCurrentWfhLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation is not supported by your browser.");
+      return;
+    }
+
+    setWfhGeocoding(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
+          if (res.ok) {
+            const data = await res.json();
+            const address = data.display_name;
+            setWfhAddress(address);
+            setWfhLat(lat);
+            setWfhLng(lon);
+            
+            updateWfhDetailsMutation.mutate({
+              wfh_address: address,
+              wfh_lat: lat,
+              wfh_lng: lon
+            });
+            toast.success("WFH Location locked to your current GPS coordinates!");
+          } else {
+             toast.error("Failed to get address for current location.");
+          }
+        } catch (err) {
+           console.error("Reverse geocoding error:", err);
+           toast.error("Failed to fetch address from coordinates.");
+        } finally {
+          setWfhGeocoding(false);
+        }
+      },
+      (err) => {
+        console.error("GPS error:", err);
+        toast.error("Failed to get current location. Ensure GPS permission is granted.");
+        setWfhGeocoding(false);
+      },
+      { enableHighAccuracy: true }
+    );
+  };
+
   useEffect(() => {
     if (!employee?.allow_wfh || !wfhAddress || wfhAddress.trim().length < 5) {
       return;
@@ -852,9 +898,20 @@ export default function EmployeeDetailPage() {
                   >
                     <div className="p-3.5 rounded-xl bg-indigo-500/5 border border-indigo-500/10 space-y-2.5">
                       <div className="space-y-1.5">
-                        <label className="block text-[9.5px] font-bold text-slate-500 uppercase tracking-wider">
-                          Home Address (For WFH GPS Lock) <span className="text-blue-400">*</span>
-                        </label>
+                        <div className="flex items-center justify-between">
+                          <label className="block text-[9.5px] font-bold text-slate-500 uppercase tracking-wider">
+                            Home Address (For WFH GPS Lock) <span className="text-blue-400">*</span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={handleSetCurrentWfhLocation}
+                            disabled={wfhGeocoding}
+                            className="flex items-center gap-1.5 bg-white text-slate-900 border border-slate-200 hover:border-slate-400 text-[10px] font-bold px-2 py-1 rounded-lg transition-all disabled:opacity-50"
+                          >
+                            <MapPin className="w-3 h-3" />
+                            Set to Current GPS Location
+                          </button>
+                        </div>
                         <textarea 
                           rows={2}
                           placeholder="e.g., 123 Main St, Springfield. Be specific for accurate GPS geocoding." 
