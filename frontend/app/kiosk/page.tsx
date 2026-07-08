@@ -194,24 +194,24 @@ export default function KioskPage() {
         gain.connect(audioCtx.destination);
         
         if (status === "success" || status === "ask_checkout") {
-          // Futuristic Success Sweep (Sci-Fi confirmation)
+          // Clean Futuristic Chime (no fart sounds)
           osc.type = "sine";
-          osc.frequency.setValueAtTime(440, audioCtx.currentTime);
-          osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.15); // Sweep up 2 octaves rapidly
+          osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+          osc.frequency.setValueAtTime(1108.73, audioCtx.currentTime + 0.1); // C#6
+          osc.frequency.setValueAtTime(1318.51, audioCtx.currentTime + 0.2); // E6
           gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
-          gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05);
-          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+          gain.gain.linearRampToValueAtTime(0.4, audioCtx.currentTime + 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
           osc.start(audioCtx.currentTime);
-          osc.stop(audioCtx.currentTime + 0.4);
+          osc.stop(audioCtx.currentTime + 0.5);
           
-          // Add a second harmonic oscillator for depth
+          // Shimmering overtone
           const osc2 = audioCtx.createOscillator();
-          osc2.type = "triangle";
+          osc2.type = "sine";
           osc2.connect(gain);
-          osc2.frequency.setValueAtTime(880, audioCtx.currentTime);
-          osc2.frequency.exponentialRampToValueAtTime(3520, audioCtx.currentTime + 0.15);
+          osc2.frequency.setValueAtTime(1760, audioCtx.currentTime); // A6
           osc2.start(audioCtx.currentTime);
-          osc2.stop(audioCtx.currentTime + 0.4);
+          osc2.stop(audioCtx.currentTime + 0.5);
           
         } else if (status === "spoof" || status === "locked" || status === "spoof_detected") {
           // Harsh Sci-Fi Denial Buzz
