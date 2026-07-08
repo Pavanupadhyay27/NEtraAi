@@ -522,11 +522,11 @@ def scan_face(
         try:
             office_lat = float(loc_lat_setting.value) if loc_lat_setting else 0.0
             office_lon = float(loc_lon_setting.value) if loc_lon_setting else 0.0
-            allowed_radius = float(loc_rad_setting.value) if loc_rad_setting else 50.0
+            allowed_radius = float(loc_rad_setting.value) if loc_rad_setting else 500.0
         except ValueError:
             office_lat = 0.0
             office_lon = 0.0
-            allowed_radius = 50.0
+            allowed_radius = 500.0
 
         if office_lat == 0.0 and office_lon == 0.0:
             # Auto-lock global office coordinates on first valid scan if unconfigured!
