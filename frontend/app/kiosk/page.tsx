@@ -50,6 +50,7 @@ export default function KioskPage() {
   const [qrCodeVal, setQrCodeVal] = useState("");
   const [qrError, setQrError] = useState<string | null>(null);
   const [faceBbox, setFaceBbox] = useState<number[] | null>(null);
+  const [lowLight, setLowLight] = useState<boolean>(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -179,6 +180,11 @@ export default function KioskPage() {
   const playStatusBeep = (status: string) => {
     if (typeof window !== "undefined") {
       try {
+        if (navigator.vibrate) {
+           if (status === "success" || status === "ask_checkout") navigator.vibrate([100, 50, 100]);
+           else navigator.vibrate([50, 100, 50, 100, 50]);
+        }
+        
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
         const audioCtx = new AudioContextClass();
         if (audioCtx.state === "suspended") audioCtx.resume();
@@ -188,28 +194,45 @@ export default function KioskPage() {
         gain.connect(audioCtx.destination);
         
         if (status === "success" || status === "ask_checkout") {
+          // Futuristic Success Sweep (Sci-Fi confirmation)
           osc.type = "sine";
-          osc.frequency.setValueAtTime(600, audioCtx.currentTime);
-          osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.3);
-          gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+          osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.15); // Sweep up 2 octaves rapidly
+          gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
+          gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
           osc.start(audioCtx.currentTime);
-          osc.stop(audioCtx.currentTime + 0.3);
+          osc.stop(audioCtx.currentTime + 0.4);
+          
+          // Add a second harmonic oscillator for depth
+          const osc2 = audioCtx.createOscillator();
+          osc2.type = "triangle";
+          osc2.connect(gain);
+          osc2.frequency.setValueAtTime(880, audioCtx.currentTime);
+          osc2.frequency.exponentialRampToValueAtTime(3520, audioCtx.currentTime + 0.15);
+          osc2.start(audioCtx.currentTime);
+          osc2.stop(audioCtx.currentTime + 0.4);
+          
         } else if (status === "spoof" || status === "locked" || status === "spoof_detected") {
-          osc.type = "square";
-          osc.frequency.setValueAtTime(250, audioCtx.currentTime);
-          osc.frequency.setValueAtTime(220, audioCtx.currentTime + 0.3);
-          gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+          // Harsh Sci-Fi Denial Buzz
+          osc.type = "sawtooth";
+          osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+          osc.frequency.linearRampToValueAtTime(80, audioCtx.currentTime + 0.3); // Pitch down
+          gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
           gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
           osc.start(audioCtx.currentTime);
           osc.stop(audioCtx.currentTime + 0.3);
         } else if (status === "unknown" || status === "needs_qr" || status === "location_error" || status === "maintenance" || status === "no_employees") {
+          // Warning/Error Double Beep
           osc.type = "square";
-          osc.frequency.setValueAtTime(400, audioCtx.currentTime);
-          gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+          osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+          osc.frequency.setValueAtTime(250, audioCtx.currentTime + 0.15);
+          gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+          gain.gain.setValueAtTime(0.15, audioCtx.currentTime + 0.15);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
           osc.start(audioCtx.currentTime);
-          osc.stop(audioCtx.currentTime + 0.2);
+          osc.stop(audioCtx.currentTime + 0.25);
         }
       } catch (err) {
         console.error("Audio beep failed:", err);
@@ -256,7 +279,12 @@ export default function KioskPage() {
     setScanFeedback(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" }
+        video: { 
+          width: { ideal: 1280 }, 
+          height: { ideal: 720 }, 
+          facingMode: "user",
+          advanced: [{ focusMode: "continuous" } as any]
+        }
       });
       streamRef.current = stream;
       
@@ -362,6 +390,7 @@ export default function KioskPage() {
       
       const track = streamRef.current?.getVideoTracks()[0];
       if (brightness < 60) {
+        setLowLight(true);
         if (track) {
           try {
              if (track.getCapabilities && (track.getCapabilities() as any).torch) {
@@ -374,6 +403,7 @@ export default function KioskPage() {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         ctx.filter = "none";
       } else {
+        setLowLight(false);
         if (track) {
           try {
              if (track.getCapabilities && (track.getCapabilities() as any).torch) {
@@ -884,32 +914,46 @@ export default function KioskPage() {
           {/* Camera Frame Frame */}
           <div className={`relative aspect-[3/4] md:aspect-video rounded-2xl overflow-hidden bg-black border border-zinc-100 shadow-sm ${kioskActive ? "block" : "hidden"}`}>
             
-            {/* Native Video player (Centrally mounted) */}
-            <video
-              ref={videoRef}
-              className="w-full h-full object-cover scale-x-[-1]"
-              autoPlay playsInline muted
-            />
+            {/* Software Front Flash */}
+            <div className={`absolute inset-0 z-50 bg-white mix-blend-overlay transition-opacity duration-300 pointer-events-none ${lowLight ? 'opacity-100' : 'opacity-0'}`} />
+            <div className={`absolute inset-0 z-50 shadow-[inset_0_0_100px_100px_rgba(255,255,255,0.9)] transition-opacity duration-300 pointer-events-none ${lowLight ? 'opacity-100' : 'opacity-0'}`} />
 
-            {/* Bounding Box Overlay */}
-            {kioskActive && faceBbox && scanStatus !== "needs_qr" && (
-              <div 
-                className="absolute pointer-events-none z-20"
-                style={{
-                  left: `${(((videoRef.current?.videoWidth || 640) - faceBbox[2]) / (videoRef.current?.videoWidth || 640)) * 100}%`,
-                  top: `${(faceBbox[1] / (videoRef.current?.videoHeight || 360)) * 100}%`,
-                  width: `${((faceBbox[2] - faceBbox[0]) / (videoRef.current?.videoWidth || 640)) * 100}%`,
-                  height: `${((faceBbox[3] - faceBbox[1]) / (videoRef.current?.videoHeight || 360)) * 100}%`,
-                  transition: "all 0.2s ease-out",
-                }}
-              >
-                <div className={`absolute inset-0 border-2 rounded-xl ${boxBorderColor} ${boxGlow} transition-all duration-300`}>
-                  <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-0.5 rounded text-[8.5px] font-mono font-bold tracking-wider uppercase whitespace-nowrap shadow-md ${labelBg} transition-all duration-300`}>
-                    {labelText}
+            {/* Video Wrapper for Digital Auto-Zoom */}
+            <div 
+              className="absolute inset-0 transition-transform duration-500 ease-out origin-center"
+              style={{
+                transform: faceBbox && scanStatus !== "needs_qr" 
+                  ? `scale(1.2) translate(${50 - (((faceBbox[0] + faceBbox[2]) / 2) / (videoRef.current?.videoWidth || 640)) * 100}%, ${50 - (((faceBbox[1] + faceBbox[3]) / 2) / (videoRef.current?.videoHeight || 360)) * 100}%)` 
+                  : "scale(1) translate(0, 0)"
+              }}
+            >
+              {/* Native Video player (Centrally mounted) */}
+              <video
+                ref={videoRef}
+                className="w-full h-full object-cover scale-x-[-1]"
+                autoPlay playsInline muted
+              />
+
+              {/* Bounding Box Overlay */}
+              {kioskActive && faceBbox && scanStatus !== "needs_qr" && (
+                <div 
+                  className="absolute pointer-events-none z-20"
+                  style={{
+                    left: `${(((videoRef.current?.videoWidth || 640) - faceBbox[2]) / (videoRef.current?.videoWidth || 640)) * 100}%`,
+                    top: `${(faceBbox[1] / (videoRef.current?.videoHeight || 360)) * 100}%`,
+                    width: `${((faceBbox[2] - faceBbox[0]) / (videoRef.current?.videoWidth || 640)) * 100}%`,
+                    height: `${((faceBbox[3] - faceBbox[1]) / (videoRef.current?.videoHeight || 360)) * 100}%`,
+                    transition: "all 0.2s ease-out",
+                  }}
+                >
+                  <div className={`absolute inset-0 border-2 rounded-xl ${boxBorderColor} ${boxGlow} transition-all duration-300`}>
+                    <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-0.5 rounded text-[8.5px] font-mono font-bold tracking-wider uppercase whitespace-nowrap shadow-md ${labelBg} transition-all duration-300`}>
+                      {labelText}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Scanning overlay: active standby state */}
             {kioskActive && scanStatus === "idle" && (
