@@ -175,11 +175,16 @@ def get_employee_attendance_history(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(checker_view)
+    current_user: models.User = Depends(security.get_current_user)
 ):
     emp = crud.get_employee_by_id(db, employee_id)
     if not emp or emp.company_id != current_user.company_id:
         raise HTTPException(status_code=404, detail="Employee not found")
+
+    role_name = current_user.role.name if current_user.role else "Employee"
+    if role_name == "Employee":
+        if not current_user.employee or current_user.employee.id != employee_id:
+            raise HTTPException(status_code=403, detail="Not authorized to view other employee records")
 
     if not start_date:
         start_date = date.today() - timedelta(days=30)

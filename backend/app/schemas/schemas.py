@@ -26,13 +26,6 @@ class UserUpdate(BaseModel):
     role_id: Optional[int] = None
     is_active: Optional[bool] = None
 
-class UserOut(UserBase):
-    id: int
-    is_active: bool
-    role_id: int
-    role: RoleOut
-    created_at: Optional[datetime] = None
-    model_config = ConfigDict(from_attributes=True)
 
 # Token Schemas
 class Token(BaseModel):
@@ -144,6 +137,16 @@ class EmployeeOut(EmployeeBase):
     images: List[EmployeeImageOut] = []
     created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
+
+class UserOut(UserBase):
+    id: int
+    is_active: bool
+    role_id: int
+    role: RoleOut
+    employee: Optional[EmployeeOut] = None
+    created_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
 
 # Face Embedding Schemas
 class FaceEmbeddingBase(BaseModel):

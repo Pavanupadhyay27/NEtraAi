@@ -4,14 +4,15 @@ import React from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ReactECharts from "echarts-for-react";
 import SidebarLayout from "@/components/SidebarLayout";
-import { fetchApi, getAccessToken, getBackendUrl, parseDateTime, getLocalDateString } from "@/app/utils/api";
+import { fetchApi, getAccessToken, getBackendUrl, parseDateTime, getLocalDateString, getUserProfile } from "@/app/utils/api";
 import { 
   Users, UserCheck, UserMinus, Clock, TrendingUp, Activity,
   ArrowRight, AlertTriangle, CheckCircle, Zap, ShieldAlert,
-  Calendar, Award, Server, Cpu, X, Search
+  Calendar, Award, Server, Cpu, X, Search, Camera, Fingerprint, QrCode, Loader2, Play, Volume2, VolumeX, Shield, Clock as ClockIcon
 } from "lucide-react";
 import Link from "next/link";
 import AttendanceHeatmap from "@/components/AttendanceHeatmap";
+import jsQR from "jsqr";
 
 // Pure SVG sparkline helper for premium look
 function Sparkline({ color, data }: { color: string; data: number[] }) {
@@ -219,7 +220,375 @@ function TeammateAvatar({ emp, size = "md" }: { emp: any; size?: "sm" | "md" }) 
   );
 }
 
+function playLocalBeep(status: string) {
+  if (typeof window !== "undefined") {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const audioCtx = new AudioContextClass();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      
+      if (status === "success") {
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(1108.73, audioCtx.currentTime + 0.1);
+        osc.frequency.setValueAtTime(1318.51, audioCtx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.4);
+      } else {
+        osc.type = "square";
+        osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(250, audioCtx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.25);
+      }
+    } catch (e) {}
+  }
+}
+
+function EmployeeDashboardView({ profile }: { profile: any }) {
+  const queryClient = useQueryClient();
+  const employee = profile?.employee;
+  const [cameraActive, setCameraActive] = React.useState(false);
+  const [coords, setCoords] = React.useState<{ latitude: number | null; longitude: number | null }>({ latitude: null, longitude: null });
+  const [scanStatus, setScanStatus] = React.useState<"idle" | "scanning" | "success" | "error">("idle");
+  const [scanMessage, setScanMessage] = React.useState<string | null>(null);
+  const [lastScanResult, setLastScanResult] = React.useState<any>(null);
+  
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  const streamRef = React.useRef<MediaStream | null>(null);
+  const scanIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
+  const scanningRef = React.useRef(false);
+
+  // Watch geolocation
+  React.useEffect(() => {
+    if (typeof window !== "undefined" && navigator.geolocation) {
+      const geoId = navigator.geolocation.watchPosition(
+        (pos) => {
+          setCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+        },
+        (err) => console.error("Employee GPS error:", err),
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+      );
+      return () => navigator.geolocation.clearWatch(geoId);
+    }
+  }, []);
+
+  // Fetch own attendance history
+  const { data: history, isLoading: loadingHistory } = useQuery({
+    queryKey: ["employee-history", employee?.id],
+    queryFn: () => fetchApi(`/attendance/employee/${employee?.id}`),
+    enabled: !!employee?.id
+  });
+
+  const startCamera = async () => {
+    setScanStatus("scanning");
+    setScanMessage("Initializing camera...");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480, facingMode: "user" }
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(() => {});
+      }
+      setCameraActive(true);
+      setScanMessage("Camera active. Align face to scan.");
+
+      scanIntervalRef.current = setInterval(captureFrame, 1500);
+    } catch (err) {
+      setScanStatus("error");
+      setScanMessage("Camera access denied. Please grant webcam permissions.");
+    }
+  };
+
+  const stopCamera = () => {
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraActive(false);
+    setScanStatus("idle");
+    setScanMessage(null);
+  };
+
+  const captureFrame = async () => {
+    if (scanningRef.current || !videoRef.current || !canvasRef.current) return;
+    scanningRef.current = true;
+    
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx || video.readyState < 2) {
+      scanningRef.current = false;
+      return;
+    }
+
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    const base64 = canvas.toDataURL("image/jpeg", 0.85);
+
+    try {
+      const payload: any = {
+        image: base64,
+        camera: "Employee Web Dashboard",
+        latitude: coords.latitude,
+        longitude: coords.longitude
+      };
+      
+      const res = await fetch(`${getBackendUrl()}/kiosk/scan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!res.ok) throw new Error("Attendance service unreachable");
+      const data = await res.json();
+
+      if (data.status === "success") {
+        playLocalBeep("success");
+        setScanStatus("success");
+        setScanMessage(`Check-in successful: ${data.attendance?.status || "Present"}`);
+        setLastScanResult(data);
+        queryClient.invalidateQueries({ queryKey: ["employee-history", employee?.id] });
+        setTimeout(stopCamera, 3000);
+      } else if (data.status === "location_error") {
+        playLocalBeep("error");
+        setScanStatus("error");
+        setScanMessage(data.message || "Location verification failed.");
+      } else if (data.status === "unknown" || data.status === "spoof_detected" || data.status === "no_face") {
+        // Continue scanning but show feedback
+        setScanMessage(data.message || "Verification failed. Retrying...");
+      }
+    } catch (err: any) {
+      setScanMessage("Network or scan service error. Retrying...");
+    } finally {
+      scanningRef.current = false;
+    }
+  };
+
+  // Quick calculations
+  const todayRecord = history?.find((h: any) => h.date === getLocalDateString());
+  const thisMonthPresent = history?.filter((h: any) => ["Present", "Late", "WFH"].includes(h.status)).length || 0;
+  const thisMonthHours = history?.reduce((acc: number, cur: any) => acc + (cur.working_hours || 0), 0).toFixed(1) || "0.0";
+
+  return (
+    <div className="space-y-6 page-enter max-w-6xl mx-auto text-slate-800">
+      {/* Welcome Header */}
+      <div className="pb-5 border-b border-zinc-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Welcome, {employee?.name || profile?.email}</h1>
+          <p className="text-xs text-slate-400 mt-1">
+            {employee?.designation || "Staff Member"} &bull; {employee?.department?.name || "General"}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-xs font-semibold font-mono text-slate-450 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl">
+          <ClockIcon className="w-3.5 h-3.5" />
+          <span>Shift: {employee?.shift?.name || "Regular Shift"} ({employee?.shift?.start_time || "09:00"} - {employee?.shift?.end_time || "17:00"})</span>
+        </div>
+      </div>
+
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        {/* Attendance Scanner & Quick Stats */}
+        <div className="lg:col-span-7 space-y-6">
+          
+          {/* Geolocation Lock Warning */}
+          {coords.latitude === null && (
+            <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl flex items-center gap-2.5 text-[11px] font-medium leading-relaxed">
+              <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 animate-bounce" />
+              <span>
+                <strong>GPS Coordinates Missing:</strong> Please enable location services/GPS permission in your browser to check in.
+              </span>
+            </div>
+          )}
+
+          {/* Premium Embedded Scanner Box */}
+          <div className="glass-card border border-slate-200 rounded-2xl overflow-hidden shadow-xs p-6 bg-white flex flex-col items-center justify-center min-h-[320px] relative">
+            <canvas ref={canvasRef} className="hidden" />
+            
+            {cameraActive ? (
+              <div className="w-full max-w-sm rounded-xl overflow-hidden border border-slate-250 bg-slate-950 aspect-video relative group shadow-inner">
+                <video ref={videoRef} className="w-full h-full object-cover scale-x-[-1]" muted playsInline />
+                
+                {/* Glowing Scanning Reticle overlay */}
+                <div className="absolute inset-0 border-[2px] border-cyan-400/30 m-6 pointer-events-none rounded-lg flex items-center justify-center">
+                  <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent absolute animate-laser" />
+                </div>
+
+                <button 
+                  onClick={stopCamera} 
+                  className="absolute bottom-3 right-3 bg-black/60 hover:bg-black/80 text-white rounded-lg px-2.5 py-1 text-[10px] font-extrabold cursor-pointer transition-all uppercase tracking-wider"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center text-center p-6 space-y-4">
+                <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 shadow-2xs group-hover:scale-105 transition-all">
+                  <Camera className="w-8 h-8 text-slate-450" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-slate-900">Mark Your Attendance</h3>
+                  <p className="text-xs text-slate-450 max-w-xs leading-normal">
+                    Secure check-in and check-out via automatic facial alignment and GPS geofence locking.
+                  </p>
+                </div>
+                <button
+                  onClick={startCamera}
+                  disabled={coords.latitude === null}
+                  className={`px-6 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 flex items-center gap-2 cursor-pointer ${
+                    coords.latitude === null 
+                      ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed" 
+                      : "bg-slate-900 hover:bg-slate-800 text-white"
+                  }`}
+                >
+                  <Fingerprint className="w-4 h-4" />
+                  Start Biometric Verification
+                </button>
+              </div>
+            )}
+
+            {/* Scan Feedback Banner */}
+            {scanMessage && (
+              <div className={`mt-4 px-4 py-2 rounded-xl text-xs font-semibold text-center border animate-fadeInUp flex items-center gap-2 ${
+                scanStatus === "success" 
+                  ? "bg-emerald-50 border-emerald-250 text-emerald-700" 
+                  : scanStatus === "error" 
+                    ? "bg-rose-50 border-rose-250 text-rose-700" 
+                    : "bg-slate-50 border-slate-200 text-slate-600"
+              }`}>
+                {scanStatus === "scanning" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {scanStatus === "success" && <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />}
+                {scanStatus === "error" && <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />}
+                <span>{scanMessage}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Stats Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-2xs space-y-1">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Today's Status</span>
+              <p className="text-base font-bold text-slate-800 mt-1">
+                {todayRecord ? (
+                  <span className={`inline-block text-[11px] font-mono px-2 py-0.5 rounded border ${
+                    todayRecord.status === "Present" 
+                      ? "bg-emerald-50 border-emerald-150 text-emerald-700" 
+                      : todayRecord.status === "Late" 
+                        ? "bg-amber-50 border-amber-150 text-amber-700" 
+                        : "bg-blue-50 border-blue-150 text-blue-700"
+                  }`}>
+                    {todayRecord.status} ({todayRecord.check_in ? new Date(todayRecord.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"})
+                  </span>
+                ) : (
+                  <span className="text-slate-400 text-xs font-semibold">Not Checked In</span>
+                )}
+              </p>
+            </div>
+            <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-2xs space-y-1">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Days Present (Month)</span>
+              <p className="text-xl font-extrabold text-slate-900">{thisMonthPresent} Days</p>
+            </div>
+            <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-2xs space-y-1">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Hours Logged (Month)</span>
+              <p className="text-xl font-extrabold text-slate-900">{thisMonthHours} hrs</p>
+            </div>
+          </div>
+
+        </div>
+
+        {/* History Logs Table */}
+        <div className="lg:col-span-5">
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs h-full flex flex-col min-h-[400px]">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Attendance Logs</h3>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {loadingHistory ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex justify-between items-center py-2 border-b border-slate-50">
+                    <div className="space-y-1.5 flex-1">
+                      <div className="skeleton h-3 w-28" />
+                      <div className="skeleton h-2 w-20" />
+                    </div>
+                    <div className="skeleton h-5 w-14 rounded-lg" />
+                  </div>
+                ))
+              ) : history && history.length > 0 ? (
+                history.map((record: any) => {
+                  const checkInTime = record.check_in ? new Date(record.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—";
+                  const checkOutTime = record.check_out ? new Date(record.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—";
+                  return (
+                    <div key={record.id} className="flex justify-between items-center py-2.5 border-b border-slate-100 hover:bg-slate-50/50 px-2 rounded-xl transition-all">
+                      <div className="space-y-1">
+                        <p className="text-xs font-bold text-slate-800">
+                          {new Date(record.date).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-mono">
+                          In: {checkInTime} &bull; Out: {checkOutTime}
+                        </p>
+                      </div>
+                      <span className={`text-[9px] font-mono px-2 py-0.5 rounded border font-semibold ${
+                        record.status === "Present"
+                          ? "bg-emerald-50 border-emerald-150 text-emerald-700"
+                          : record.status === "Late"
+                            ? "bg-amber-50 border-amber-150 text-amber-700"
+                            : record.status === "WFH"
+                              ? "bg-blue-50 border-blue-150 text-blue-700"
+                              : "bg-rose-50 border-rose-150 text-rose-700"
+                      }`}>
+                        {record.status}
+                      </span>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="h-full flex items-center justify-center text-center py-12 text-slate-400 text-xs font-medium">
+                  No attendance records found for this period.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
+  const profile = getUserProfile();
+  const isEmployee = profile?.role?.name === "Employee";
+
+  if (isEmployee) {
+    return (
+      <SidebarLayout>
+        <EmployeeDashboardView profile={profile} />
+      </SidebarLayout>
+    );
+  }
+
   const [currentTime, setCurrentTime] = React.useState("");
   const [currentDate, setCurrentDate] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<"ALL" | "MATCHED" | "UNKNOWN" | "SPOOF">("ALL");

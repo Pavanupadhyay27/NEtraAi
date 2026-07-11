@@ -159,8 +159,10 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
   };
 
   const initials = user?.email ? user.email[0].toUpperCase() : "A";
-
-  return (
+  const isEmployee = user?.role?.name === "Employee";
+  const visibleNavItems = isEmployee 
+    ? navItems.filter(item => item.href === "/dashboard") 
+    : navItems;
     <div className="min-h-screen flex bg-[var(--bg-base)] text-[var(--text-primary)] font-sans relative">
       {/* Ambient background */}
       <div className="ambient-bg" />
@@ -239,7 +241,7 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
 
           {/* Navigation */}
           <nav className="flex-1 space-y-0.5">
-            {navItems.map((item) => (
+            {visibleNavItems.map((item) => (
               <NavLink
                 key={item.href}
                 item={item}
@@ -248,39 +250,41 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
               />
             ))}
             
-            <NavLink
-              item={{ name: "Organizations", href: "/tenants", icon: Building2 }}
-              isActive={pathname.startsWith("/tenants")}
-              isCollapsed={isCollapsed}
-            />
+            {!isEmployee && (
+              <>
+                <NavLink
+                  item={{ name: "Organizations", href: "/tenants", icon: Building2 }}
+                  isActive={pathname.startsWith("/tenants")}
+                  isCollapsed={isCollapsed}
+                />
 
-            {/* Separator */}
-            <div className="my-3 border-t border-[var(--border-subtle)]" />
+                {/* Separator */}
+                <div className="my-3 border-t border-[var(--border-subtle)]" />
 
-            {/* Kiosk Launch */}
-            <a
-              href="/kiosk"
-              target="_blank"
-              rel="noopener noreferrer"
-              data-tooltip={isCollapsed ? "Launch Kiosk" : undefined}
-              className={`group flex items-center ${isCollapsed ? "justify-center px-2" : "gap-3 px-3"} py-2.5 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--border-subtle)] transition-all duration-200`}
-            >
-              <div className="w-8 h-8 rounded-lg bg-[var(--border-subtle)] flex items-center justify-center group-hover:bg-[var(--text-primary)] transition-all">
-                <Monitor className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[var(--bg-base)]" />
-              </div>
-              {!isCollapsed && (
-                <>
-                  <div className="flex-1">
-                    <p className="text-sm">Launch Kiosk</p>
+                {/* Kiosk Launch */}
+                <a
+                  href="/kiosk"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-tooltip={isCollapsed ? "Launch Kiosk" : undefined}
+                  className={`group flex items-center ${isCollapsed ? "justify-center px-2" : "gap-3 px-3"} py-2.5 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--border-subtle)] transition-all duration-200`}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-[var(--border-subtle)] flex items-center justify-center group-hover:bg-[var(--text-primary)] transition-all">
+                    <Monitor className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[var(--bg-base)]" />
                   </div>
-                  <span className="text-[9px] font-mono text-[var(--text-secondary)] bg-[var(--border-subtle)] px-1.5 py-0.5 rounded uppercase tracking-wider font-semibold">
-                    Live
-                  </span>
-                </>
-              )}
-            </a>
-
-
+                  {!isCollapsed && (
+                    <>
+                      <div className="flex-1">
+                        <p className="text-sm">Launch Kiosk</p>
+                      </div>
+                      <span className="text-[9px] font-mono text-[var(--text-secondary)] bg-[var(--border-subtle)] px-1.5 py-0.5 rounded uppercase tracking-wider font-semibold">
+                        Live
+                      </span>
+                    </>
+                  )}
+                </a>
+              </>
+            )}
           </nav>
 
           {/* User Profile Footer */}
@@ -399,7 +403,7 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
 
           <nav className="flex-1 overflow-y-auto space-y-1 p-4">
             <div className="mb-2 px-3 text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase">Menu</div>
-            {navItems.map((item) => (
+            {visibleNavItems.map((item) => (
               <NavLink
                 key={item.href}
                 item={item}
@@ -409,18 +413,22 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
               />
             ))}
             
-            <div className="mt-6 mb-2 px-3 text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase">System</div>
-            <a
-              href="/kiosk"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 px-3 py-3 rounded-xl text-[var(--text-secondary)] hover:text-white hover:bg-slate-800 transition-all border border-transparent hover:border-slate-700 shadow-sm"
-            >
-              <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
-                <Monitor className="w-4 h-4 text-cyan-400" />
-              </div>
-              <span className="text-sm font-medium">Launch Kiosk</span>
-            </a>
+            {!isEmployee && (
+              <>
+                <div className="mt-6 mb-2 px-3 text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase">System</div>
+                <a
+                  href="/kiosk"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 px-3 py-3 rounded-xl text-[var(--text-secondary)] hover:text-white hover:bg-slate-800 transition-all border border-transparent hover:border-slate-700 shadow-sm"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
+                    <Monitor className="w-4 h-4 text-cyan-400" />
+                  </div>
+                  <span className="text-sm font-medium">Launch Kiosk</span>
+                </a>
+              </>
+            )}
           </nav>
 
           <div className="p-4 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)]">

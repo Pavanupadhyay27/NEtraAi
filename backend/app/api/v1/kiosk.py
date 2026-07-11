@@ -529,12 +529,24 @@ def scan_face(
             allowed_radius = 500.0
 
         if office_lat == 0.0 and office_lon == 0.0:
-            # Auto-lock global office coordinates on first valid scan if unconfigured!
-            crud.set_setting(db, "LOCATION_LATITUDE", str(payload.latitude), "Auto-locked Global Office Latitude")
-            crud.set_setting(db, "LOCATION_LONGITUDE", str(payload.longitude), "Auto-locked Global Office Longitude")
-            office_lat = payload.latitude
-            office_lon = payload.longitude
-            logger.info(f"Auto-locked Global Office Coordinates to {payload.latitude}, {payload.longitude}")
+            log_entry = crud.create_attendance_log(
+                db=db,
+                employee_id=employee.id,
+                camera=payload.camera,
+                confidence=similarity if 'similarity' in locals() else 1.0,
+                liveness_score=liveness_score if 'liveness_score' in locals() else 1.0,
+                is_spoof=False,
+                status="Location Config Error",
+                timestamp=now,
+                location_text=location_text, latitude=payload.latitude, longitude=payload.longitude
+            )
+            _publish_log(log_entry, employee)
+            return {
+                "status": "location_error",
+                "message": "Office geofence coordinates are not configured by the administrator in settings.",
+                "should_retry": False,
+                "bbox": bbox_list
+            }
 
         dist = calculate_distance_meters(payload.latitude, payload.longitude, office_lat, office_lon)
         if dist > allowed_radius:
