@@ -76,26 +76,44 @@ export default function SettingsPage() {
             LOCATION_LONGITUDE: lon
           }));
           
-          // Save both settings
-          saveMutation.mutate({ key: "LOCATION_LATITUDE", value: lat });
-          saveMutation.mutate({ key: "LOCATION_LONGITUDE", value: lon });
-          
           try {
-            const url = `${getBackendUrl().replace('/api/v1', '')}/api/v1/kiosk/reverse-geocode?lat=${lat}&lng=${lon}`;
-            const res = await fetch(url);
-            if (res.ok) {
-              const data = await res.json();
-              if (data.address) {
-                setEditValues(prev => ({ ...prev, LOCATION_ADDRESS: data.address }));
-                saveMutation.mutate({ key: "LOCATION_ADDRESS", value: data.address });
+            // Save latitude
+            await fetchApi("/settings/LOCATION_LATITUDE", {
+              method: "PUT",
+              body: JSON.stringify({ value: lat })
+            });
+            // Save longitude
+            await fetchApi("/settings/LOCATION_LONGITUDE", {
+              method: "PUT",
+              body: JSON.stringify({ value: lon })
+            });
+            
+            // Try to reverse geocode and save address
+            try {
+              const url = `${getBackendUrl().replace('/api/v1', '')}/api/v1/kiosk/reverse-geocode?lat=${lat}&lng=${lon}`;
+              const res = await fetch(url);
+              if (res.ok) {
+                const data = await res.json();
+                if (data.address) {
+                  setEditValues(prev => ({ ...prev, LOCATION_ADDRESS: data.address }));
+                  await fetchApi("/settings/LOCATION_ADDRESS", {
+                    method: "PUT",
+                    body: JSON.stringify({ value: data.address })
+                  });
+                }
               }
+            } catch (err) {
+              console.error("Failed to fetch address", err);
             }
-          } catch (err) {
-            console.error("Failed to fetch address", err);
+
+            queryClient.invalidateQueries({ queryKey: ["settings"] });
+            toast.success("Coordinates updated to current location!");
+          } catch (err: any) {
+            console.error("Failed to save location settings:", err);
+            toast.error("Failed to save location coordinates.");
+          } finally {
+            setFetchingGps(false);
           }
-          
-          toast.success("Coordinates updated to current location!");
-          setFetchingGps(false);
         },
         (err) => {
           console.error("GPS error:", err);
