@@ -655,7 +655,11 @@ export default function EnrollPage() {
     setSuccessMsg(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720, facingMode: "user" }
+        video: { 
+          width: { ideal: 1280 }, 
+          height: { ideal: 720 }, 
+          facingMode: "user" 
+        }
       });
       streamRef.current = stream;
       if (videoRef.current) {
@@ -777,6 +781,17 @@ export default function EnrollPage() {
     await startWebcam();
   };
 
+  // Standard Base64 to Blob helper
+  const base64ToBlob = (base64Data: string, contentType = "image/jpeg") => {
+    const byteString = atob(base64Data.split(",")[1]);
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([ab], { type: contentType });
+  };
+
   // Sequential batch upload to FastAPI backend
   const saveBiometricProfile = async () => {
     setCaptureState("saving");
@@ -795,8 +810,7 @@ export default function EnrollPage() {
 
       try {
         // Convert base64 data url to blob
-        const resBlob = await fetch(base64);
-        const blob = await resBlob.blob();
+        const blob = base64ToBlob(base64, "image/jpeg");
 
         const fd = new FormData();
         fd.append("employee_id", employeeId as string);
@@ -875,8 +889,11 @@ export default function EnrollPage() {
           }
           .scanner-target {
             position: absolute;
-            width: 260px;
-            height: 260px;
+            width: 65%;
+            height: auto;
+            aspect-ratio: 1 / 1;
+            max-width: 260px;
+            max-height: 260px;
             border: 1px dashed rgba(34, 211, 238, 0.4);
             border-radius: 50%;
             animation: pulse-ring 2.5s ease-in-out infinite;
@@ -1102,7 +1119,7 @@ export default function EnrollPage() {
             </div>
 
             {/* Video stream container with Cybernetic HUD */}
-            <div className="relative aspect-video w-full max-w-3xl rounded-3xl overflow-hidden bg-black border border-slate-950 shadow-2xl">
+            <div className="relative aspect-[3/4] md:aspect-video w-full max-w-3xl rounded-3xl overflow-hidden bg-black border border-slate-950 shadow-2xl">
               
               {/* Native video element */}
               <video

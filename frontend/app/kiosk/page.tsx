@@ -800,44 +800,68 @@ export default function KioskPage() {
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-slate-500/5 blur-[120px] pointer-events-none rounded-full" />
 
       {/* ─── Top HUD Bar ─── */}
-      <header className="relative z-30 h-14 border-b border-[var(--border-medium)] px-6 flex items-center justify-between kiosk-header">
-        {/* Brand info */}
-        <div className="flex items-center gap-2.5 animate-fadeInUp">
-          <div className="relative inline-flex items-center justify-center w-9 h-9 rounded-lg bg-slate-900 border border-slate-700/80 shadow-[0_0_12px_rgba(6,182,212,0.2)] overflow-hidden shrink-0">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.15)_0%,transparent_70%)] animate-pulse" />
-            <div className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 border border-white z-20" />
-            <svg viewBox="0 0 100 100" className="w-6 h-6 relative z-10 animate-fade-in" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="50" cy="50" r="45" stroke="#334155" strokeWidth="2" strokeDasharray="8 12" className="animate-rotate-ring" />
-              <circle cx="50" cy="50" r="40" stroke="#06b6d4" strokeWidth="1.5" strokeDasharray="30 15" className="animate-rotate-ring-reverse" style={{ opacity: 0.8 }} />
-              <path d="M15 50 C 30 25, 70 25, 85 50 C 70 75, 30 75, 15 50 Z" stroke="#64748b" strokeWidth="2.5" />
-              <g className="animate-eye-lid">
-                <circle cx="50" cy="50" r="22" fill="#1e293b" stroke="#06b6d4" strokeWidth="2" />
-                <circle cx="50" cy="50" r="7" fill="#22d3ee" className="animate-pupil" />
-              </g>
-              <line x1="15" y1="50" x2="85" y2="50" stroke="#22d3ee" strokeWidth="2" className="animate-laser" />
-            </svg>
+      <header className="relative z-30 min-h-14 py-2 md:py-0 md:h-14 border-b border-[var(--border-medium)] px-4 md:px-6 flex flex-col md:flex-row items-center justify-between gap-3 md:gap-0 kiosk-header">
+        <div className="flex items-center justify-between w-full md:w-auto">
+          {/* Brand info */}
+          <div className="flex items-center gap-2.5 animate-fadeInUp">
+            <div className="relative inline-flex items-center justify-center w-9 h-9 rounded-lg bg-slate-900 border border-slate-700/80 shadow-[0_0_12px_rgba(6,182,212,0.2)] overflow-hidden shrink-0">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.15)_0%,transparent_70%)] animate-pulse" />
+              <div className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 border border-white z-20" />
+              <svg viewBox="0 0 100 100" className="w-6 h-6 relative z-10 animate-fade-in" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="50" cy="50" r="45" stroke="#334155" strokeWidth="2" strokeDasharray="8 12" className="animate-rotate-ring" />
+                <circle cx="50" cy="50" r="40" stroke="#06b6d4" strokeWidth="1.5" strokeDasharray="30 15" className="animate-rotate-ring-reverse" style={{ opacity: 0.8 }} />
+                <path d="M15 50 C 30 25, 70 25, 85 50 C 70 75, 30 75, 15 50 Z" stroke="#64748b" strokeWidth="2.5" />
+                <g className="animate-eye-lid">
+                  <circle cx="50" cy="50" r="22" fill="#1e293b" stroke="#06b6d4" strokeWidth="2" />
+                  <circle cx="50" cy="50" r="7" fill="#22d3ee" className="animate-pupil" />
+                </g>
+                <line x1="15" y1="50" x2="85" y2="50" stroke="#22d3ee" strokeWidth="2" className="animate-laser" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="font-bold text-[15px] tracking-tight text-[var(--text-primary)] leading-none">NetraID Kiosk</h1>
+              <p className="text-[9px] font-bold text-slate-500 font-mono mt-0.5 uppercase tracking-wider">{cameraLabel}</p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-bold text-[15px] tracking-tight text-[var(--text-primary)] leading-none">NetraID Kiosk</h1>
-            <p className="text-[9px] font-bold text-slate-500 font-mono mt-0.5 uppercase tracking-wider">{cameraLabel}</p>
+
+          {/* Controls on mobile */}
+          <div className="flex items-center gap-2 md:hidden">
+            <button
+              onClick={() => setVoiceEnabled(!voiceEnabled)}
+              title={voiceEnabled ? "Mute audio assistance" : "Enable audio assistance"}
+              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                voiceEnabled
+                  ? "bg-zinc-950 border-zinc-950 text-white"
+                  : "bg-slate-50 border-slate-200 text-slate-400"
+              }`}
+            >
+              {voiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={toggleFullscreen}
+              title="Fullscreen toggle"
+              className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-500 hover:text-slate-800 transition-all cursor-pointer"
+            >
+              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+            </button>
           </div>
         </div>
 
         {/* Clock & GPS Indicator */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center gap-1 z-20">
-          <p className="text-base font-bold font-mono tracking-tight text-[var(--text-primary)] leading-none tabular-nums">
+        <div className="flex flex-row md:flex-col items-center justify-center gap-3 md:gap-1 z-20 md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2">
+          <p className="text-sm md:text-base font-bold font-mono tracking-tight text-[var(--text-primary)] leading-none tabular-nums">
             {currentTime || "00:00:00"}
           </p>
           {coords.latitude !== null && (
-            <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg border border-slate-700/50 bg-slate-900 text-[8.5px] font-mono text-slate-300 select-none animate-fadeIn flex-row shrink-0" title={`${coords.latitude.toFixed(6)}, ${coords.longitude?.toFixed(6)}`}>
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg border border-slate-700/50 bg-slate-900 text-[8px] md:text-[8.5px] font-mono text-slate-300 select-none animate-fadeIn flex-row shrink-0" title={`${coords.latitude.toFixed(6)}, ${coords.longitude?.toFixed(6)}`}>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <span className="max-w-[200px] truncate">GPS: {kioskAddress || `${coords.latitude.toFixed(4)}, ${coords.longitude?.toFixed(4)}`}</span>
+              <span className="max-w-[120px] md:max-w-[200px] truncate">{kioskAddress || `${coords.latitude.toFixed(4)}, ${coords.longitude?.toFixed(4)}`}</span>
             </div>
           )}
         </div>
 
-        {/* Controls */}
-        <div className="flex items-center gap-2">
+        {/* Controls on desktop */}
+        <div className="hidden md:flex items-center gap-2">
           <button
             onClick={() => setVoiceEnabled(!voiceEnabled)}
             title={voiceEnabled ? "Mute audio assistance" : "Enable audio assistance"}
