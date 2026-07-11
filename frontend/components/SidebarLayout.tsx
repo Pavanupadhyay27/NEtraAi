@@ -163,6 +163,8 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
   const visibleNavItems = isEmployee 
     ? navItems.filter(item => item.href === "/dashboard") 
     : navItems;
+
+  return (
     <div className="min-h-screen flex bg-[var(--bg-base)] text-[var(--text-primary)] font-sans relative">
       {/* Ambient background */}
       <div className="ambient-bg" />
