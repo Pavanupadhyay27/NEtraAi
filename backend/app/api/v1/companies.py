@@ -83,3 +83,27 @@ def update_company(
         details=details
     )
     return updated
+
+@router.delete("/{id}")
+def delete_company(
+    request: Request,
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(checker_super)
+):
+    db_company = crud.get_company_by_id(db, id)
+    if not db_company:
+        raise HTTPException(status_code=404, detail="Company not found")
+        
+    db.delete(db_company)
+    db.commit()
+    
+    crud.create_audit_log(
+        db=db,
+        user_id=current_user.id,
+        action="Delete Company",
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+        details=f"De-onboarded / Deleted company ID: {id} and name: {db_company.name}"
+    )
+    return {"message": "Company deleted successfully"}

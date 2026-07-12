@@ -7,7 +7,7 @@ import { fetchApi } from "@/app/utils/api";
 import { useToast } from "@/app/utils/toast";
 import { 
   Building2, Plus, Edit2, ShieldAlert, CheckCircle2, 
-  Search, Shield, AlertTriangle, Users, Database, MapPin, Phone, Mail, Loader2
+  Search, Shield, AlertTriangle, Users, Database, MapPin, Phone, Mail, Loader2, Trash2
 } from "lucide-react";
 
 export default function TenantsPage() {
@@ -68,6 +68,29 @@ export default function TenantsPage() {
       toast.error(err.message || "Failed to update organization");
     }
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await fetchApi(`/companies/${id}`, {
+        method: "DELETE"
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tenants"] });
+      toast.success("Organization deleted successfully");
+      setShowEditModal(false);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to delete organization");
+    }
+  });
+
+  const handleDelete = () => {
+    if (!selectedTenant) return;
+    if (window.confirm(`Are you absolutely sure you want to delete ${selectedTenant.name}? This will permanently remove all associated employees, departments, shifts, settings, and logs. This action cannot be undone.`)) {
+      deleteMutation.mutate(selectedTenant.id);
+    }
+  };
 
   const resetForm = () => {
     setName("");
@@ -275,7 +298,7 @@ export default function TenantsPage() {
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400"
+                    className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400 bg-white text-slate-900"
                   />
                 </div>
                 <div className="space-y-1">
@@ -285,7 +308,7 @@ export default function TenantsPage() {
                     required
                     value={adminEmail}
                     onChange={(e) => setAdminEmail(e.target.value)}
-                    className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400"
+                    className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400 bg-white text-slate-900"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -296,7 +319,7 @@ export default function TenantsPage() {
                       required
                       value={maxEmployees}
                       onChange={(e) => setMaxEmployees(Number(e.target.value))}
-                      className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400"
+                      className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400 bg-white text-slate-900"
                     />
                   </div>
                   <div className="space-y-1">
@@ -306,7 +329,7 @@ export default function TenantsPage() {
                       required
                       value={availableTokens}
                       onChange={(e) => setAvailableTokens(Number(e.target.value))}
-                      className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400"
+                      className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400 bg-white text-slate-900"
                     />
                   </div>
                 </div>
@@ -316,7 +339,7 @@ export default function TenantsPage() {
                     type="text"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400"
+                    className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400 bg-white text-slate-900"
                   />
                 </div>
                 <div className="space-y-1">
@@ -325,7 +348,7 @@ export default function TenantsPage() {
                     type="text"
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400"
+                    className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400 bg-white text-slate-900"
                   />
                 </div>
                 <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
@@ -361,7 +384,7 @@ export default function TenantsPage() {
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
-                    className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400 bg-white"
+                    className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400 bg-white text-slate-900"
                   >
                     <option value="Active">Active</option>
                     <option value="Suspended">Suspended</option>
@@ -375,7 +398,7 @@ export default function TenantsPage() {
                     required
                     value={adminEmail}
                     onChange={(e) => setAdminEmail(e.target.value)}
-                    className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400"
+                    className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400 bg-white text-slate-900"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -386,7 +409,7 @@ export default function TenantsPage() {
                       required
                       value={maxEmployees}
                       onChange={(e) => setMaxEmployees(Number(e.target.value))}
-                      className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400"
+                      className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400 bg-white text-slate-900"
                     />
                   </div>
                   <div className="space-y-1">
@@ -396,7 +419,7 @@ export default function TenantsPage() {
                       required
                       value={availableTokens}
                       onChange={(e) => setAvailableTokens(Number(e.target.value))}
-                      className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400"
+                      className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400 bg-white text-slate-900"
                     />
                   </div>
                 </div>
@@ -406,7 +429,7 @@ export default function TenantsPage() {
                     type="text"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400"
+                    className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400 bg-white text-slate-900"
                   />
                 </div>
                 <div className="space-y-1">
@@ -415,10 +438,19 @@ export default function TenantsPage() {
                     type="text"
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400"
+                    className="w-full text-xs h-9 px-3 rounded-lg border border-slate-200 focus:outline-none focus:border-cyan-400 bg-white text-slate-900"
                   />
                 </div>
                 <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={deleteMutation.isPending}
+                    className="mr-auto px-3 py-1.5 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg cursor-pointer flex items-center gap-1.5 active:scale-95 transition-all"
+                  >
+                    {deleteMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    Delete Company
+                  </button>
                   <button
                     type="button"
                     onClick={() => setShowEditModal(false)}
