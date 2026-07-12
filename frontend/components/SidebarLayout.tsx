@@ -17,12 +17,14 @@ import {
   Scan,
   History,
   Sun,
-  Moon
+  Moon,
+  Building2
 } from "lucide-react";
 import { getAccessToken, getUserProfile, clearTokens } from "@/app/utils/api";
 
 const navItems = [
   { name: "Dashboard",       href: "/dashboard",  icon: LayoutDashboard },
+  { name: "Organizations",   href: "/tenants",    icon: Building2 },
   { name: "Attendance",      href: "/attendance", icon: Clock },
   { name: "Employees",       href: "/employees",  icon: Users },
   { name: "Reports",         href: "/reports",    icon: FileSpreadsheet },
@@ -139,6 +141,8 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
       // Auto-redirect employees to dashboard if they attempt to access any admin views
       if (profile?.role?.name === "Employee" && pathname !== "/dashboard") {
         router.push("/dashboard");
+      } else if (profile?.role?.name !== "Super Admin" && pathname === "/tenants") {
+        router.push("/dashboard");
       }
     }
   }, [router, pathname]);
@@ -164,9 +168,12 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
 
   const initials = user?.email ? user.email[0].toUpperCase() : "A";
   const isEmployee = user?.role?.name === "Employee";
+  const isSuperAdmin = user?.role?.name === "Super Admin";
   const visibleNavItems = isEmployee 
     ? navItems.filter(item => item.href === "/dashboard") 
-    : navItems;
+    : isSuperAdmin
+      ? navItems
+      : navItems.filter(item => item.href !== "/tenants");
 
   return (
     <div className="min-h-screen flex bg-[var(--bg-base)] text-[var(--text-primary)] font-sans relative">

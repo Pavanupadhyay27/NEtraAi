@@ -12,6 +12,34 @@ class RoleOut(RoleBase):
     id: int
     model_config = ConfigDict(from_attributes=True)
 
+# Company Schemas
+class CompanyBase(BaseModel):
+    name: str
+    status: Optional[str] = "Active"
+    max_employees: Optional[int] = 100
+    available_tokens: Optional[int] = 1000
+    tokens_used: Optional[int] = 0
+    admin_email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+
+class CompanyCreate(CompanyBase):
+    pass
+
+class CompanyUpdate(BaseModel):
+    name: Optional[str] = None
+    status: Optional[str] = None
+    max_employees: Optional[int] = None
+    available_tokens: Optional[int] = None
+    tokens_used: Optional[int] = None
+    admin_email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+
+class CompanyOut(CompanyBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
 # User Schemas
 class UserBase(BaseModel):
     email: EmailStr
@@ -132,6 +160,7 @@ class EmployeeImageOut(BaseModel):
 class EmployeeOut(EmployeeBase):
     id: int
     user_id: Optional[int] = None
+    company_id: Optional[int] = None
     department: Optional[DepartmentOut] = None
     shift: Optional[ShiftOut] = None
     images: List[EmployeeImageOut] = []
@@ -143,6 +172,8 @@ class UserOut(UserBase):
     is_active: bool
     role_id: int
     role: RoleOut
+    company_id: Optional[int] = None
+    company: Optional[CompanyOut] = None
     employee: Optional[EmployeeOut] = None
     created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)

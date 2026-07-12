@@ -20,7 +20,7 @@ def read_audit_logs(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(checker_view)
 ):
-    return crud.get_audit_logs(db, skip=skip, limit=limit)
+    return crud.get_audit_logs(db, company_id=current_user.company_id, skip=skip, limit=limit)
 
 @router.delete("/")
 def delete_all_audit_logs(
@@ -28,7 +28,7 @@ def delete_all_audit_logs(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(checker_view)
 ):
-    deleted_count = crud.clear_all_audit_logs(db)
+    deleted_count = crud.clear_all_audit_logs(db, company_id=current_user.company_id)
     
     # Audit log the deletion itself
     crud.create_audit_log(
@@ -37,7 +37,8 @@ def delete_all_audit_logs(
         action="Clear Audit Logs",
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
-        details=f"Cleared {deleted_count} system audit logs."
+        details=f"Cleared {deleted_count} system audit logs.",
+        company_id=current_user.company_id
     )
     
     return {"message": "Audit logs cleared successfully", "deleted_count": deleted_count}

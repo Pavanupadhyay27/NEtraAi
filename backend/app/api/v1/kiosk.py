@@ -398,6 +398,14 @@ def scan_face(
             }
         log_status_success = "Match Success"
 
+    if employee and employee.company and employee.company.status != "Active":
+        return {
+            "status": "locked",
+            "message": f"Verification denied. Your company account is {employee.company.status}.",
+            "should_retry": False,
+            "bbox": bbox_list
+        }
+
     if not employee or employee.status != "Active":
         # Inactive employee
         emp_id_to_log = employee.id if employee else (db_emb.employee_id if ('db_emb' in locals() and db_emb) else None)

@@ -16,7 +16,7 @@ from sqlalchemy import delete
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.init_db import init_db
-from app.api.v1 import auth, employees, departments, enrollment, kiosk, attendance, reports, analytics, settings as settings_api, audit
+from app.api.v1 import auth, employees, departments, enrollment, kiosk, attendance, reports, analytics, settings as settings_api, audit, companies
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -192,5 +192,6 @@ app.include_router(reports.router, prefix=f"{settings.API_V1_STR}/reports", tags
 app.include_router(analytics.router, prefix=f"{settings.API_V1_STR}/analytics", tags=["Dashboard Analytics"])
 app.include_router(settings_api.router, prefix=f"{settings.API_V1_STR}/settings", tags=["System Settings"])
 app.include_router(audit.router, prefix=f"{settings.API_V1_STR}/audit", tags=["System Audit Logs"])
+app.include_router(companies.router, prefix=f"{settings.API_V1_STR}/companies", tags=["Company Management"])
 # Trigger reload - reload 2
 

@@ -71,6 +71,13 @@ def get_current_user(
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
         
+    # Validate company status for lockout control
+    if user.company_id and user.company and user.company.status != "Active":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied: Your company account is {user.company.status}."
+        )
+        
     return user
 
 class RoleChecker:
@@ -113,6 +120,13 @@ def get_current_user_from_token(token: str, db: Session) -> models.User:
         raise credentials_exception
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
+        
+    # Validate company status for lockout control
+    if user.company_id and user.company and user.company.status != "Active":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied: Your company account is {user.company.status}."
+        )
         
     return user
 

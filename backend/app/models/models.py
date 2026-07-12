@@ -39,6 +39,26 @@ class SafeVector(TypeDecorator):
         except Exception:
             return value
 
+class Company(Base):
+    __tablename__ = "companies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), unique=True, nullable=False)
+    status = Column(String(50), default="Active")  # Active, Suspended, Deauthorized
+    max_employees = Column(Integer, default=100)
+    available_tokens = Column(Integer, default=1000)
+    tokens_used = Column(Integer, default=0)
+    admin_email = Column(String(255), nullable=True)
+    phone = Column(String(50), nullable=True)
+    address = Column(String(255), nullable=True)
+
+    users = relationship("User", back_populates="company", cascade="all, delete-orphan")
+    employees = relationship("Employee", back_populates="company", cascade="all, delete-orphan")
+    departments = relationship("Department", back_populates="company", cascade="all, delete-orphan")
+    shifts = relationship("Shift", back_populates="company", cascade="all, delete-orphan")
+    settings = relationship("Setting", back_populates="company", cascade="all, delete-orphan")
+    audit_logs = relationship("AuditLog", back_populates="company", cascade="all, delete-orphan")
+
 class Role(Base):
     __tablename__ = "roles"
 
@@ -56,10 +76,12 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=False)
+    company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
     role = relationship("Role", back_populates="users")
+    company = relationship("Company", back_populates="users")
     employee = relationship("Employee", back_populates="user", uselist=False)
     audit_logs = relationship("AuditLog", back_populates="user")
 
@@ -67,21 +89,35 @@ class Department(Base):
     __tablename__ = "departments"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), unique=True, nullable=False)
-    code = Column(String(20), unique=True, nullable=False)
+    name = Column(String(100), nullable=False)
+    code = Column(String(20), nullable=False)
     description = Column(String(255), nullable=True)
+    company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=True)
 
+    __table_args__ = (
+        UniqueConstraint("name", "company_id", name="uq_department_name_company"),
+        UniqueConstraint("code", "company_id", name="uq_department_code_company"),
+    )
+
+    company = relationship("Company", back_populates="departments")
     employees = relationship("Employee", back_populates="department")
 
 class Shift(Base):
     __tablename__ = "shifts"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), unique=True, nullable=False)
+    name = Column(String(100), nullable=False)
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
     grace_period_minutes = Column(Integer, default=15)
     description = Column(String(255), nullable=True)
+    company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("name", "company_id", name="uq_shift_name_company"),
+    )
+
+    company = relationship("Company", back_populates="shifts")
 
 class Employee(Base):
     __tablename__ = "employees"
@@ -97,6 +133,7 @@ class Employee(Base):
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
     shift_id = Column(Integer, ForeignKey("shifts.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, unique=True)
+    company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=True)
     allow_wfh = Column(Boolean, default=False)
     wfh_address = Column(String(255), nullable=True)
     wfh_lat = Column(Float, nullable=True)
@@ -104,6 +141,7 @@ class Employee(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
+    company = relationship("Company", back_populates="employees")
     department = relationship("Department", back_populates="employees")
     shift = relationship("Shift")
     user = relationship("User", back_populates="employee")
@@ -200,9 +238,16 @@ class Setting(Base):
     __tablename__ = "settings"
 
     id = Column(Integer, primary_key=True, index=True)
-    key = Column(String(100), unique=True, nullable=False)
+    key = Column(String(100), nullable=False)
     value = Column(Text, nullable=False)
     description = Column(String(255), nullable=True)
+    company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("key", "company_id", name="uq_setting_key_company"),
+    )
+
+    company = relationship("Company", back_populates="settings")
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
@@ -214,5 +259,7 @@ class AuditLog(Base):
     ip_address = Column(String(50), nullable=True)
     user_agent = Column(String(255), nullable=True)
     details = Column(Text, nullable=True)
+    company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=True)
 
+    company = relationship("Company", back_populates="audit_logs")
     user = relationship("User", back_populates="audit_logs")

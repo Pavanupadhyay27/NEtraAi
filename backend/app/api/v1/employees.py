@@ -29,7 +29,7 @@ def read_employees(
     current_user: models.User = Depends(checker_view)
 ):
     return crud.get_employees(
-        db, skip=skip, limit=limit, search=search, department_id=department_id, status=status
+        db, company_id=current_user.company_id, skip=skip, limit=limit, search=search, department_id=department_id, status=status
     )
 
 @router.get("/count")
@@ -40,7 +40,7 @@ def get_employee_count(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(checker_view)
 ):
-    count = crud.count_employees(db, search=search, department_id=department_id, status=status)
+    count = crud.count_employees(db, company_id=current_user.company_id, search=search, department_id=department_id, status=status)
     return {"count": count}
 
 @router.get("/{id}", response_model=schemas.EmployeeOut)
@@ -50,7 +50,7 @@ def read_employee(
     current_user: models.User = Depends(checker_view)
 ):
     db_emp = crud.get_employee_by_id(db, id=id)
-    if not db_emp:
+    if not db_emp or (current_user.company_id is not None and db_emp.company_id != current_user.company_id):
         raise HTTPException(status_code=404, detail="Employee not found")
     return db_emp
 
@@ -70,14 +70,14 @@ def create_employee(
     if existing_email:
         raise HTTPException(status_code=400, detail="Employee email already exists")
 
-    # Check duplicate name (case-insensitive)
-    existing_name = crud.get_employee_by_name(db, name=emp.name)
+    # Check duplicate name (case-insensitive, scoped to company)
+    existing_name = crud.get_employee_by_name(db, name=emp.name, company_id=current_user.company_id)
     if existing_name:
         raise HTTPException(status_code=400, detail="An employee with this name is already registered")
 
-    # Check duplicate phone
+    # Check duplicate phone (scoped to company)
     if emp.phone:
-        existing_phone = crud.get_employee_by_phone(db, phone=emp.phone)
+        existing_phone = crud.get_employee_by_phone(db, phone=emp.phone, company_id=current_user.company_id)
         if existing_phone:
             raise HTTPException(status_code=400, detail="This phone number is already registered to another employee")
         
@@ -101,7 +101,7 @@ def create_employee(
             password=emp.password,
             role_id=role_emp.id
         )
-        db_user = crud.create_user(db, user_in)
+        db_user = crud.create_user(db, user_in, company_id=current_user.company_id)
         user_id = db_user.id
         
     if emp.allow_wfh and emp.wfh_address:
@@ -112,7 +112,7 @@ def create_employee(
         emp.wfh_lat = None
         emp.wfh_lng = None
         
-    db_emp = crud.create_employee(db, emp=emp, user_id=user_id)
+    db_emp = crud.create_employee(db, emp=emp, user_id=user_id, company_id=current_user.company_id)
     
     crud.create_audit_log(
         db=db,
@@ -120,7 +120,8 @@ def create_employee(
         action="Create Employee",
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
-        details=f"Created employee: {emp.name} ({emp.employee_id})"
+        details=f"Created employee: {emp.name} ({emp.employee_id})",
+        company_id=current_user.company_id
     )
     return db_emp
 
@@ -133,7 +134,7 @@ def update_employee(
     current_user: models.User = Depends(checker_manage)
 ):
     db_emp = crud.get_employee_by_id(db, id)
-    if not db_emp:
+    if not db_emp or (current_user.company_id is not None and db_emp.company_id != current_user.company_id):
         raise HTTPException(status_code=404, detail="Employee not found")
         
     if emp.allow_wfh is not None:
@@ -158,7 +159,8 @@ def update_employee(
         action="Update Employee",
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
-        details=f"Updated employee ID: {id}"
+        details=f"Updated employee ID: {id}",
+        company_id=current_user.company_id
     )
     return updated
 
@@ -170,7 +172,7 @@ def delete_employee(
     current_user: models.User = Depends(checker_manage)
 ):
     db_emp = crud.get_employee_by_id(db, id)
-    if not db_emp:
+    if not db_emp or (current_user.company_id is not None and db_emp.company_id != current_user.company_id):
         raise HTTPException(status_code=404, detail="Employee not found")
         
     # Clear face embeddings from disk and database first
@@ -187,7 +189,8 @@ def delete_employee(
         action="Delete Employee",
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
-        details=f"Deleted employee ID: {id}"
+        details=f"Deleted employee ID: {id}",
+        company_id=current_user.company_id
     )
     return {"message": "Employee deleted successfully"}
 
@@ -233,15 +236,15 @@ def import_csv(
                 except Exception:
                     pass
             
-            # Resolve department
+            # Resolve department (scoped by company)
             dept_id = None
             if "department_code" in df.columns and pd.notna(row["department_code"]):
                 dept_code = str(row["department_code"]).strip()
-                dept = crud.get_department_by_code(db, code=dept_code)
+                dept = crud.get_department_by_code(db, code=dept_code, company_id=current_user.company_id)
                 if dept:
                     dept_id = dept.id
             
-            # Check duplicates
+            # Check duplicates (scoped to company name check)
             if crud.get_employee_by_uuid(db, employee_id=emp_id) or crud.get_employee_by_email(db, email=email):
                 skipped_count += 1
                 continue
@@ -258,7 +261,7 @@ def import_csv(
                     department_id=dept_id,
                     create_user_login=False
                 )
-                crud.create_employee(db, emp=emp_in)
+                crud.create_employee(db, emp=emp_in, company_id=current_user.company_id)
                 imported_count += 1
             except Exception as e:
                 errors.append(f"Row {idx+2}: {str(e)}")
@@ -270,7 +273,8 @@ def import_csv(
             action="Bulk Import CSV",
             ip_address=request.client.host if request.client else None,
             user_agent=request.headers.get("user-agent"),
-            details=f"Imported {imported_count} employees, skipped {skipped_count}"
+            details=f"Imported {imported_count} employees, skipped {skipped_count}",
+            company_id=current_user.company_id
         )
         
         return {
@@ -293,7 +297,7 @@ async def upload_avatar(
     Manually upload a profile avatar for an employee without facial enrollment.
     """
     db_emp = crud.get_employee_by_id(db, id)
-    if not db_emp:
+    if not db_emp or (current_user.company_id is not None and db_emp.company_id != current_user.company_id):
         raise HTTPException(status_code=404, detail="Employee not found")
         
     if not file.content_type.startswith("image/"):
@@ -329,7 +333,8 @@ async def upload_avatar(
         action="Manual Avatar Upload",
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
-        details=f"Manually uploaded avatar for employee ID: {id}"
+        details=f"Manually uploaded avatar for employee ID: {id}",
+        company_id=current_user.company_id
     )
     
     return {"message": "Avatar uploaded successfully"}

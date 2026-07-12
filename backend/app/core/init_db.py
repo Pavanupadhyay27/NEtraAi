@@ -111,6 +111,20 @@ def init_db(db: Session):
         else:
             db.execute(text("ALTER TABLE employee_images ADD COLUMN image_bytes BLOB"))
         db.commit()
+
+    # Seed Default Company
+    default_company = db.execute(select(models.Company).where(models.Company.name == "NetraID Base")).scalar_one_or_none()
+    if not default_company:
+        logger.info("Seeding default company 'NetraID Base'...")
+        default_company = models.Company(
+            name="NetraID Base",
+            status="Active",
+            max_employees=1000,
+            available_tokens=999999
+        )
+        db.add(default_company)
+        db.commit()
+        db.refresh(default_company)
         
     # 0. Seed Shifts
     shifts_to_seed = [
@@ -120,10 +134,13 @@ def init_db(db: Session):
         {"name": "Night Shift", "start_time": time(23, 0), "end_time": time(7, 0), "grace_period_minutes": 15, "description": "Overnight shift"}
     ]
     for s in shifts_to_seed:
-        shift_record = db.execute(select(models.Shift).where(models.Shift.name == s["name"])).scalar_one_or_none()
+        shift_record = db.execute(select(models.Shift).where(
+            models.Shift.name == s["name"],
+            models.Shift.company_id == default_company.id
+        )).scalar_one_or_none()
         if not shift_record:
             logger.info(f"Seeding shift: {s['name']}")
-            db_shift = models.Shift(**s)
+            db_shift = models.Shift(**s, company_id=default_company.id)
             db.add(db_shift)
     db.commit()
     
@@ -152,10 +169,13 @@ def init_db(db: Session):
         {"name": "Operations", "code": "OPS", "description": "Office administration and business facilities"}
     ]
     for d in departments:
-        dept = db.execute(select(models.Department).where(models.Department.code == d["code"])).scalar_one_or_none()
+        dept = db.execute(select(models.Department).where(
+            models.Department.code == d["code"],
+            models.Department.company_id == default_company.id
+        )).scalar_one_or_none()
         if not dept:
             logger.info(f"Seeding department: {d['name']} ({d['code']})")
-            crud.create_department(db, schemas.DepartmentCreate(**d))
+            crud.create_department(db, schemas.DepartmentCreate(**d), company_id=default_company.id)
             
     # 3. Seed Default Settings
     default_settings = [
@@ -185,12 +205,12 @@ def init_db(db: Session):
     ]
     
     for s in default_settings:
-        setting = crud.get_setting_by_key(db, s["key"])
+        setting = crud.get_setting_by_key(db, s["key"], company_id=default_company.id)
         if not setting:
             logger.info(f"Seeding setting: {s['key']} = {s['value']}")
-            crud.set_setting(db, s["key"], s["value"], s["description"])
+            crud.set_setting(db, s["key"], s["value"], s["description"], company_id=default_company.id)
             
-    # 3. Seed Initial Super Admin User
+    # 3. Seed Initial Super Admin User (Super Admins are company-agnostic, company_id=None)
     admin_email = settings.INITIAL_ADMIN_EMAIL
     admin_user = crud.get_user_by_email(db, admin_email)
     if not admin_user:
@@ -200,10 +220,11 @@ def init_db(db: Session):
             password=settings.INITIAL_ADMIN_PASSWORD,
             role_id=db_roles["Super Admin"].id
         )
-        crud.create_user(db, admin_create)
+        crud.create_user(db, admin_create, company_id=None)
     else:
         logger.info(f"Super Admin user {admin_email} already exists. Syncing password with configuration...")
         admin_user.hashed_password = crud.get_password_hash(settings.INITIAL_ADMIN_PASSWORD)
+        admin_user.company_id = None
         db.commit()
         
     logger.info("Database initialization and seeding completed successfully.")
