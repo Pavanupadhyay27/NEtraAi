@@ -135,8 +135,13 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
     } else {
       setUser(profile);
       setAuthorized(true);
+      
+      // Auto-redirect employees to dashboard if they attempt to access any admin views
+      if (profile?.role?.name === "Employee" && pathname !== "/dashboard") {
+        router.push("/dashboard");
+      }
     }
-  }, [router]);
+  }, [router, pathname]);
 
   if (!authorized) {
     return (
