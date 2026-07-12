@@ -30,7 +30,13 @@ async def upload_face_image(
     # Validate employee exists
     employee = crud.get_employee_by_id(db, id=employee_id)
     if not employee:
-        raise HTTPException(status_code=404, detail="Employee not found")
+        all_emps = db.query(models.Employee).all()
+        emp_ids = [e.id for e in all_emps]
+        emp_uuids = [e.employee_id for e in all_emps]
+        raise HTTPException(
+            status_code=404,
+            detail=f"Employee not found. Received employee_id: {employee_id} (type: {type(employee_id).__name__}). Existing PK IDs: {emp_ids}, String IDs: {emp_uuids}"
+        )
         
     # Read file bytes
     try:
