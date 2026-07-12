@@ -48,7 +48,6 @@ def create_user(db: Session, user: schemas.UserCreate, company_id: int = None):
         email=user.email,
         hashed_password=hashed_pwd,
         role_id=user.role_id,
-        company_id=company_id,
         is_active=True
     )
     db.add(db_user)
@@ -59,21 +58,17 @@ def create_user(db: Session, user: schemas.UserCreate, company_id: int = None):
 # --- Department CRUD ---
 def get_departments(db: Session, company_id: int = None, skip: int = 0, limit: int = 100):
     query = select(models.Department)
-    if company_id:
-        query = query.where(models.Department.company_id == company_id)
     return db.execute(query.offset(skip).limit(limit)).scalars().all()
 
 def get_department_by_code(db: Session, code: str, company_id: int = None):
     query = select(models.Department).where(models.Department.code == code)
-    if company_id:
-        query = query.where(models.Department.company_id == company_id)
     return db.execute(query).scalar_one_or_none()
 
 def get_department_by_id(db: Session, department_id: int):
     return db.get(models.Department, department_id)
 
 def create_department(db: Session, dept: schemas.DepartmentCreate, company_id: int = None):
-    db_dept = models.Department(**dept.model_dump(), company_id=company_id)
+    db_dept = models.Department(**dept.model_dump())
     db.add(db_dept)
     db.commit()
     db.refresh(db_dept)
@@ -109,16 +104,12 @@ def get_employee_by_email(db: Session, email: str):
 
 def get_employee_by_name(db: Session, name: str, company_id: int = None):
     query = select(models.Employee).where(func.lower(models.Employee.name) == func.lower(name))
-    if company_id:
-        query = query.where(models.Employee.company_id == company_id)
     return db.execute(query).scalars().first()
 
 def get_employee_by_phone(db: Session, phone: str, company_id: int = None):
     import re
     cleaned = re.sub(r'[\s\-()]', '', phone)
     query = select(models.Employee).where(models.Employee.phone.isnot(None))
-    if company_id:
-        query = query.where(models.Employee.company_id == company_id)
     all_emps = db.execute(query).scalars().all()
     for emp in all_emps:
         if re.sub(r'[\s\-()]', '', emp.phone) == cleaned:
@@ -137,8 +128,6 @@ def get_employees(
     query = select(models.Employee)
     filters = []
     
-    if company_id:
-        filters.append(models.Employee.company_id == company_id)
     if search:
         filters.append(or_(
             models.Employee.name.ilike(f"%{search}%"),
@@ -160,8 +149,6 @@ def count_employees(db: Session, company_id: int = None, search: str = None, dep
     query = select(func.count(models.Employee.id))
     filters = []
     
-    if company_id:
-        filters.append(models.Employee.company_id == company_id)
     if search:
         filters.append(or_(
             models.Employee.name.ilike(f"%{search}%"),
@@ -189,7 +176,6 @@ def create_employee(db: Session, emp: schemas.EmployeeCreate, user_id: int = Non
         status=emp.status,
         department_id=emp.department_id,
         shift_id=emp.shift_id,
-        company_id=company_id,
         user_id=user_id,
         allow_wfh=emp.allow_wfh,
         wfh_address=emp.wfh_address,
@@ -278,24 +264,20 @@ def delete_face_embeddings(db: Session, employee_id: int):
 # --- System Settings CRUD ---
 def get_setting_by_key(db: Session, key: str, company_id: int = None):
     query = select(models.Setting).where(models.Setting.key == key)
-    if company_id:
-        query = query.where(models.Setting.company_id == company_id)
     return db.execute(query).scalars().first()
 
 def get_settings(db: Session, company_id: int = None):
     query = select(models.Setting)
-    if company_id:
-        query = query.where(models.Setting.company_id == company_id)
     return db.execute(query).scalars().all()
 
 def set_setting(db: Session, key: str, value: str, description: str = None, company_id: int = None):
-    db_setting = get_setting_by_key(db, key, company_id=company_id)
+    db_setting = get_setting_by_key(db, key)
     if db_setting:
         db_setting.value = value
         if description:
             db_setting.description = description
     else:
-        db_setting = models.Setting(key=key, value=value, description=description, company_id=company_id)
+        db_setting = models.Setting(key=key, value=value, description=description)
         db.add(db_setting)
     db.commit()
     db.refresh(db_setting)
@@ -327,9 +309,6 @@ def get_attendance_logs(db: Session, company_id: int = None, skip: int = 0, limi
     query = select(models.AttendanceLog)
     filters = []
     
-    if company_id:
-        query = query.join(models.Employee).where(models.Employee.company_id == company_id)
-        
     if employee_id:
         filters.append(models.AttendanceLog.employee_id == employee_id)
         
@@ -351,9 +330,6 @@ def get_daily_attendance(db: Session, date_val: date, employee_id: int = None, d
     query = select(models.Attendance).join(models.Employee)
     filters = [models.Attendance.date == date_val]
     
-    if company_id:
-        filters.append(models.Employee.company_id == company_id)
-        
     if employee_id:
         filters.append(models.Attendance.employee_id == employee_id)
         
@@ -450,11 +426,6 @@ def mark_kiosk_attendance(db: Session, employee_id: int, timestamp: datetime, ca
         )
         db.add(db_attendance)
         
-        # Deduct a token for this check-in
-        if employee.company and employee.company.available_tokens > 0:
-            employee.company.available_tokens -= 1
-            employee.company.tokens_used += 1
-            
         logger.info(f"Marked Check-In for employee {employee_id} at {timestamp}. Status: {status}")
     else:
         # Second scan of the day -> CHECK-OUT
@@ -586,8 +557,7 @@ def create_audit_log(db: Session, user_id: int, action: str, ip_address: str = N
         action=action,
         ip_address=ip_address,
         user_agent=user_agent,
-        details=details,
-        company_id=company_id
+        details=details
     )
     db.add(log)
     db.commit()
@@ -596,34 +566,13 @@ def create_audit_log(db: Session, user_id: int, action: str, ip_address: str = N
 
 def get_audit_logs(db: Session, company_id: int = None, skip: int = 0, limit: int = 100):
     query = select(models.AuditLog)
-    if company_id:
-        query = query.where(models.AuditLog.company_id == company_id)
     query = query.order_by(models.AuditLog.timestamp.desc()).offset(skip).limit(limit)
     return db.execute(query).scalars().all()
 
 def clear_all_audit_logs(db: Session, company_id: int = None) -> int:
     from sqlalchemy import delete
     stmt = delete(models.AuditLog)
-    if company_id:
-        stmt = stmt.where(models.AuditLog.company_id == company_id)
     result = db.execute(stmt)
     db.commit()
     return result.rowcount
-
-# --- Company CRUD ---
-def get_company_by_id(db: Session, company_id: int):
-    return db.get(models.Company, company_id)
-
-def get_company_by_name(db: Session, name: str):
-    return db.execute(select(models.Company).where(models.Company.name == name)).scalar_one_or_none()
-
-def create_company(db: Session, name: str, status: str = "Active"):
-    db_company = models.Company(name=name, status=status)
-    db.add(db_company)
-    db.commit()
-    db.refresh(db_company)
-    return db_company
-
-def get_companies(db: Session, skip: int = 0, limit: int = 100):
-    return db.execute(select(models.Company).offset(skip).limit(limit)).scalars().all()
 

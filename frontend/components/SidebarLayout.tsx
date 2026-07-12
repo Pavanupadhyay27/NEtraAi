@@ -17,8 +17,7 @@ import {
   Scan,
   History,
   Sun,
-  Moon,
-  Building2
+  Moon
 } from "lucide-react";
 import { getAccessToken, getUserProfile, clearTokens } from "@/app/utils/api";
 
@@ -254,12 +253,6 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
             
             {!isEmployee && (
               <>
-                <NavLink
-                  item={{ name: "Organizations", href: "/tenants", icon: Building2 }}
-                  isActive={pathname.startsWith("/tenants")}
-                  isCollapsed={isCollapsed}
-                />
-
                 {/* Separator */}
                 <div className="my-3 border-t border-[var(--border-subtle)]" />
 

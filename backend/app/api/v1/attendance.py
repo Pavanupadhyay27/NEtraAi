@@ -27,15 +27,15 @@ def read_daily_attendance(
         date_val = date.today()
     if department_id:
         dept = crud.get_department_by_id(db, department_id)
-        if not dept or dept.company_id != current_user.company_id:
+        if not dept:
             raise HTTPException(status_code=404, detail="Department not found")
     if employee_id:
         emp = crud.get_employee_by_id(db, employee_id)
-        if not emp or emp.company_id != current_user.company_id:
+        if not emp:
             raise HTTPException(status_code=404, detail="Employee not found")
             
     return crud.get_daily_attendance(
-        db, date_val=date_val, employee_id=employee_id, department_id=department_id, company_id=current_user.company_id
+        db, date_val=date_val, employee_id=employee_id, department_id=department_id
     )
 
 @router.put("/{id}", response_model=schemas.AttendanceOut)
@@ -47,7 +47,7 @@ def manual_update_attendance(
     current_user: models.User = Depends(checker_manage)
 ):
     db_att = crud.get_attendance_by_id(db, id)
-    if not db_att or db_att.employee.company_id != current_user.company_id:
+    if not db_att:
         raise HTTPException(status_code=404, detail="Attendance record not found")
         
     updated = crud.update_attendance(db, id=id, data=data)
@@ -60,8 +60,7 @@ def manual_update_attendance(
         action="Manual Attendance Correction",
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
-        details=f"Adjusted attendance ID: {id} for date {updated.date}. New Status: {updated.status}",
-        company_id=current_user.company_id
+        details=f"Adjusted attendance ID: {id} for date {updated.date}. New Status: {updated.status}"
     )
     return updated
 
@@ -72,10 +71,9 @@ def manual_create_or_update_attendance(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(checker_manage)
 ):
-    # Verify employee exists (scoped by company)
+    # Verify employee exists
     employee = db.query(models.Employee).filter(
-        models.Employee.id == data.employee_id,
-        models.Employee.company_id == current_user.company_id
+        models.Employee.id == data.employee_id
     ).first()
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
@@ -116,8 +114,8 @@ def manual_create_or_update_attendance(
             shift_start = employee.shift.start_time
             grace_mins = employee.shift.grace_period_minutes
         else:
-            start_time_setting = crud.get_setting_by_key(db, "CHECK_IN_START", company_id=current_user.company_id)
-            grace_period_setting = crud.get_setting_by_key(db, "GRACE_PERIOD_MINUTES", company_id=current_user.company_id)
+            start_time_setting = crud.get_setting_by_key(db, "CHECK_IN_START")
+            grace_period_setting = crud.get_setting_by_key(db, "GRACE_PERIOD_MINUTES")
             
             start_str = start_time_setting.value if start_time_setting else "09:00"
             grace_mins = int(grace_period_setting.value) if grace_period_setting else 15
@@ -153,8 +151,7 @@ def manual_create_or_update_attendance(
         action="Manual Attendance Override",
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
-        details=f"Manually logged attendance for employee {employee.name} (ID: {employee.employee_id}) on {data.date}. Status: {db_att.status}",
-        company_id=current_user.company_id
+        details=f"Manually logged attendance for employee {employee.name} (ID: {employee.employee_id}) on {data.date}. Status: {db_att.status}"
     )
     return db_att
 
@@ -167,7 +164,7 @@ def read_attendance_logs(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(checker_view)
 ):
-    return crud.get_attendance_logs(db, company_id=current_user.company_id, skip=skip, limit=limit, employee_id=employee_id, date_str=date_str)
+    return crud.get_attendance_logs(db, skip=skip, limit=limit, employee_id=employee_id, date_str=date_str)
 
 @router.get("/employee/{employee_id}", response_model=List[schemas.AttendanceOut])
 def get_employee_attendance_history(
@@ -178,7 +175,7 @@ def get_employee_attendance_history(
     current_user: models.User = Depends(security.get_current_user)
 ):
     emp = crud.get_employee_by_id(db, employee_id)
-    if not emp or emp.company_id != current_user.company_id:
+    if not emp:
         raise HTTPException(status_code=404, detail="Employee not found")
 
     role_name = current_user.role.name if current_user.role else "Employee"

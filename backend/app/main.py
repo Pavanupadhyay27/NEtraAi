@@ -16,8 +16,7 @@ from sqlalchemy import delete
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.init_db import init_db
-from app.api.v1 import auth, employees, departments, enrollment, kiosk, attendance, reports, analytics, settings as settings_api, audit, companies
-from app.models import models
+from app.api.v1 import auth, employees, departments, enrollment, kiosk, attendance, reports, analytics, settings as settings_api, audit
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -90,7 +89,6 @@ def purge_old_audit_logs():
             logger.error(f"Error purging old audit logs: {e}")
         time.sleep(3600)
 
-# Create folders on startup
 @app.on_event("startup")
 def startup_event():
     global db_error
@@ -107,80 +105,7 @@ def startup_event():
     # Initialize and Seed database
     db = SessionLocal()
     try:
-        from sqlalchemy import text
-        from app.core.database import engine
-        try:
-            with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE companies ADD COLUMN admin_email VARCHAR(255);"))
-                conn.commit()
-        except Exception:
-            pass
-        try:
-            with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE companies ADD COLUMN max_employees INTEGER DEFAULT 100;"))
-                conn.commit()
-        except Exception:
-            pass
-        try:
-            with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE companies ADD COLUMN available_tokens INTEGER DEFAULT 1000;"))
-                conn.execute(text("ALTER TABLE companies ADD COLUMN tokens_used INTEGER DEFAULT 0;"))
-                conn.commit()
-        except Exception:
-            pass
-        try:
-            with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE companies ADD COLUMN phone VARCHAR(50);"))
-                conn.execute(text("ALTER TABLE companies ADD COLUMN address VARCHAR(255);"))
-                conn.commit()
-        except Exception:
-            pass
-        try:
-            with engine.connect() as conn:
-                conn.execute(text("DELETE FROM companies WHERE name = 'NetraID Demo';"))
-                conn.commit()
-        except Exception:
-            pass
-            
-        try:
-            with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE settings DROP CONSTRAINT IF EXISTS settings_key_key;"))
-                conn.commit()
-        except Exception as e:
-            logger.warning(f"Could not drop settings_key_key constraint: {e}")
-            
-        try:
-            with engine.connect() as conn:
-                conn.execute(text("DROP INDEX IF EXISTS settings_key_key;"))
-                conn.execute(text("DROP INDEX IF EXISTS ix_settings_key;"))
-                conn.commit()
-        except Exception as e:
-            logger.warning(f"Could not drop settings_key_key index: {e}")
-            
         init_db(db)
-        
-        # Backfill settings for existing companies
-        try:
-            from app.models import models
-            from app.crud import crud
-            all_companies = db.query(models.Company).all()
-            base_company = db.query(models.Company).filter(models.Company.name == "NetraID Base").first()
-            if base_company:
-                base_settings = crud.get_settings(db, company_id=base_company.id)
-                for company in all_companies:
-                    if company.id == base_company.id:
-                        continue
-                    existing_settings = crud.get_settings(db, company_id=company.id)
-                    if not existing_settings:
-                        for s in base_settings:
-                            try:
-                                crud.set_setting(db, s.key, s.value, s.description, company_id=company.id)
-                            except Exception as e:
-                                db.rollback()
-                                logger.warning(f"Silently skipping setting backfill {s.key} for company {company.id}: {e}")
-        except Exception as e:
-            logger.error(f"Error in backfilling settings loop: {e}")
-            
         db_error = "Success"
         
         # Start background RTSP processor
@@ -267,6 +192,5 @@ app.include_router(reports.router, prefix=f"{settings.API_V1_STR}/reports", tags
 app.include_router(analytics.router, prefix=f"{settings.API_V1_STR}/analytics", tags=["Dashboard Analytics"])
 app.include_router(settings_api.router, prefix=f"{settings.API_V1_STR}/settings", tags=["System Settings"])
 app.include_router(audit.router, prefix=f"{settings.API_V1_STR}/audit", tags=["System Audit Logs"])
-app.include_router(companies.router, prefix=f"{settings.API_V1_STR}/companies", tags=["Company Management"])
 # Trigger reload - reload 2
 

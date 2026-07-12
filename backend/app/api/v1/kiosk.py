@@ -55,8 +55,7 @@ def _publish_log(log_obj, employee=None):
             "is_spoof": log_obj.is_spoof,
             "status": log_obj.status,
             "image_path": log_obj.image_path,
-            "employee": emp_data,
-            "company_id": employee.company_id if employee else None
+            "employee": emp_data
         }
         event_bus.publish_scan_event(payload)
     except Exception as exc:
@@ -515,9 +514,9 @@ def scan_face(
                 "bbox": bbox_list
             }
 
-        loc_lat_setting = crud.get_setting_by_key(db, "LOCATION_LATITUDE", company_id=employee.company_id)
-        loc_lon_setting = crud.get_setting_by_key(db, "LOCATION_LONGITUDE", company_id=employee.company_id)
-        loc_rad_setting = crud.get_setting_by_key(db, "LOCATION_RADIUS_METERS", company_id=employee.company_id)
+        loc_lat_setting = crud.get_setting_by_key(db, "LOCATION_LATITUDE")
+        loc_lon_setting = crud.get_setting_by_key(db, "LOCATION_LONGITUDE")
+        loc_rad_setting = crud.get_setting_by_key(db, "LOCATION_RADIUS_METERS")
 
         try:
             office_lat = float(loc_lat_setting.value) if loc_lat_setting else 0.0
@@ -957,9 +956,9 @@ def confirm_qr(
             )
             raise HTTPException(status_code=400, detail="GPS coordinates are required to mark attendance.")
 
-        loc_lat_setting = crud.get_setting_by_key(db, "LOCATION_LATITUDE", company_id=employee.company_id)
-        loc_lon_setting = crud.get_setting_by_key(db, "LOCATION_LONGITUDE", company_id=employee.company_id)
-        loc_rad_setting = crud.get_setting_by_key(db, "LOCATION_RADIUS_METERS", company_id=employee.company_id)
+        loc_lat_setting = crud.get_setting_by_key(db, "LOCATION_LATITUDE")
+        loc_lon_setting = crud.get_setting_by_key(db, "LOCATION_LONGITUDE")
+        loc_rad_setting = crud.get_setting_by_key(db, "LOCATION_RADIUS_METERS")
 
         try:
             office_lat = float(loc_lat_setting.value) if loc_lat_setting else 0.0

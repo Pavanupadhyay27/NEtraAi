@@ -15,15 +15,12 @@ checker_view = security.RoleChecker(["Super Admin", "Admin"])
 
 @router.get("/", response_model=List[schemas.AuditLogOut])
 def read_audit_logs(
-    company_id: int = None,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(checker_view)
 ):
-    if current_user.role.name != "Super Admin":
-        company_id = current_user.company_id
-    return crud.get_audit_logs(db, company_id=company_id, skip=skip, limit=limit)
+    return crud.get_audit_logs(db, skip=skip, limit=limit)
 
 @router.delete("/")
 def delete_all_audit_logs(
