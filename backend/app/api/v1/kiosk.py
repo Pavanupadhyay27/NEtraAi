@@ -515,9 +515,9 @@ def scan_face(
                 "bbox": bbox_list
             }
 
-        loc_lat_setting = crud.get_setting_by_key(db, "LOCATION_LATITUDE")
-        loc_lon_setting = crud.get_setting_by_key(db, "LOCATION_LONGITUDE")
-        loc_rad_setting = crud.get_setting_by_key(db, "LOCATION_RADIUS_METERS")
+        loc_lat_setting = crud.get_setting_by_key(db, "LOCATION_LATITUDE", company_id=employee.company_id)
+        loc_lon_setting = crud.get_setting_by_key(db, "LOCATION_LONGITUDE", company_id=employee.company_id)
+        loc_rad_setting = crud.get_setting_by_key(db, "LOCATION_RADIUS_METERS", company_id=employee.company_id)
 
         try:
             office_lat = float(loc_lat_setting.value) if loc_lat_setting else 0.0
@@ -957,9 +957,9 @@ def confirm_qr(
             )
             raise HTTPException(status_code=400, detail="GPS coordinates are required to mark attendance.")
 
-        loc_lat_setting = crud.get_setting_by_key(db, "LOCATION_LATITUDE")
-        loc_lon_setting = crud.get_setting_by_key(db, "LOCATION_LONGITUDE")
-        loc_rad_setting = crud.get_setting_by_key(db, "LOCATION_RADIUS_METERS")
+        loc_lat_setting = crud.get_setting_by_key(db, "LOCATION_LATITUDE", company_id=employee.company_id)
+        loc_lon_setting = crud.get_setting_by_key(db, "LOCATION_LONGITUDE", company_id=employee.company_id)
+        loc_rad_setting = crud.get_setting_by_key(db, "LOCATION_RADIUS_METERS", company_id=employee.company_id)
 
         try:
             office_lat = float(loc_lat_setting.value) if loc_lat_setting else 0.0
