@@ -182,7 +182,7 @@ def get_employee_attendance_history(
         raise HTTPException(status_code=404, detail="Employee not found")
 
     role_name = current_user.role.name if current_user.role else "Employee"
-    if role_name == "Employee":
+    if role_name not in ["Super Admin", "Admin", "HR"]:
         if not current_user.employee or current_user.employee.id != employee_id:
             raise HTTPException(status_code=403, detail="Not authorized to view other employee records")
 

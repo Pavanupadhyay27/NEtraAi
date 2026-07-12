@@ -970,6 +970,22 @@ def confirm_qr(
             office_lon = 0.0
             allowed_radius = 50.0
 
+        if office_lat == 0.0 and office_lon == 0.0:
+            crud.create_attendance_log(
+                db=db,
+                employee_id=employee.id,
+                camera=payload.camera,
+                confidence=1.0,
+                liveness_score=1.0,
+                is_spoof=False,
+                status="Location Config Error",
+                timestamp=datetime.now()
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Office geofence coordinates are not configured by the administrator in settings."
+            )
+
         dist = calculate_distance_meters(payload.latitude, payload.longitude, office_lat, office_lon)
         if dist > allowed_radius:
             crud.create_attendance_log(

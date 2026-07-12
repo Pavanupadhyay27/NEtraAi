@@ -530,8 +530,8 @@ class FaceEngine:
             elif brightness > 235.0:
                 is_valid = False
                 reason = "Image is too bright or washed out. Please adjust the lighting."
-            # Check blur (threshold < 70 is considered blurry)
-            elif blur_score < 70.0:
+            # Check blur (threshold < 15.0 is considered blurry)
+            elif blur_score < 15.0:
                 is_valid = False
                 reason = "Image is too blurry. Please capture a steadier, clearer image."
                 
