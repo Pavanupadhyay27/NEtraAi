@@ -508,3 +508,52 @@ def clear_all_audit_logs(db: Session, company_id: int = None) -> int:
     result = db.execute(stmt)
     db.commit()
     return result.rowcount
+
+# --- Support Tickets CRUD ---
+def get_ticket_by_id(db: Session, ticket_id: int):
+    return db.get(models.Ticket, ticket_id)
+
+def get_tickets(db: Session, company_id: int = None, employee_id: int = None):
+    query = select(models.Ticket)
+    filters = []
+    if company_id is not None:
+        filters.append(models.Ticket.company_id == company_id)
+    if employee_id is not None:
+        filters.append(models.Ticket.employee_id == employee_id)
+    if filters:
+        query = query.where(and_(*filters))
+    return db.execute(query.order_by(models.Ticket.created_at.desc())).scalars().all()
+
+def create_ticket(db: Session, ticket: schemas.TicketCreate, employee_id: int, company_id: int):
+    db_ticket = models.Ticket(
+        employee_id=employee_id,
+        company_id=company_id,
+        title=ticket.title,
+        category=ticket.category,
+        priority=ticket.priority,
+        status="Open"
+    )
+    db.add(db_ticket)
+    db.commit()
+    db.refresh(db_ticket)
+    return db_ticket
+
+def create_ticket_message(db: Session, ticket_id: int, msg: schemas.TicketMessageCreate, sender_id: int):
+    db_message = models.TicketMessage(
+        ticket_id=ticket_id,
+        sender_id=sender_id,
+        message=msg.message
+    )
+    db.add(db_message)
+    db.commit()
+    db.refresh(db_message)
+    return db_message
+
+def update_ticket_status(db: Session, ticket_id: int, status: str):
+    db_ticket = get_ticket_by_id(db, ticket_id)
+    if not db_ticket:
+        return None
+    db_ticket.status = status
+    db.commit()
+    db.refresh(db_ticket)
+    return db_ticket

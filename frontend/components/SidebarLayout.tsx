@@ -18,7 +18,8 @@ import {
   History,
   Sun,
   Moon,
-  Building2
+  Building2,
+  MessageSquare
 } from "lucide-react";
 import { getAccessToken, getUserProfile, clearTokens } from "@/app/utils/api";
 
@@ -27,6 +28,7 @@ const navItems = [
   { name: "Organizations",   href: "/tenants",    icon: Building2 },
   { name: "Attendance",      href: "/attendance", icon: Clock },
   { name: "Employees",       href: "/employees",  icon: Users },
+  { name: "Helpdesk Support",href: "/tickets",    icon: MessageSquare },
   { name: "Reports",         href: "/reports",    icon: FileSpreadsheet },
   { name: "Audit Logs",      href: "/audit",      icon: History },
   { name: "Settings",        href: "/settings",   icon: Settings },
@@ -138,8 +140,8 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
       setUser(profile);
       setAuthorized(true);
       
-      // Auto-redirect employees to dashboard if they attempt to access any admin views
-      if (profile?.role?.name === "Employee" && pathname !== "/dashboard") {
+       // Auto-redirect employees to dashboard if they attempt to access any admin views
+      if (profile?.role?.name === "Employee" && pathname !== "/dashboard" && pathname !== "/tickets") {
         router.push("/dashboard");
       } else if (profile?.role?.name !== "Super Admin" && pathname === "/tenants") {
         router.push("/dashboard");
@@ -170,7 +172,7 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
   const isEmployee = user?.role?.name === "Employee";
   const isSuperAdmin = user?.role?.name === "Super Admin";
   const visibleNavItems = isEmployee 
-    ? navItems.filter(item => item.href === "/dashboard") 
+    ? navItems.filter(item => item.href === "/dashboard" || item.href === "/tickets") 
     : isSuperAdmin
       ? navItems
       : navItems.filter(item => item.href !== "/tenants");

@@ -58,6 +58,7 @@ class Company(Base):
     shifts = relationship("Shift", back_populates="company", cascade="all, delete-orphan")
     settings = relationship("Setting", back_populates="company", cascade="all, delete-orphan")
     audit_logs = relationship("AuditLog", back_populates="company", cascade="all, delete-orphan")
+    tickets = relationship("Ticket", back_populates="company", cascade="all, delete-orphan")
 
 class Role(Base):
     __tablename__ = "roles"
@@ -150,6 +151,7 @@ class Employee(Base):
     attendance_records = relationship("Attendance", back_populates="employee", cascade="all, delete-orphan")
     attendance_logs = relationship("AttendanceLog", back_populates="employee", cascade="all, delete-orphan")
     leave_requests = relationship("LeaveRequest", back_populates="employee", cascade="all, delete-orphan")
+    tickets = relationship("Ticket", back_populates="employee", cascade="all, delete-orphan")
 
 class EmployeeImage(Base):
     __tablename__ = "employee_images"
@@ -263,3 +265,31 @@ class AuditLog(Base):
 
     company = relationship("Company", back_populates="audit_logs")
     user = relationship("User", back_populates="audit_logs")
+
+class Ticket(Base):
+    __tablename__ = "tickets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False)
+    company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False)
+    title = Column(String(255), nullable=False)
+    category = Column(String(100), nullable=False)  # Payroll, Attendance, IT, Leave, etc.
+    priority = Column(String(50), default="Medium")  # Low, Medium, High
+    status = Column(String(50), default="Open")  # Open, In Progress, Closed
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    employee = relationship("Employee", back_populates="tickets")
+    company = relationship("Company", back_populates="tickets")
+    messages = relationship("TicketMessage", back_populates="ticket", cascade="all, delete-orphan")
+
+class TicketMessage(Base):
+    __tablename__ = "ticket_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ticket_id = Column(Integer, ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False)
+    sender_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    message = Column(Text, nullable=False)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+
+    ticket = relationship("Ticket", back_populates="messages")
+    sender = relationship("User")

@@ -293,3 +293,40 @@ class AuditLogOut(BaseModel):
     user_agent: Optional[str] = None
     details: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
+
+# Ticket Message Schemas
+class TicketMessageBase(BaseModel):
+    message: str
+
+class TicketMessageCreate(TicketMessageBase):
+    pass
+
+class TicketMessageOut(TicketMessageBase):
+    id: int
+    ticket_id: int
+    sender_id: int
+    sender: UserEmailOut
+    timestamp: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+# Ticket Schemas
+class TicketBase(BaseModel):
+    title: str
+    category: str
+    priority: str
+
+class TicketCreate(TicketBase):
+    pass
+
+class TicketUpdateStatus(BaseModel):
+    status: str
+
+class TicketOut(TicketBase):
+    id: int
+    employee_id: int
+    company_id: int
+    status: str
+    created_at: datetime
+    employee: Optional[EmployeeOut] = None
+    messages: List[TicketMessageOut] = []
+    model_config = ConfigDict(from_attributes=True)
