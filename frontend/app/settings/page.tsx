@@ -688,10 +688,10 @@ export default function SettingsPage() {
                         type="button"
                         disabled={fetchingGps}
                         onClick={handleSetCurrentLocation}
-                        className={`h-9.5 px-4 rounded-xl text-[12px] font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-sm hover:scale-[1.02] active:scale-[0.98] ${
+                        className={`h-10 px-5 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-md hover:scale-[1.02] active:scale-[0.98] ${
                           fetchingGps 
                             ? "bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed" 
-                            : "bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900"
+                            : "bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 text-white shadow-[0_0_15px_rgba(6,182,212,0.25)] border border-cyan-400/20"
                         }`}
                       >
                         {fetchingGps ? (
@@ -717,7 +717,7 @@ export default function SettingsPage() {
                             scrolling="no" 
                             marginHeight={0} 
                             marginWidth={0} 
-                            src={`https://www.openstreetmap.org/export/embed.html?bbox=${parseFloat(editValues["LOCATION_LONGITUDE"]) - 0.01}%2C${parseFloat(editValues["LOCATION_LATITUDE"]) - 0.01}%2C${parseFloat(editValues["LOCATION_LONGITUDE"]) + 0.01}%2C${parseFloat(editValues["LOCATION_LATITUDE"]) + 0.01}&layer=mapnik&marker=${editValues["LOCATION_LATITUDE"]}%2C${editValues["LOCATION_LONGITUDE"]}`}
+                            src={`https://www.openstreetmap.org/export/embed.html?bbox=${parseFloat(editValues["LOCATION_LONGITUDE"]) - 0.002}%2C${parseFloat(editValues["LOCATION_LATITUDE"]) - 0.002}%2C${parseFloat(editValues["LOCATION_LONGITUDE"]) + 0.002}%2C${parseFloat(editValues["LOCATION_LATITUDE"]) + 0.002}&layer=mapnik&marker=${editValues["LOCATION_LATITUDE"]}%2C${editValues["LOCATION_LONGITUDE"]}`}
                           ></iframe>
                         </div>
                       ) : (

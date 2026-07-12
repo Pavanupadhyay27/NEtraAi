@@ -76,7 +76,7 @@ export default function AuditLogsPage() {
             <button
               onClick={() => setShowClearConfirm(true)}
               disabled={isDeleting}
-              className="text-[12px] h-9.5 px-4 flex items-center gap-2 rounded-xl border border-zinc-200 text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:border-rose-100 disabled:opacity-50 cursor-pointer transition-all active:scale-95 font-medium"
+              className="text-[12px] h-10 px-5 flex items-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 text-white hover:opacity-90 active:scale-95 shadow-md shadow-red-950/20 border border-red-500/20 cursor-pointer transition-all font-bold"
             >
               <Trash2 className="w-3.5 h-3.5" />
               Clear Logs
@@ -223,7 +223,7 @@ export default function AuditLogsPage() {
                   type="button" 
                   onClick={handleClearLogs}
                   disabled={isDeleting}
-                  className="flex-1 bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-bold text-[12px] rounded-xl cursor-pointer h-9.5 flex items-center justify-center gap-2 shadow-md shadow-rose-950/20 border border-rose-500/20"
+                  className="flex-1 bg-gradient-to-r from-red-650 to-rose-600 hover:opacity-90 active:scale-95 text-white font-bold text-[12px] rounded-xl cursor-pointer h-10 flex items-center justify-center gap-2 shadow-md shadow-rose-950/15 border border-rose-500/10 transition-all"
                 >
                   {isDeleting ? (
                     <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
