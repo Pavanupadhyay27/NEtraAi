@@ -115,6 +115,7 @@ export default function EnrollPage() {
   const [webcamActive, setWebcamActive] = useState(false);
   const [singleRetakePose, setSingleRetakePose] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [photoTimestamp, setPhotoTimestamp] = useState(Date.now());
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -452,7 +453,7 @@ export default function EnrollPage() {
 
       // Load logo, photo, and QR code
       const baseUrl = getBackendUrl().replace("/api/v1", "");
-      const photoSrc = `${baseUrl}/uploads/${employee.employee_id}/front.jpg`;
+      const photoSrc = `${baseUrl}/uploads/${employee.employee_id}/front.jpg?t=${Date.now()}`;
       const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${employee.employee_id}`;
 
       let logoImg: HTMLImageElement | null = null;
@@ -828,6 +829,7 @@ export default function EnrollPage() {
     }
 
     refetchStatus();
+    setPhotoTimestamp(Date.now());
     setCaptureState("success");
   };
 
@@ -1455,7 +1457,7 @@ export default function EnrollPage() {
                     <div className={`relative w-[120px] h-[120px] rounded-full p-1 bg-gradient-to-tr ${themeStyles.photoBorder} shadow-md`}>
                       <div className="w-full h-full rounded-full overflow-hidden border-2 border-white bg-slate-100">
                         <img
-                          src={`${getBackendUrl().replace("/api/v1", "")}/uploads/${employee?.employee_id}/front.jpg`}
+                          src={`${getBackendUrl().replace("/api/v1", "")}/uploads/${employee?.employee_id}/front.jpg?t=${photoTimestamp}`}
                           alt={employee?.name}
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
