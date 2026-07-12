@@ -577,17 +577,7 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
   );
 }
 
-export default function DashboardPage() {
-  const profile = getUserProfile();
-  const isEmployee = profile?.role?.name === "Employee";
-
-  if (isEmployee) {
-    return (
-      <SidebarLayout>
-        <EmployeeDashboardView profile={profile} />
-      </SidebarLayout>
-    );
-  }
+function AdminDashboardView({ profile }: { profile: any }) {
 
   const [currentTime, setCurrentTime] = React.useState("");
   const [currentDate, setCurrentDate] = React.useState("");
@@ -1552,4 +1542,41 @@ export default function DashboardPage() {
       )}
     </SidebarLayout>
   );
+}
+
+export default function DashboardPage() {
+  const [profile, setProfile] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const prof = getUserProfile();
+    setProfile(prof);
+    setLoading(false);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-base)] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative w-12 h-12">
+            <div className="absolute inset-0 rounded-full border-2 border-[var(--border-subtle)]" />
+            <div className="absolute inset-0 rounded-full border-2 border-[var(--text-primary)] border-t-transparent animate-spin" />
+          </div>
+          <p className="text-[var(--text-secondary)] text-sm font-mono">Loading Dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const isEmployee = profile?.role?.name === "Employee";
+
+  if (isEmployee) {
+    return (
+      <SidebarLayout>
+        <EmployeeDashboardView profile={profile} />
+      </SidebarLayout>
+    );
+  }
+
+  return <AdminDashboardView profile={profile} />;
 }
