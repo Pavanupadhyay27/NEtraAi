@@ -426,23 +426,23 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
           <div className="glass-card border border-slate-200 rounded-2xl overflow-hidden shadow-xs p-6 bg-white flex flex-col items-center justify-center min-h-[320px] relative">
             <canvas ref={canvasRef} className="hidden" />
             
-            {cameraActive ? (
-              <div className="w-full max-w-sm rounded-xl overflow-hidden border border-slate-250 bg-slate-950 aspect-video relative group shadow-inner">
-                <video ref={videoRef} className="w-full h-full object-cover scale-x-[-1]" muted playsInline />
-                
-                {/* Glowing Scanning Reticle overlay */}
-                <div className="absolute inset-0 border-[2px] border-cyan-400/30 m-6 pointer-events-none rounded-lg flex items-center justify-center">
-                  <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent absolute animate-laser" />
-                </div>
-
-                <button 
-                  onClick={stopCamera} 
-                  className="absolute bottom-3 right-3 bg-black/60 hover:bg-black/80 text-white rounded-lg px-2.5 py-1 text-[10px] font-extrabold cursor-pointer transition-all uppercase tracking-wider"
-                >
-                  Cancel
-                </button>
+            <div className={`w-full max-w-sm rounded-xl overflow-hidden border border-slate-250 bg-slate-950 aspect-video relative group shadow-inner ${cameraActive ? "" : "hidden"}`}>
+              <video ref={videoRef} className="w-full h-full object-cover scale-x-[-1]" muted playsInline />
+              
+              {/* Glowing Scanning Reticle overlay */}
+              <div className="absolute inset-0 border-[2px] border-cyan-400/30 m-6 pointer-events-none rounded-lg flex items-center justify-center">
+                <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent absolute animate-laser" />
               </div>
-            ) : (
+
+              <button 
+                onClick={stopCamera} 
+                className="absolute bottom-3 right-3 bg-black/60 hover:bg-black/80 text-white rounded-lg px-2.5 py-1 text-[10px] font-extrabold cursor-pointer transition-all uppercase tracking-wider"
+              >
+                Cancel
+              </button>
+            </div>
+
+            {!cameraActive && (
               <div className="flex flex-col items-center justify-center text-center p-6 space-y-4">
                 <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 shadow-2xs group-hover:scale-105 transition-all">
                   <Camera className="w-8 h-8 text-slate-450" />
