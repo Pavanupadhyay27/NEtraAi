@@ -1047,7 +1047,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ─── KPI Grid ─── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <StatCard label="Total Staff" value={loadingSummary ? "—" : summary?.total_employees} icon={Users} color="blue" loading={loadingSummary} sublabel="Registered" sparkData={staffSpark} />
           <StatCard label="Present Today" value={loadingSummary ? "—" : summary?.present_today} icon={UserCheck} color="emerald" loading={loadingSummary} sublabel="Clocked in" sparkData={presentSpark} />
           <StatCard label="Late Arrivals" value={loadingSummary ? "—" : summary?.late_today} icon={Clock} color="amber" loading={loadingSummary} sublabel="Grace exceeded" sparkData={lateSpark} />
@@ -1172,7 +1172,7 @@ export default function DashboardPage() {
               </div>
               
               {/* Status Filters */}
-              <div className="flex bg-zinc-50 border border-zinc-100 p-0.5 rounded-xl text-[10px] font-semibold text-zinc-400">
+              <div className="flex bg-zinc-50 border border-zinc-100 p-0.5 rounded-xl text-[10px] font-semibold text-zinc-400 overflow-x-auto max-w-full scrollbar-none whitespace-nowrap">
                 {(["ALL", "IN_OFFICE", "ABSENT", "CHECKED_OUT"] as const).map((filter) => (
                   <button
                     key={filter}
@@ -1325,7 +1325,7 @@ export default function DashboardPage() {
                 No department stats found.
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 {deptStats.map((d: any) => {
                   const percent = d.total_employees > 0 
                     ? Math.round((d.present_today / d.total_employees) * 100) 
