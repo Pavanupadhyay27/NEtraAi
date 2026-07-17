@@ -1462,8 +1462,8 @@ export default function TenantsPage() {
 
           {/* Edit Details Modal */}
           {showEditModal && (
-            <div className="fixed inset-0 z-55 flex items-center justify-center bg-black/40 backdrop-blur-xs px-4">
-              <div className="bg-white border border-slate-200 rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-fadeInUp p-6 space-y-4">
+            <div className="fixed inset-0 z-55 flex items-center justify-center bg-black/40 backdrop-blur-xs px-4 py-8 overflow-y-auto">
+              <div className="bg-white border border-slate-200 rounded-2xl shadow-xl w-full max-w-2xl my-auto animate-fadeInUp p-6 space-y-4 max-h-[90vh] overflow-y-auto">
                 
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
