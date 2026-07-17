@@ -201,6 +201,10 @@ def delete_company(
 
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to delete company: {str(e)}")
+        # Log the full technical error server-side for debugging
+        import logging
+        logging.getLogger("NetraID").error(f"Company deletion failed for ID {id}: {e}", exc_info=True)
+        # Return a sanitized message to the client (no internal details)
+        raise HTTPException(status_code=500, detail="Failed to delete company. Please try again or contact support.")
 
     return {"message": f"Company '{company_name}' and all associated data deleted successfully"}

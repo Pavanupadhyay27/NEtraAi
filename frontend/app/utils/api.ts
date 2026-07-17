@@ -1,21 +1,18 @@
 const DEFAULT_BACKEND_URL = "https://netraai07-netra.hf.space/api/v1";
 
+// Request timeout in milliseconds (10 seconds)
+// Prevents requests hanging indefinitely — important for security & UX
+const REQUEST_TIMEOUT_MS = 10_000;
+
 export function getBackendUrl(): string {
-  // Check for environment variable configuration (e.g. on Vercel)
   if (process.env.NEXT_PUBLIC_API_URL) {
     let url = process.env.NEXT_PUBLIC_API_URL.trim();
-
-    if (url.endsWith("/")) {
-      url = url.slice(0, -1);
-    }
-    if (!url.endsWith("/api/v1")) {
-      url = `${url}/api/v1`;
-    }
+    if (url.endsWith("/")) url = url.slice(0, -1);
+    if (!url.endsWith("/api/v1")) url = `${url}/api/v1`;
     return url;
   }
   if (typeof window !== "undefined") {
     const host = window.location.hostname;
-    // If running on localhost or a local private IP network, connect to local port 8000
     if (
       host === "localhost" ||
       host === "127.0.0.1" ||
@@ -28,6 +25,24 @@ export function getBackendUrl(): string {
     }
   }
   return DEFAULT_BACKEND_URL;
+}
+
+/**
+ * Wraps fetch with an AbortController timeout.
+ * Prevents requests from hanging indefinitely (network stall / SSRF slow-loris).
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs = REQUEST_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function setTokens(access: string, refresh: string) {
@@ -80,76 +95,91 @@ export function getUserProfile(): any | null {
 export async function fetchApi(endpoint: string, options: RequestInit = {}): Promise<any> {
   const url = `${getBackendUrl()}${endpoint}`;
   const headers = new Headers(options.headers || {});
-  
+
   const token = getAccessToken();
   if (token && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${token}`);
   }
-  
+
   if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
-  
-  const response = await fetch(url, {
-    ...options,
-    headers
-  });
-  
+
+  const response = await fetchWithTimeout(url, { ...options, headers });
+
   if (response.status === 401 && endpoint !== "/auth/login") {
-    // Attempt token refresh
+    // Attempt silent token refresh
     const refresh = getRefreshToken();
     if (refresh) {
       try {
-        const refreshResponse = await fetch(`${getBackendUrl()}/auth/refresh?refresh_token=${refresh}`, {
-          method: "POST"
-        });
+        // ⚠️ SECURITY: Send refresh token in JSON body, NOT as a URL query param.
+        // URL params appear in server logs, browser history, and Referer headers.
+        const refreshResponse = await fetchWithTimeout(
+          `${getBackendUrl()}/auth/refresh`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refresh_token: refresh }),
+          }
+        );
         if (refreshResponse.ok) {
           const tokens = await refreshResponse.json();
           setTokens(tokens.access_token, tokens.refresh_token);
-          // Retry the original request
+          // Retry the original request with new token
           headers.set("Authorization", `Bearer ${tokens.access_token}`);
-          const retryResponse = await fetch(url, { ...options, headers });
+          const retryResponse = await fetchWithTimeout(url, { ...options, headers });
           if (retryResponse.ok) {
             return await retryResponse.json();
           }
         }
       } catch (err) {
-        console.error("Token refresh failed", err);
+        // Silent — don't log tokens or sensitive data to console in production
+        if (process.env.NODE_ENV !== "production") {
+          console.error("Token refresh failed", err);
+        }
       }
     }
-    // Clear tokens and redirect to login if refresh fails
+    // Clear tokens and redirect to login
     clearTokens();
     if (typeof window !== "undefined" && window.location.pathname !== "/") {
       window.location.href = "/";
     }
     throw new Error("Session expired. Please login again.");
   }
-  
+
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: "Unknown server error" }));
     let errMsg = "Server error occurred";
     if (typeof errorData.detail === "string") {
       errMsg = errorData.detail;
     } else if (Array.isArray(errorData.detail)) {
-      errMsg = errorData.detail.map((err: any) => `${err.loc[err.loc.length - 1] || "field"}: ${err.msg}`).join(", ");
+      errMsg = errorData.detail
+        .map((err: any) => `${err.loc?.[err.loc.length - 1] ?? "field"}: ${err.msg}`)
+        .join(", ");
     } else if (errorData.detail && typeof errorData.detail === "object") {
       errMsg = JSON.stringify(errorData.detail);
     }
     throw new Error(errMsg);
   }
-  
+
   // Handle file responses (PDF, Excel, CSV)
   const contentType = response.headers.get("content-type");
-  if (contentType && (contentType.includes("pdf") || contentType.includes("sheet") || contentType.includes("csv"))) {
+  if (
+    contentType &&
+    (contentType.includes("pdf") ||
+      contentType.includes("sheet") ||
+      contentType.includes("csv"))
+  ) {
     return await response.blob();
   }
-  
+
   return await response.json();
 }
 
 export function parseDateTime(dateStr: string | null | undefined): Date | null {
   if (!dateStr) return null;
-  const hasTimezone = dateStr.endsWith("Z") || dateStr.includes("+") || /-\d{2}:\d{2}$/.test(dateStr);
+  const hasTimezone =
+    dateStr.endsWith("Z") || dateStr.includes("+") || /-\d{2}:\d{2}$/.test(dateStr);
   const formattedStr = hasTimezone ? dateStr : dateStr.replace(" ", "T") + "Z";
   return new Date(formattedStr);
 }
@@ -160,4 +190,3 @@ export function getLocalDateString(d: Date = new Date()): string {
   const day = String(d.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
-

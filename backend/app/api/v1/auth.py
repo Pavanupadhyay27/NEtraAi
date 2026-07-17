@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File, Form
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_
 from datetime import timedelta
@@ -74,39 +75,43 @@ def login(
         "token_type": "bearer"
     }
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
 @router.post("/refresh", response_model=schemas.Token)
 def refresh_token(
-    refresh_token: str,
+    body: RefreshRequest,
     db: Session = Depends(get_db)
 ):
+    """
+    Exchange a refresh token for a new access + refresh token pair.
+    Token is accepted in the JSON body (NOT as a URL query parameter)
+    to prevent exposure in server logs, browser history, and Referer headers.
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate refresh token",
     )
     try:
         payload = jwt.decode(
-            refresh_token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+            body.refresh_token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
         )
         email: str = payload.get("sub")
         token_type: str = payload.get("type")
-        
+
         if email is None or token_type != "refresh":
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-        
+
     user = crud.get_user_by_email(db, email=email)
     if user is None or not user.is_active:
         raise credentials_exception
-        
+
     role_name = user.role.name if user.role else "Employee"
-    access_token = security.create_access_token(
-        user.email, role=role_name
-    )
-    new_refresh_token = security.create_refresh_token(
-        user.email, role=role_name
-    )
-    
+    access_token = security.create_access_token(user.email, role=role_name)
+    new_refresh_token = security.create_refresh_token(user.email, role=role_name)
+
     return {
         "access_token": access_token,
         "refresh_token": new_refresh_token,

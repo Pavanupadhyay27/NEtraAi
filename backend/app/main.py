@@ -31,11 +31,15 @@ logger = logging.getLogger("NetraID")
 
 from fastapi.staticfiles import StaticFiles
 
+# Hide API docs in production — prevents attackers from browsing your schema
+_is_production = settings.ENVIRONMENT.lower() == "production"
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    docs_url=None if _is_production else "/docs",
+    redoc_url=None if _is_production else "/redoc",
+    openapi_url=None if _is_production else "/openapi.json",
 )
 
 from fastapi import Request
@@ -43,11 +47,28 @@ from fastapi import Request
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
+    # Prevent clickjacking
     response.headers["X-Frame-Options"] = "DENY"
+    # Prevent MIME-type sniffing
     response.headers["X-Content-Type-Options"] = "nosniff"
+    # Legacy XSS protection
     response.headers["X-XSS-Protection"] = "1; mode=block"
+    # Limit referrer information leakage
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Content-Security-Policy"] = "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; img-src 'self' data: blob: https:; connect-src 'self' ws: wss: https:;"
+    # Force HTTPS for 2 years including subdomains
+    response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
+    # Restrict browser feature access
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
+    # Tighter CSP for API-only backend
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'none'; "
+        "img-src 'self' data: blob:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none';"
+    )
+    # Remove server fingerprinting header
+    response.headers.pop("server", None)
+    response.headers.pop("x-powered-by", None)
     return response
 
 # Mount uploads directory as static files
@@ -91,34 +112,37 @@ def get_upload_file(employee_id: str, filename: str, db: Session = Depends(get_d
             
     raise HTTPException(status_code=404, detail="File not found")
 
-# CORS configuration
+# CORS — restrict to explicit methods and headers only
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
+    expose_headers=["Content-Disposition"],
+    max_age=600,
 )
 
 db_error = None
 
 def purge_old_audit_logs():
-    """Background loop to delete audit logs older than 24 hours."""
-    logger.info("Starting background audit log purger thread...")
+    """Background loop to delete audit logs older than AUDIT_LOG_RETENTION_DAYS (default 90)."""
+    retention_days = getattr(settings, "AUDIT_LOG_RETENTION_DAYS", 90)
+    logger.info(f"Starting background audit log purger (retention: {retention_days} days)...")
     while True:
         try:
             db = SessionLocal()
-            cutoff = datetime.now() - timedelta(hours=24)
+            cutoff = datetime.now() - timedelta(days=retention_days)
             stmt = delete(models.AuditLog).where(models.AuditLog.timestamp < cutoff)
             result = db.execute(stmt)
             db.commit()
             deleted_count = result.rowcount
             if deleted_count > 0:
-                logger.info(f"Purged {deleted_count} audit logs older than 24 hours.")
+                logger.info(f"Purged {deleted_count} audit logs older than {retention_days} days.")
             db.close()
         except Exception as e:
             logger.error(f"Error purging old audit logs: {e}")
-        time.sleep(3600)
+        time.sleep(3600)  # Run every hour
 
 @app.on_event("startup")
 def startup_event():
@@ -179,27 +203,8 @@ def read_root():
         "docs": "/docs"
     }
 
-@app.get("/debug-db")
-def debug_db():
-    masked_url = None
-    if settings.DATABASE_URL:
-        # Mask password for security
-        parts = settings.DATABASE_URL.split("@")
-        if len(parts) >= 2:
-            creds = parts[0]
-            host_info = "@".join(parts[1:])
-            if ":" in creds:
-                scheme_user, _ = creds.rsplit(":", 1)
-                masked_url = f"{scheme_user}:****@{host_info}"
-            else:
-                masked_url = f"{creds}:****@{host_info}"
-        else:
-            masked_url = settings.DATABASE_URL
-            
-    return {
-        "db_error": db_error,
-        "database_url": masked_url
-    }
+# REMOVED: /debug-db endpoint was leaking database connection info.
+# Use server logs to debug DB connection issues instead.
 
 @app.get("/health", tags=["Status"])
 def health_check():

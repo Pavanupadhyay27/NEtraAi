@@ -49,8 +49,12 @@ class Settings(BaseSettings):
     # JWT & Security
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15   # Short-lived — silent refresh handles renewal
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 1      # 24-hour refresh window
+    # Set to True only if behind a trusted reverse proxy (nginx/Cloudflare) that sets X-Forwarded-For
+    TRUST_PROXY: bool = False
+    # Set to 'production' in .env to disable API docs and tighten other settings
+    ENVIRONMENT: str = "development"
     
     # Seeding
     INITIAL_ADMIN_EMAIL: str = "pavanupadhyay027@gmail.com"
@@ -70,7 +74,9 @@ class Settings(BaseSettings):
     MODELS_DIR: str = "./models"
     
     # Rate Limiting
-    RATE_LIMIT_PER_MINUTE: int = 100
+    RATE_LIMIT_PER_MINUTE: int = 200
+    # Audit log retention in days (default: 90 days)
+    AUDIT_LOG_RETENTION_DAYS: int = 90
     
     # CORS Origins
     # We load them as a list of strings
