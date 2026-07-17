@@ -144,8 +144,9 @@ export default function TenantsPage() {
       });
     },
     onSuccess: () => {
+      const tenantName = selectedTenant?.name || "Company";
       queryClient.invalidateQueries({ queryKey: ["tenants"] });
-      toast.success("Organization deleted successfully");
+      toast.success(`Purged organization database: "${tenantName}" and all related workspaces have been deleted.`);
       setShowEditModal(false);
       setSelectedTenant(null);
     },
@@ -1013,8 +1014,8 @@ export default function TenantsPage() {
 
           {/* Onboarding 14-Step Wizard */}
           {showAddModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs px-4">
-              <div className="bg-white border border-slate-200 rounded-2xl shadow-xl w-full max-w-xl overflow-hidden animate-fadeInUp flex flex-col h-[85vh]">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+              <div className="bg-white border border-slate-200 rounded-2xl shadow-xl w-full max-w-xl overflow-hidden animate-fadeInUp flex flex-col" style={{maxHeight: 'min(85vh, 620px)'}}>
                 
                 {/* Wizard Header */}
                 <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
@@ -1462,8 +1463,8 @@ export default function TenantsPage() {
 
           {/* Edit Details Modal */}
           {showEditModal && (
-            <div className="fixed inset-0 z-55 flex items-center justify-center bg-black/40 backdrop-blur-xs px-4 py-8 overflow-y-auto">
-              <div className="bg-white border border-slate-200 rounded-2xl shadow-xl w-full max-w-2xl my-auto animate-fadeInUp p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="fixed inset-0 z-55 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+              <div className="bg-white border border-slate-200 rounded-2xl shadow-xl w-full max-w-2xl animate-fadeInUp p-6 space-y-4 overflow-y-auto" style={{maxHeight: 'min(90vh, 560px)'}}>
                 
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">

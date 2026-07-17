@@ -250,7 +250,7 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
   const visibleNavItems = getVisibleNavItems();
 
   return (
-    <div className="min-h-screen flex bg-[var(--bg-base)] text-[var(--text-primary)] font-sans relative">
+    <div className="h-screen overflow-hidden flex bg-[var(--bg-base)] text-[var(--text-primary)] font-sans relative">
       <CommandPalette />
       {/* Ambient background */}
       <div className="ambient-bg" />
@@ -513,7 +513,7 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
       </div>
 
       {/* ─── Main Content ─── */}
-      <main className="flex-1 min-h-screen overflow-y-auto relative z-10 pt-14 md:pt-0">
+      <main className="flex-1 flex flex-col relative z-10 pt-14 md:pt-0 overflow-hidden">
         {/* Desktop Top Navbar */}
         <header className="hidden md:flex h-14 border-b border-[var(--border-subtle)] px-8 items-center justify-between bg-[var(--bg-surface)]/95 backdrop-blur-xl sticky top-0 z-30">
           <div className="flex-1" />
@@ -542,7 +542,7 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
 
         <div 
           key={pathname}
-          className="max-w-7xl mx-auto px-5 py-6 md:px-8 md:py-8 page-enter"
+          className="flex-1 overflow-y-auto max-w-7xl mx-auto w-full px-5 py-6 md:px-8 md:py-8 page-enter"
         >
           {children}
         </div>
