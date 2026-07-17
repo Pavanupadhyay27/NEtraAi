@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response, UploadFile, File, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
+from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_
 from datetime import timedelta
@@ -20,12 +21,12 @@ router = APIRouter()
 @router.post("/login", response_model=schemas.Token, dependencies=[Depends(check_login_rate_limit)])
 def login(
     request: Request,
+    response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
     user = crud.get_user_by_email(db, email=form_data.username)
     if not user or not crud.verify_password(form_data.password, user.hashed_password):
-        # Log failed login attempt
         crud.create_audit_log(
             db=db,
             user_id=None,
@@ -49,17 +50,37 @@ def login(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Inactive user account"
         )
-        
+
     role_name = user.role.name if user.role else "Employee"
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = security.create_access_token(
         user.email, role=role_name, expires_delta=access_token_expires
     )
-    refresh_token = security.create_refresh_token(
-        user.email, role=role_name
+    refresh_token = security.create_refresh_token(user.email, role=role_name)
+
+    # ─── Set HttpOnly cookies (most secure — JS cannot read these) ───
+    is_production = settings.ENVIRONMENT.lower() == "production"
+    # SameSite=None required for cross-origin (Vercel ↔ HuggingFace)
+    # HttpOnly=True means XSS cannot steal the token — massive security win
+    cookie_opts = dict(
+        httponly=True,
+        secure=is_production,          # Require HTTPS in prod
+        samesite="none" if is_production else "lax",
+        path="/",
     )
-    
-    # Audit log login
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        **cookie_opts
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        **cookie_opts
+    )
+
     crud.create_audit_log(
         db=db,
         user_id=user.id,
@@ -68,7 +89,8 @@ def login(
         user_agent=request.headers.get("user-agent"),
         details=f"Successful login for user email {user.email}"
     )
-    
+
+    # Also return tokens in body for backward-compat (kiosk / non-browser clients)
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -76,25 +98,32 @@ def login(
     }
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    refresh_token: Optional[str] = None
 
 @router.post("/refresh", response_model=schemas.Token)
-def refresh_token(
-    body: RefreshRequest,
+def refresh_token_endpoint(
+    request: Request,
+    response: Response,
+    body: RefreshRequest = RefreshRequest(),
     db: Session = Depends(get_db)
 ):
     """
     Exchange a refresh token for a new access + refresh token pair.
-    Token is accepted in the JSON body (NOT as a URL query parameter)
-    to prevent exposure in server logs, browser history, and Referer headers.
+    Reads refresh token from HttpOnly cookie first (browser sessions),
+    falls back to JSON body (API / kiosk clients).
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate refresh token",
     )
+    # Cookie takes priority over body
+    raw_refresh = request.cookies.get("refresh_token") or body.refresh_token
+    if not raw_refresh:
+        raise credentials_exception
+
     try:
         payload = jwt.decode(
-            body.refresh_token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+            raw_refresh, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
         )
         email: str = payload.get("sub")
         token_type: str = payload.get("type")
@@ -109,14 +138,58 @@ def refresh_token(
         raise credentials_exception
 
     role_name = user.role.name if user.role else "Employee"
-    access_token = security.create_access_token(user.email, role=role_name)
+    new_access_token = security.create_access_token(user.email, role=role_name)
     new_refresh_token = security.create_refresh_token(user.email, role=role_name)
 
+    # Rotate cookies
+    is_production = settings.ENVIRONMENT.lower() == "production"
+    cookie_opts = dict(
+        httponly=True,
+        secure=is_production,
+        samesite="none" if is_production else "lax",
+        path="/",
+    )
+    response.set_cookie(key="access_token", value=new_access_token,
+                        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60, **cookie_opts)
+    response.set_cookie(key="refresh_token", value=new_refresh_token,
+                        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400, **cookie_opts)
+
     return {
-        "access_token": access_token,
+        "access_token": new_access_token,
         "refresh_token": new_refresh_token,
         "token_type": "bearer"
     }
+
+@router.post("/logout")
+def logout(
+    response: Response,
+    current_user: models.User = Depends(security.get_current_user),
+    db: Session = Depends(get_db),
+    request: Request = None
+):
+    """
+    Clears authentication cookies server-side.
+    After this, no cookie is present so subsequent requests are unauthenticated.
+    """
+    is_production = settings.ENVIRONMENT.lower() == "production"
+    cookie_opts = dict(
+        httponly=True,
+        secure=is_production,
+        samesite="none" if is_production else "lax",
+        path="/",
+    )
+    response.delete_cookie(key="access_token", **cookie_opts)
+    response.delete_cookie(key="refresh_token", **cookie_opts)
+
+    crud.create_audit_log(
+        db=db,
+        user_id=current_user.id,
+        action="User Logout",
+        ip_address=request.client.host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+        details=f"User {current_user.email} logged out"
+    )
+    return {"message": "Logged out successfully"}
 
 @router.get("/me", response_model=schemas.UserOut)
 def read_users_me(

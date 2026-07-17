@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
-from typing import Union, Any, List
+from typing import Union, Any, List, Optional
 from jose import jwt, JWTError
-from fastapi import Depends, HTTPException, status, Request, Query
+from fastapi import Depends, HTTPException, status, Request, Query, Header
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -11,6 +11,12 @@ from app.models import models
 from app.crud import crud
 
 import bcrypt
+
+# Keep oauth2_scheme for OpenAPI schema documentation only
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.API_V1_STR}/auth/login",
+    auto_error=False,  # Don't auto-raise 401 — we handle it in get_current_user
+)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
@@ -57,15 +63,39 @@ def create_refresh_token(subject: Union[str, Any], role: str, expires_delta: tim
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
+def _extract_token(request: Request, bearer_token: Optional[str]) -> str:
+    """
+    Priority order for token extraction (most secure first):
+    1. HttpOnly cookie 'access_token'  — browser-based sessions (XSS-proof)
+    2. Authorization: Bearer header    — kiosk devices / API clients
+    """
+    # 1. Cookie (set by login endpoint, cannot be read by JS)
+    cookie_token = request.cookies.get("access_token")
+    if cookie_token:
+        return cookie_token
+
+    # 2. Bearer header (kiosk, mobile, API clients)
+    if bearer_token:
+        return bearer_token
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
 def get_current_user(
+    request: Request,
     db: Session = Depends(get_db),
-    token: str = Depends(oauth2_scheme)
+    bearer_token: Optional[str] = Depends(oauth2_scheme),
 ) -> models.User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    token = _extract_token(request, bearer_token)
     try:
         payload = jwt.decode(
             token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
