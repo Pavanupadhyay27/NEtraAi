@@ -66,9 +66,12 @@ async def add_security_headers(request: Request, call_next):
         "connect-src 'self'; "
         "frame-ancestors 'none';"
     )
-    # Remove server fingerprinting header
-    response.headers.pop("server", None)
-    response.headers.pop("x-powered-by", None)
+    # Remove server fingerprinting headers (MutableHeaders has no .pop())
+    for _hdr in ("server", "x-powered-by"):
+        try:
+            del response.headers[_hdr]
+        except KeyError:
+            pass
     return response
 
 # Mount uploads directory as static files
