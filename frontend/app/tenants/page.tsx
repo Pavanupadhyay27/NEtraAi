@@ -18,6 +18,7 @@ export default function TenantsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<any>(null);
   const [activeWorkspaceTenant, setActiveWorkspaceTenant] = useState<any>(null);
   const [workspaceTab, setWorkspaceTab] = useState("overview");
@@ -157,9 +158,13 @@ export default function TenantsPage() {
 
   const handleDelete = () => {
     if (!selectedTenant) return;
-    if (window.confirm(`Are you absolutely sure you want to delete ${selectedTenant.name}? This will permanently remove all associated employees, departments, shifts, settings, and logs. This action cannot be undone.`)) {
-      deleteMutation.mutate(selectedTenant.id);
-    }
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    if (!selectedTenant) return;
+    deleteMutation.mutate(selectedTenant.id);
+    setShowDeleteConfirm(false);
   };
 
   const handleDetectLocation = () => {
@@ -1581,6 +1586,131 @@ export default function TenantsPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ─── Delete Confirmation Modal ─── */}
+      {showDeleteConfirm && selectedTenant && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 999998,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(0,0,0,0.75)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            padding: "16px",
+          }}
+        >
+          <div
+            style={{
+              background: "rgba(9,12,20,0.95)",
+              border: "1px solid rgba(244,63,94,0.3)",
+              boxShadow: "0 0 0 1px rgba(255,255,255,0.04), 0 32px 80px rgba(0,0,0,0.8), 0 0 60px rgba(244,63,94,0.12)",
+              backdropFilter: "blur(32px)",
+              borderRadius: "20px",
+              width: "100%",
+              maxWidth: "420px",
+              padding: "28px",
+              animation: "toastIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards",
+            }}
+          >
+            {/* Warning icon */}
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
+              <div style={{
+                width: 60, height: 60, borderRadius: "16px",
+                background: "rgba(244,63,94,0.12)",
+                border: "1px solid rgba(244,63,94,0.3)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: "0 0 24px rgba(244,63,94,0.2)",
+              }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                    stroke="#f43f5e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            </div>
+
+            {/* Title */}
+            <h2 style={{
+              color: "rgba(255,255,255,0.95)", fontSize: "16px", fontWeight: 800,
+              textAlign: "center", marginBottom: "10px", letterSpacing: "-0.01em",
+            }}>
+              Delete Organization
+            </h2>
+
+            {/* Body */}
+            <p style={{
+              color: "rgba(255,255,255,0.5)", fontSize: "12.5px", textAlign: "center",
+              lineHeight: 1.65, marginBottom: "8px",
+            }}>
+              You are about to permanently delete
+            </p>
+            <p style={{
+              color: "#f43f5e", fontSize: "14px", fontWeight: 700, textAlign: "center",
+              marginBottom: "16px", letterSpacing: "-0.01em",
+            }}>
+              &ldquo;{selectedTenant.name}&rdquo;
+            </p>
+            <div style={{
+              background: "rgba(244,63,94,0.07)",
+              border: "1px solid rgba(244,63,94,0.18)",
+              borderRadius: "10px", padding: "10px 14px",
+              marginBottom: "24px",
+            }}>
+              <p style={{ color: "rgba(255,255,255,0.55)", fontSize: "11.5px", lineHeight: 1.6, margin: 0 }}>
+                This will <strong style={{ color: "rgba(255,255,255,0.8)" }}>permanently remove</strong> all associated employees, departments, shifts, attendance records, face data, and logs.
+                This action <strong style={{ color: "#f43f5e" }}>cannot be undone</strong>.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{
+                  flex: 1, height: "42px", borderRadius: "12px",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  background: "rgba(255,255,255,0.05)",
+                  color: "rgba(255,255,255,0.6)", fontSize: "13px", fontWeight: 600,
+                  cursor: "pointer", transition: "all 0.15s",
+                }}
+                onMouseEnter={e => Object.assign((e.currentTarget as HTMLElement).style, { background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.9)" })}
+                onMouseLeave={e => Object.assign((e.currentTarget as HTMLElement).style, { background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.6)" })}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleteMutation.isPending}
+                style={{
+                  flex: 1, height: "42px", borderRadius: "12px",
+                  border: "1px solid rgba(244,63,94,0.35)",
+                  background: "linear-gradient(135deg, #f43f5e, #e11d48)",
+                  boxShadow: "0 4px 16px rgba(244,63,94,0.35)",
+                  color: "#fff", fontSize: "13px", fontWeight: 700,
+                  cursor: "pointer", display: "flex", alignItems: "center",
+                  justifyContent: "center", gap: "6px", transition: "all 0.15s",
+                }}
+                onMouseEnter={e => Object.assign((e.currentTarget as HTMLElement).style, { background: "linear-gradient(135deg, #e11d48, #be123c)", boxShadow: "0 6px 24px rgba(244,63,94,0.5)" })}
+                onMouseLeave={e => Object.assign((e.currentTarget as HTMLElement).style, { background: "linear-gradient(135deg, #f43f5e, #e11d48)", boxShadow: "0 4px 16px rgba(244,63,94,0.35)" })}
+              >
+                {deleteMutation.isPending ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ animation: "spin 0.8s linear infinite" }}>
+                    <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="3"/>
+                    <path d="M12 2a10 10 0 010 20" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <polyline points="3 6 5 6 21 6" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                    <path d="M19 6l-1 14H6L5 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M10 11v6M14 11v6" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                    <path d="M9 6V4h6v2" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+                Yes, Delete Permanently
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </SidebarLayout>
