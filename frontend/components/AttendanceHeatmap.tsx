@@ -89,7 +89,7 @@ export default function AttendanceHeatmap({ employeeId, title }: AttendanceHeatm
   });
 
   return (
-    <div className="bg-white border border-zinc-100 rounded-xl p-5 shadow-xs">
+    <div className="tech-card-3d p-5">
       <div className="flex items-center gap-2 mb-4 border-b border-zinc-50 pb-3">
         <Calendar className="w-4 h-4 text-slate-450" />
         <h3 className="text-[11px] font-bold text-slate-450 uppercase tracking-wider">

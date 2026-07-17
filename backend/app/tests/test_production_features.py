@@ -79,9 +79,9 @@ def test_shift_attendance_rules():
         db.commit()
         db.refresh(employee)
         
-        # Test 1: Check-in before deadline (10:10)
-        # We manually call mark_kiosk_attendance with timestamps
-        checkin_time_on_time = datetime.combine(datetime.now().date(), time(10, 5))
+        # Test 1: Check-in before deadline (10:10 IST)
+        # We manually call mark_kiosk_attendance with UTC timestamps (10:05 IST = 04:35 UTC)
+        checkin_time_on_time = datetime.combine(datetime.now().date(), time(4, 35))
         att = crud.mark_kiosk_attendance(db, employee.id, checkin_time_on_time, "Test Cam", 0.95)
         
         assert att.late_arrival is False
@@ -91,8 +91,8 @@ def test_shift_attendance_rules():
         db.delete(att)
         db.commit()
         
-        # Test 2: Check-in after deadline (10:15)
-        checkin_time_late = datetime.combine(datetime.now().date(), time(10, 15))
+        # Test 2: Check-in after deadline (10:15 IST = 04:45 UTC)
+        checkin_time_late = datetime.combine(datetime.now().date(), time(4, 45))
         att_late = crud.mark_kiosk_attendance(db, employee.id, checkin_time_late, "Test Cam", 0.95)
         
         # In mark_kiosk_attendance, it uses local_now (current time) for determining is_late,

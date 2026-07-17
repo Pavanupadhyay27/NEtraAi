@@ -1167,16 +1167,8 @@ export default function EmployeeDetailPage() {
                 </div>
 
                 {/* Footer QR fallback */}
-                <div className="bg-slate-50/80 border-t border-slate-100 h-[100px] flex items-center justify-between px-5 pb-2 shrink-0 z-10">
-                  <div className="flex flex-col min-w-0 pr-1.5">
-                    <span className="text-[7.5px] font-black text-slate-900 tracking-wider uppercase font-mono">
-                      SCAN TO VERIFY
-                    </span>
-                    <p className="text-[6.5px] text-slate-450 font-medium leading-snug mt-0.5 max-w-[115px] font-mono">
-                      Scan this backup barcode QR badge if Kiosk face matching fails.
-                    </p>
-                  </div>
-                  <div className="w-[64px] h-[64px] bg-white rounded-lg border border-slate-200/80 p-1 flex items-center justify-center shadow-2xs shrink-0">
+                <div className="bg-slate-50/80 border-t border-slate-100 h-[90px] flex items-center justify-center pb-1 shrink-0 z-10">
+                  <div className="w-[60px] h-[60px] bg-white rounded-lg border border-slate-200/80 p-1 flex items-center justify-center shadow-2xs shrink-0">
                     <img 
                       src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${employee.employee_id}`}
                       alt="QR"

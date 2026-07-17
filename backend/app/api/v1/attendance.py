@@ -20,22 +20,24 @@ def read_daily_attendance(
     date_val: Optional[date] = None,
     employee_id: Optional[int] = None,
     department_id: Optional[int] = None,
+    company_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(checker_view)
 ):
+    target_company_id = current_user.company_id if current_user.company_id is not None else company_id
     if not date_val:
         date_val = date.today()
     if department_id:
         dept = crud.get_department_by_id(db, department_id)
-        if not dept or (current_user.company_id is not None and dept.company_id != current_user.company_id):
+        if not dept or (target_company_id is not None and dept.company_id != target_company_id):
             raise HTTPException(status_code=404, detail="Department not found")
     if employee_id:
         emp = crud.get_employee_by_id(db, employee_id)
-        if not emp or (current_user.company_id is not None and emp.company_id != current_user.company_id):
+        if not emp or (target_company_id is not None and emp.company_id != target_company_id):
             raise HTTPException(status_code=404, detail="Employee not found")
             
     return crud.get_daily_attendance(
-        db, date_val=date_val, employee_id=employee_id, department_id=department_id, company_id=current_user.company_id
+        db, date_val=date_val, employee_id=employee_id, department_id=department_id, company_id=target_company_id
     )
 
 @router.put("/{id}", response_model=schemas.AttendanceOut)
@@ -163,10 +165,18 @@ def read_attendance_logs(
     limit: int = 100,
     employee_id: Optional[int] = None,
     date_str: Optional[str] = None, # YYYY-MM-DD
+    company_id: Optional[int] = None,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(checker_view)
+    current_user: models.User = Depends(security.get_current_user)
 ):
-    return crud.get_attendance_logs(db, company_id=current_user.company_id, skip=skip, limit=limit, employee_id=employee_id, date_str=date_str)
+    role_name = current_user.role.name if current_user.role else "Employee"
+    if role_name == "Employee":
+        if not current_user.employee:
+            return []
+        employee_id = current_user.employee.id
+        
+    target_company_id = current_user.company_id if current_user.company_id is not None else company_id
+    return crud.get_attendance_logs(db, company_id=target_company_id, skip=skip, limit=limit, employee_id=employee_id, date_str=date_str)
 
 @router.get("/employee/{employee_id}", response_model=List[schemas.AttendanceOut])
 def get_employee_attendance_history(

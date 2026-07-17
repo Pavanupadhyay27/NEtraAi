@@ -52,24 +52,6 @@ export default function ReportsPage() {
   const { data: departments } = useQuery({ queryKey: ["departments"], queryFn: () => fetchApi("/departments/") });
   const { data: employees } = useQuery({ queryKey: ["employees-list"], queryFn: () => fetchApi("/employees/") });
 
-  // Preview Query
-  const { data: previewData, isLoading: loadingPreview } = useQuery({
-    queryKey: ["reports-preview", startDate, endDate, employeeId, departmentId, minHours, maxHours, selectedColumns],
-    queryFn: () => {
-      const params = [
-        `start_date=${startDate}`,
-        `end_date=${endDate}`,
-        `columns=${selectedColumns.join(",")}`
-      ];
-      if (employeeId) params.push(`employee_id=${employeeId}`);
-      if (departmentId) params.push(`department_id=${departmentId}`);
-      if (minHours) params.push(`min_hours=${minHours}`);
-      if (maxHours) params.push(`max_hours=${maxHours}`);
-      
-      return fetchApi(`/reports/preview?${params.join("&")}`);
-    }
-  });
-
   const handleExport = async (e: React.FormEvent) => {
     e.preventDefault();
     setExporting(true); setSuccess(false);
@@ -115,7 +97,7 @@ export default function ReportsPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           {/* Form */}
-          <div className="lg:col-span-2 glass-card rounded-2xl border border-slate-200 p-6 space-y-6 shadow-2xs">
+          <div className="lg:col-span-2 tech-card-3d-minimal bg-white p-6 space-y-6">
             <div className="flex items-center gap-2.5 border-b border-slate-100 pb-4">
               <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center border border-zinc-200">
                 <FileDown className="w-4 h-4 text-zinc-700" />
@@ -340,7 +322,7 @@ export default function ReportsPage() {
 
           {/* Sidebar info */}
           <div className="space-y-4 md:col-span-1">
-            <div className="glass-card rounded-2xl border border-slate-200 p-5 space-y-4.5 bg-slate-50/10">
+            <div className="tech-card-3d-minimal bg-white p-5 space-y-4.5">
               <div className="flex items-center gap-2 mb-1">
                 <Layers className="w-4 h-4 text-zinc-700" />
                 <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">Audit Protocols</h3>
@@ -370,71 +352,6 @@ export default function ReportsPage() {
                   </p>
                 </div>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* ─── Live Preview Grid Card ─── */}
-        <div className="glass-card rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/10">
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
-              <h2 className="text-[11px] font-bold text-slate-450 uppercase tracking-wider">
-                Live Data Preview ({previewData?.total_count || 0} matching logs)
-              </h2>
-            </div>
-            <span className="text-[9.5px] font-mono text-slate-400 font-bold uppercase">
-              Showing first 8 records
-            </span>
-          </div>
-
-          <div className="overflow-x-auto scrollbar-thin">
-            {loadingPreview ? (
-              <div className="p-8 flex items-center justify-center text-slate-400 text-xs gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-slate-650" />
-                <span>Computing report preview...</span>
-              </div>
-            ) : !previewData?.records || previewData.records.length === 0 ? (
-              <div className="p-12 text-center text-slate-400 italic text-xs">
-                No attendance logs found matching these search criteria. Try adjusting dates or filters.
-              </div>
-            ) : (
-              <table className="w-full text-left border-collapse text-[11px] min-w-[700px]">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 uppercase tracking-wider font-mono">
-                    {previewData.columns.map((col: string) => (
-                      <th key={col} className="py-2.5 px-4 font-semibold">{col}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700 font-sans">
-                  {previewData.records.slice(0, 8).map((row: any, rIdx: number) => (
-                    <tr key={rIdx} className="hover:bg-slate-50/40 transition-colors">
-                      {previewData.columns.map((col: string) => {
-                        const val = row[col];
-                        return (
-                          <td key={col} className="py-2.5 px-4 font-mono text-slate-800">
-                            {col === "Status" ? (
-                              <span className={`inline-block text-[8.5px] font-semibold px-1.5 py-0.5 rounded border ${
-                                val === "Present" ? "bg-emerald-50 border-emerald-250 text-emerald-700" :
-                                val === "Late" ? "bg-amber-50 border-amber-250 text-amber-700" :
-                                val === "Half Day" ? "bg-indigo-50 border-indigo-250 text-indigo-750" :
-                                "bg-rose-50 border-rose-250 text-rose-700"
-                              }`}>
-                                {val}
-                              </span>
-                            ) : typeof val === "number" ? (
-                              val.toFixed(2)
-                            ) : (
-                              val || "-"
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             )}
           </div>
         </div>

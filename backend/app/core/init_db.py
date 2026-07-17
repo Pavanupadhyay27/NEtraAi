@@ -226,5 +226,46 @@ def init_db(db: Session):
         admin_user.hashed_password = crud.get_password_hash(settings.INITIAL_ADMIN_PASSWORD)
         admin_user.company_id = None
         db.commit()
+
+    # 4. Seed Default Company Admin User linked to NetraID Base
+    default_admin_email = "hr@netraid.ai"
+    default_admin = crud.get_user_by_email(db, default_admin_email)
+    if not default_admin:
+        logger.info(f"Seeding default company admin user: {default_admin_email}")
+        admin_create = schemas.UserCreate(
+            email=default_admin_email,
+            password="Admin@NetraID2026",
+            role_id=db_roles["Admin"].id
+        )
+        crud.create_user(db, admin_create, company_id=default_company.id)
+
+    # 5. Seed Default Employee User linked to NetraID Base
+    default_emp_email = "employee@netraid.ai"
+    default_emp = crud.get_user_by_email(db, default_emp_email)
+    if not default_emp:
+        logger.info(f"Seeding default employee user: {default_emp_email}")
+        emp_create = schemas.UserCreate(
+            email=default_emp_email,
+            password="Employee@NetraID2026",
+            role_id=db_roles["Employee"].id
+        )
+        db_user = crud.create_user(db, emp_create, company_id=default_company.id)
+        
+        eng_dept = db.execute(select(models.Department).where(
+            models.Department.code == "ENG",
+            models.Department.company_id == default_company.id
+        )).scalar_one_or_none()
+        dept_id = eng_dept.id if eng_dept else None
+
+        employee_in = schemas.EmployeeCreate(
+            name="Rahul Kumar",
+            employee_id="EMP101",
+            phone="9876543210",
+            email=default_emp_email,
+            designation="Software Engineer",
+            department_id=dept_id,
+            status="Active"
+        )
+        crud.create_employee(db, employee_in, user_id=db_user.id, company_id=default_company.id)
         
     logger.info("Database initialization and seeding completed successfully.")

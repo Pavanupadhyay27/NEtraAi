@@ -25,11 +25,13 @@ def read_employees(
     search: Optional[str] = None,
     department_id: Optional[int] = None,
     status: Optional[str] = None,
+    company_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(checker_view)
 ):
+    target_company_id = current_user.company_id if current_user.company_id is not None else company_id
     return crud.get_employees(
-        db, company_id=current_user.company_id, skip=skip, limit=limit, search=search, department_id=department_id, status=status
+        db, company_id=target_company_id, skip=skip, limit=limit, search=search, department_id=department_id, status=status
     )
 
 @router.get("/count")
@@ -37,11 +39,106 @@ def get_employee_count(
     search: Optional[str] = None,
     department_id: Optional[int] = None,
     status: Optional[str] = None,
+    company_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(checker_view)
 ):
-    count = crud.count_employees(db, company_id=current_user.company_id, search=search, department_id=department_id, status=status)
+    target_company_id = current_user.company_id if current_user.company_id is not None else company_id
+    count = crud.count_employees(db, company_id=target_company_id, search=search, department_id=department_id, status=status)
     return {"count": count}
+
+
+# --- Leave Requests Endpoints ---
+
+@router.get("/leaves", response_model=List[schemas.LeaveRequestOut])
+def list_leaves(
+    employee_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.RoleChecker(["Super Admin", "Admin", "HR", "Employee"]))
+):
+    if current_user.role.name == "Employee":
+        if not current_user.employee:
+            raise HTTPException(status_code=400, detail="User is not linked to an employee profile")
+        target_employee_id = current_user.employee.id
+    else:
+        target_employee_id = employee_id
+
+    if target_employee_id:
+        emp = crud.get_employee_by_id(db, target_employee_id)
+        if not emp or (current_user.company_id is not None and emp.company_id != current_user.company_id):
+            raise HTTPException(status_code=404, detail="Employee not found")
+        return crud.get_leave_requests(db, employee_id=target_employee_id)
+    
+    leaves = crud.get_leave_requests(db)
+    if current_user.company_id is not None:
+        leaves = [l for l in leaves if l.employee and l.employee.company_id == current_user.company_id]
+    return leaves
+
+
+@router.post("/leaves", response_model=schemas.LeaveRequestOut, status_code=status.HTTP_201_CREATED)
+def apply_leave(
+    req: schemas.LeaveRequestCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.RoleChecker(["Super Admin", "Admin", "HR", "Employee"]))
+):
+    if current_user.role.name == "Employee":
+        if not current_user.employee:
+            raise HTTPException(status_code=400, detail="User is not linked to an employee profile")
+        if req.employee_id != current_user.employee.id:
+            raise HTTPException(status_code=403, detail="You can only apply leave for yourself")
+    else:
+        emp = crud.get_employee_by_id(db, req.employee_id)
+        if not emp or (current_user.company_id is not None and emp.company_id != current_user.company_id):
+            raise HTTPException(status_code=404, detail="Employee not found")
+
+    return crud.create_leave_request(db, req, employee_id=req.employee_id)
+
+
+@router.put("/leaves/{id}", response_model=schemas.LeaveRequestOut)
+def update_leave(
+    id: int,
+    data: schemas.LeaveRequestUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.RoleChecker(["Super Admin", "Admin", "HR"]))
+):
+    db_req = db.get(models.LeaveRequest, id)
+    if not db_req:
+        raise HTTPException(status_code=404, detail="Leave request not found")
+        
+    emp = crud.get_employee_by_id(db, db_req.employee_id)
+    if not emp or (current_user.company_id is not None and emp.company_id != current_user.company_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    updated = crud.update_leave_status(db, id=id, status=data.status, admin_user_id=current_user.id)
+    if not updated:
+      raise HTTPException(status_code=404, detail="Leave request not found")
+    return updated
+
+
+@router.delete("/leaves/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_leave(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.RoleChecker(["Super Admin", "Admin", "HR", "Employee"]))
+):
+    db_req = db.get(models.LeaveRequest, id)
+    if not db_req:
+        raise HTTPException(status_code=404, detail="Leave request not found")
+        
+    if current_user.role.name == "Employee":
+        if not current_user.employee or db_req.employee_id != current_user.employee.id:
+            raise HTTPException(status_code=403, detail="You can only withdraw your own leave requests")
+        if db_req.status != "Pending":
+            raise HTTPException(status_code=400, detail="You can only withdraw pending leave requests")
+    else:
+        emp = crud.get_employee_by_id(db, db_req.employee_id)
+        if not emp or (current_user.company_id is not None and emp.company_id != current_user.company_id):
+            raise HTTPException(status_code=403, detail="Access denied")
+            
+    db.delete(db_req)
+    db.commit()
+    return None
+
 
 @router.get("/{id}", response_model=schemas.EmployeeOut)
 def read_employee(
@@ -152,6 +249,13 @@ def update_employee(
     updated = crud.update_employee(db, id=id, emp=emp)
     if not updated:
         raise HTTPException(status_code=404, detail="Employee not found")
+
+    if emp.status is not None and db_emp.user_id:
+        db_user = db.get(models.User, db_emp.user_id)
+        if db_user:
+            db_user.is_active = (emp.status == "Active")
+            db.add(db_user)
+            db.commit()
         
     crud.create_audit_log(
         db=db,
@@ -338,3 +442,4 @@ async def upload_avatar(
     )
     
     return {"message": "Avatar uploaded successfully"}
+

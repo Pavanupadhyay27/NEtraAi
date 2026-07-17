@@ -278,6 +278,22 @@ export default function EnrollPage() {
     }
   });
 
+  const deletePoseMutation = useMutation({
+    mutationFn: (pose: string) => fetchApi(`/enrollment/${employeeId}/pose/${pose}`, { method: "DELETE" }),
+    onSuccess: (_, pose) => {
+      refetchStatus();
+      setCapturedImages(prev => {
+        const next = { ...prev };
+        delete next[pose];
+        return next;
+      });
+      toast.success(`Face profile for pose '${POSES[pose]?.label || pose}' cleared.`);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to delete pose");
+    }
+  });
+
   // Offline Web Audio API Sound Generator (synthesized camera click & alert beeps)
   const playSound = (type: "beep" | "click") => {
     if (typeof window === "undefined") return;
@@ -993,39 +1009,49 @@ export default function EnrollPage() {
             
             {/* Left Box: Progress and instructions */}
             <div className="space-y-5">
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-                <h3 className="text-[13px] font-bold text-slate-900 uppercase tracking-wider">Facial Registry</h3>
+              <div className="tech-card-3d-minimal bg-white p-5 space-y-4">
+                <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wider">Facial Registry</h3>
                 
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-650">
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-600">
                     <span>Database Status:</span>
-                    <span className={isProfileComplete ? "text-emerald-600" : "text-amber-500"}>
+                    <span className={`inline-flex items-center gap-1.5 ${isProfileComplete ? "text-emerald-600" : "text-amber-500"}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isProfileComplete ? "bg-emerald-500 animate-pulse" : "bg-amber-400"}`} />
                       {isProfileComplete ? "Complete" : "Incomplete"}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-650">
-                    <span>Active Vectors:</span>
-                    <span>{enrolledCount} / {POSE_KEYS.length}</span>
+                  
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-650">
+                      <span>Active Vectors:</span>
+                      <span>{enrolledCount} / {POSE_KEYS.length}</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200/40">
+                      <div 
+                        className="bg-cyan-500 h-2 rounded-full transition-all duration-500" 
+                        style={{ width: `${(enrolledCount / POSE_KEYS.length) * 100}%` }} 
+                      />
+                    </div>
                   </div>
                 </div>
 
                 <button
                   onClick={startAutoCapture}
-                  className="w-full h-11 bg-slate-950 hover:bg-slate-900 border border-slate-950 text-white font-bold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2.5 transition-all shadow-md cursor-pointer"
+                  className="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2.5 transition-all active:scale-95 cursor-pointer shadow-sm border border-slate-850"
                 >
-                  <Camera className="w-4 h-4" />
+                  <Camera className="w-4 h-4 text-cyan-400 animate-pulse" />
                   Start Auto-Capture Session
                 </button>
               </div>
 
               {/* Upload Fallback File Option */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
-                <h4 className="text-[11.5px] font-bold text-slate-700 uppercase tracking-wider">Manual Photo Upload</h4>
+              <div className="tech-card-3d-minimal bg-white p-5 space-y-3">
+                <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-wider">Manual Photo Upload</h4>
                 <div className="flex gap-2">
                   <select
                     value={selectedPose}
                     onChange={(e) => setSelectedPose(e.target.value)}
-                    className="h-9 px-2 text-[11px] font-bold bg-white border border-slate-200 rounded-lg flex-1 outline-none text-slate-700"
+                    className="h-9.5 px-3 text-[11px] font-extrabold bg-white border border-slate-200 rounded-lg flex-1 outline-none text-slate-700 focus:border-slate-800 cursor-pointer"
                   >
                     {POSE_KEYS.map((key) => (
                       <option key={key} value={key}>{POSES[key].label}</option>
@@ -1037,7 +1063,7 @@ export default function EnrollPage() {
                       onChange={handleFileChange}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     />
-                    <div className="h-9 px-3.5 bg-white border border-slate-250 text-slate-800 hover:bg-slate-50 font-bold text-[11px] rounded-lg flex items-center gap-1.5 transition-all shadow-sm">
+                    <div className="h-9.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] rounded-lg flex items-center gap-1.5 transition-all shadow-sm cursor-pointer active:scale-95">
                       <Upload className="w-3.5 h-3.5" />
                       Browse
                     </div>
@@ -1047,8 +1073,8 @@ export default function EnrollPage() {
             </div>
 
             {/* Right: Big visual grid checklist */}
-            <div className="md:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-              <h3 className="text-sm font-black text-slate-900 tracking-tight">Facial Pose Checklist</h3>
+            <div className="md:col-span-2 tech-card-3d-minimal bg-white p-6 space-y-4">
+              <h3 className="text-xs font-black text-slate-850 uppercase tracking-wider">Facial Pose Checklist</h3>
               
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5 pt-2">
                 {POSE_KEYS.map((key) => {
@@ -1057,24 +1083,38 @@ export default function EnrollPage() {
                   return (
                     <div
                       key={key}
-                      className={`p-4 rounded-2xl border flex flex-col items-center text-center justify-center transition-all hover:scale-[1.03] duration-200 select-none ${
+                      className={`p-4 flex flex-col items-center text-center justify-center transition-all duration-300 select-none cursor-default border rounded-2xl hover:translate-y-[-2px] ${
                         done
-                          ? "bg-emerald-500/[0.03] border-emerald-500/20 text-emerald-800 shadow-[0_2px_12px_rgba(16,185,129,0.02)]"
-                          : "bg-slate-50/50 border-slate-200/80 hover:border-slate-350"
+                          ? "bg-emerald-50/40 border-emerald-500/40 text-emerald-800 shadow-[2px_2px_0px_rgba(16,185,129,0.15)]"
+                          : "bg-white border-slate-200/80 hover:border-slate-400 hover:shadow-[2px_2px_0px_rgba(15,23,42,0.08)]"
                       }`}
                     >
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 transition-all ${
                         done
                           ? "bg-emerald-500/10 text-emerald-600"
-                          : "bg-slate-100 text-slate-400"
+                          : "bg-slate-50 border border-slate-200 text-slate-400"
                       }`}>
                         <Icon className="w-4.5 h-4.5" />
                       </div>
-                      <span className={`text-[10px] font-bold uppercase tracking-wider font-mono ${done ? "text-emerald-800" : "text-slate-505"}`}>
+                      <span className={`text-[10px] font-bold uppercase tracking-wider font-mono ${done ? "text-emerald-800" : "text-slate-500"}`}>
                         {POSES[key].label.replace(" Profile", "").replace(" Face", "").replace(" Option", "").replace(" Light", "")}
                       </span>
                       {done ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-3 shrink-0" />
+                        <div className="flex items-center gap-1.5 mt-3 justify-center w-full">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`Are you sure you want to clear and re-take/re-upload the ${POSES[key].label}?`)) {
+                                deletePoseMutation.mutate(key);
+                              }
+                            }}
+                            className="p-1 hover:bg-rose-100/60 hover:text-rose-600 rounded text-slate-400 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                            title="Delete and re-upload this pose"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       ) : (
                         <div className="w-4 h-4 rounded-full border-2 border-slate-200 mt-3 shrink-0 bg-white" />
                       )}
@@ -1525,18 +1565,9 @@ export default function EnrollPage() {
                   </div>
 
                   {/* QR Code Fallback Section */}
-                  <div className="bg-slate-50/80 backdrop-blur-xs border-t border-slate-100 h-[120px] flex items-center justify-between px-6 pb-2.5 shrink-0 z-10">
-                    <div className="flex flex-col min-w-0 pr-2">
-                      <span className="text-[8px] font-black text-slate-900 tracking-wider uppercase font-mono">
-                        SCAN TO VERIFY
-                      </span>
-                      <p className="text-[7px] text-slate-450 font-medium leading-snug mt-0.5 max-w-[130px] font-mono">
-                        If facial scanner recognition fails, scan this backup QR code at Kiosk terminal.
-                      </p>
-                    </div>
-
+                  <div className="bg-slate-50/80 backdrop-blur-xs border-t border-slate-100 h-[105px] flex items-center justify-center pb-1.5 shrink-0 z-10">
                     {/* QR Code Container */}
-                    <div className="w-[75px] h-[75px] bg-white rounded-lg border border-slate-200/80 p-1 flex items-center justify-center shadow-2xs shrink-0 font-mono">
+                    <div className="w-[72px] h-[72px] bg-white rounded-lg border border-slate-200/80 p-1 flex items-center justify-center shadow-2xs shrink-0 font-mono">
                       <img 
                         src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${employee?.employee_id}`}
                         alt="QR Code"

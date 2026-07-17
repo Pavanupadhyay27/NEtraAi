@@ -42,6 +42,7 @@
 
 html {
   scroll-behavior: smooth;
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -265,16 +266,15 @@ select.input-field option {
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background-color: var(--bg-base);
+  background-color: transparent;
   background-image: 
-    radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.08) 0%, rgba(59, 130, 246, 0.03) 40%, transparent 70%),
-    radial-gradient(circle at 50% 50%, transparent 30%, var(--bg-base) 85%),
+    radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.15) 0%, rgba(59, 130, 246, 0.08) 45%, transparent 75%),
     linear-gradient(rgba(148, 163, 184, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(148, 163, 184, 0.03) 1px, transparent 1px),
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 600' width='100%' height='100%'><defs><filter id='glow-light' x='-50%' y='-50%' width='200%' height='200%'><feGaussianBlur in='SourceGraphic' stdDeviation='4' result='blur'/><feMerge><feMergeNode in='blur'/><feMergeNode in='SourceGraphic'/></feMerge></filter><linearGradient id='grad-cyan-light' x1='0' y1='0' x2='0' y2='1'><stop offset='0%' stop-color='%2306b6d4' stop-opacity='0.15'/><stop offset='100%' stop-color='%2306b6d4' stop-opacity='0'/></linearGradient><linearGradient id='grad-indigo-light' x1='0' y1='0' x2='0' y2='1'><stop offset='0%' stop-color='%236366f1' stop-opacity='0.1'/><stop offset='100%' stop-color='%236366f1' stop-opacity='0'/></linearGradient></defs><style>.wave-1{animation:flow-1 38s linear infinite, bob-1 12s ease-in-out infinite alternate}.wave-2{animation:flow-2 28s linear infinite, bob-2 8s ease-in-out infinite alternate}.wave-3{animation:flow-3 22s linear infinite, bob-3 10s ease-in-out infinite alternate}.wave-4{animation:flow-4 16s linear infinite, bob-4 6s ease-in-out infinite alternate}@keyframes flow-1{0%{transform:translate3d(0,0,0)}100%{transform:translate3d(-1440px,0,0)}}@keyframes flow-2{0%{transform:translate3d(-1440px,0,0)}100%{transform:translate3d(0,0,0)}}@keyframes flow-3{0%{transform:translate3d(0,0,0)}100%{transform:translate3d(-1440px,0,0)}}@keyframes flow-4{0%{transform:translate3d(-1440px,0,0)}100%{transform:translate3d(0,0,0)}}@keyframes bob-1{0%{transform:translateY(-10px)}100%{transform:translateY(10px)}}@keyframes bob-2{0%{transform:translateY(8px)}100%{transform:translateY(-8px)}}@keyframes bob-3{0%{transform:translateY(-6px)}100%{transform:translateY(6px)}}@keyframes bob-4{0%{transform:translateY(5px)}100%{transform:translateY(-5px)}}</style><path class='wave-1' fill='url(%23grad-cyan-light)' d='M-1440,320 C-1080,240 -720,400 -360,320 C0,240 360,400 720,320 C1080,240 1440,400 1800,320 C2160,240 2520,400 2880,320 L2880,600 L-1440,600 Z'/><path class='wave-2' fill='url(%23grad-indigo-light)' d='M-1440,340 C-1080,440 -720,240 -360,340 C0,440 360,240 720,340 C1080,440 1440,240 1800,340 C2160,440 2520,240 2880,340 L2880,600 L-1440,600 Z'/><path class='wave-3' stroke='%2306b6d4' stroke-width='1.5' fill='none' opacity='0.45' filter='url(%23glow-light)' d='M-1440,310 C-1080,250 -720,370 -360,310 C0,250 360,370 720,310 C1080,250 1440,370 1800,310 C2160,250 2520,370 2880,310'/><path class='wave-4' stroke='%236366f1' stroke-width='1.25' fill='none' opacity='0.35' d='M-1440,330 C-1080,380 -720,280 -360,330 C0,380 360,280 720,330 C1080,380 1440,280 1800,330 C2160,380 2520,280 2880,330'/><path class='wave-3' stroke='%233b82f6' stroke-width='0.75' fill='none' opacity='0.5' d='M-1440,300 C-1080,220 -720,380 -360,300 C0,220 360,380 720,300 C1080,220 1440,380 1800,300 C2160,220 2520,380 2880,300'/></svg>");
-  background-size: cover, cover, 80px 80px, 80px 80px, cover;
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 600' width='100%' height='100%'><defs><filter id='glow-light' x='-50%' y='-50%' width='200%' height='200%'><feGaussianBlur in='SourceGraphic' stdDeviation='4' result='blur'/><feMerge><feMergeNode in='blur'/><feMergeNode in='SourceGraphic'/></feMerge></filter><linearGradient id='grad-cyan-light' x1='0' y1='0' x2='0' y2='1'><stop offset='0%' stop-color='%2306b6d4' stop-opacity='0.25'/><stop offset='100%' stop-color='%2306b6d4' stop-opacity='0'/></linearGradient><linearGradient id='grad-indigo-light' x1='0' y1='0' x2='0' y2='1'><stop offset='0%' stop-color='%236366f1' stop-opacity='0.2'/><stop offset='100%' stop-color='%236366f1' stop-opacity='0'/></linearGradient></defs><style>.wave-1{animation:flow-1 38s linear infinite, bob-1 12s ease-in-out infinite alternate}.wave-2{animation:flow-2 28s linear infinite, bob-2 8s ease-in-out infinite alternate}.wave-3{animation:flow-3 22s linear infinite, bob-3 10s ease-in-out infinite alternate}.wave-4{animation:flow-4 16s linear infinite, bob-4 6s ease-in-out infinite alternate}@keyframes flow-1{0%{transform:translate3d(0,0,0)}100%{transform:translate3d(-1440px,0,0)}}@keyframes flow-2{0%{transform:translate3d(-1440px,0,0)}100%{transform:translate3d(0,0,0)}}@keyframes flow-3{0%{transform:translate3d(0,0,0)}100%{transform:translate3d(-1440px,0,0)}}@keyframes flow-4{0%{transform:translate3d(-1440px,0,0)}100%{transform:translate3d(0,0,0)}}@keyframes bob-1{0%{transform:translateY(-10px)}100%{transform:translateY(10px)}}@keyframes bob-2{0%{transform:translateY(8px)}100%{transform:translateY(-8px)}}@keyframes bob-3{0%{transform:translateY(-6px)}100%{transform:translateY(6px)}}@keyframes bob-4{0%{transform:translateY(5px)}100%{transform:translateY(-5px)}}</style><path class='wave-1' fill='url(%23grad-cyan-light)' d='M-1440,320 C-1080,240 -720,400 -360,320 C0,240 360,400 720,320 C1080,240 1440,400 1800,320 C2160,240 2520,400 2880,320 L2880,600 L-1440,600 Z'/><path class='wave-2' fill='url(%23grad-indigo-light)' d='M-1440,340 C-1080,440 -720,240 -360,340 C0,440 360,240 720,340 C1080,440 1440,240 1800,340 C2160,440 2520,240 2880,340 L2880,600 L-1440,600 Z'/><path class='wave-3' stroke='%2306b6d4' stroke-width='2.25' fill='none' opacity='0.85' filter='url(%23glow-light)' d='M-1440,310 C-1080,250 -720,370 -360,310 C0,250 360,370 720,310 C1080,250 1440,370 1800,310 C2160,250 2520,370 2880,310'/><path class='wave-4' stroke='%236366f1' stroke-width='2.0' fill='none' opacity='0.75' d='M-1440,330 C-1080,380 -720,280 -360,330 C0,380 360,280 720,330 C1080,380 1440,280 1800,330 C2160,380 2520,280 2880,330'/><path class='wave-3' stroke='%233b82f6' stroke-width='1.75' fill='none' opacity='0.8' d='M-1440,300 C-1080,220 -720,380 -360,300 C0,220 360,380 720,300 C1080,220 1440,380 1800,300 C2160,220 2520,380 2880,300'/></svg>");
+  background-size: cover, 80px 80px, 80px 80px, cover;
   background-position: center;
-  background-repeat: no-repeat, no-repeat, repeat, repeat, no-repeat;
+  background-repeat: no-repeat, repeat, repeat, no-repeat;
 }
 
 .mesh-bg {
@@ -293,6 +293,21 @@ select.input-field option {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(39, 39, 42, 0.4) !important;
+}
+
+/* Solid 3D Flat card structure without glassmorph or transitions */
+.tech-card-3d {
+  background: var(--bg-surface);
+  border: 1.5px solid var(--text-primary);
+  box-shadow: 4px 4px 0px 0px var(--text-primary);
+  border-radius: var(--radius-xl);
+}
+
+.tech-card-3d-minimal {
+  background: var(--bg-surface);
+  border: 1px solid var(--text-primary);
+  box-shadow: 2px 2px 0px 0px var(--text-primary);
+  border-radius: var(--radius-lg);
 }
 
 /* ─── Kiosk Scanner Laser ─── */
@@ -334,6 +349,21 @@ select.input-field option {
   animation: fadeIn 0.25s ease both;
 }
 
+/* ─── Spin Rotation for Refresh Buttons ─── */
+@keyframes spin-360 {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin-icon {
+  animation: spin-360 0.8s linear infinite !important;
+  transform-origin: center !important;
+}
+
 /* ─── Pulse Ring ─── */
 @keyframes pulse-ring {
   0%   { transform: scale(1); opacity: 0.5; }
@@ -364,7 +394,7 @@ select.input-field option {
 
 /* ─── Page Transition ─── */
 .page-enter {
-  animation: fadeInUp 0.3s cubic-bezier(0.4,0,0.2,1) both;
+  animation: fadeIn 0.25s cubic-bezier(0.4,0,0.2,1) both;
 }
 
 /* ─── Sidebar Active Indicator ─── */
@@ -418,14 +448,15 @@ select.input-field option {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  z-index: 50;
+  z-index: 999;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 16px;
+  padding: 40px 16px;
+  overflow-y: auto;
   animation: fadeIn 0.2s ease;
 }
 
@@ -435,10 +466,10 @@ select.input-field option {
   border-radius: var(--radius-2xl);
   padding: 28px;
   width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
+  margin: auto;
+  position: relative;
   animation: fadeInUp 0.25s cubic-bezier(0.4,0,0.2,1) both;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
 }
 
 /* ─── Stat Card Accent Lines ─── */
@@ -627,7 +658,7 @@ select.input-field option {
 .dark .text-zinc-800,
 .dark .text-zinc-755,
 .dark .text-zinc-750 {
-  color: #f4f4f5 !important; /* Zinc 100 */
+  color: #f4f4f5 !important; /* Crisp Zinc 100 */
 }
 
 .dark .text-slate-555,
@@ -640,7 +671,7 @@ select.input-field option {
 .dark .text-zinc-500,
 .dark .text-zinc-450,
 .dark .text-zinc-400 {
-  color: #a1a1aa !important; /* Zinc 400 */
+  color: #d4d4d8 !important; /* High contrast Zinc 300 */
 }
 
 .dark .text-slate-650,
@@ -650,18 +681,18 @@ select.input-field option {
 .dark .text-zinc-605,
 .dark .text-zinc-600,
 .dark .text-zinc-700 {
-  color: #d4d4d8 !important; /* Zinc 300 */
+  color: #e4e4e7 !important; /* High contrast Zinc 200 */
 }
 
 .dark .bg-zinc-50,
 .dark .bg-zinc-55,
 .dark .bg-slate-50,
 .dark .bg-slate-100 {
-  background-color: #27272a !important;
+  background-color: #18181b !important;
 }
 
 .dark .bg-zinc-100 {
-  background-color: #18181b !important;
+  background-color: #27272a !important;
 }
 
 .dark .border-zinc-200 {
@@ -724,13 +755,68 @@ select.input-field option {
   border-color: #ffffff !important;
 }
 
-.dark select.input-field option {
-  background: #18181b;
-  color: #f4f4f5;
+/* ─── Global Custom Select & Options Styling ─── */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: #ffffff;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-md);
+  padding: 6px 32px 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+  transition: all 0.15s ease;
+}
+
+select:focus {
+  outline: none;
+  border-color: #06b6d4 !important;
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.15);
+}
+
+select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  padding: 10px 14px !important;
+  font-size: 12px;
+}
+
+/* Dark mode select & options */
+.dark select {
+  background-color: #18181b !important;
+  color: #f4f4f5 !important;
+  border-color: #27272a !important;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+}
+
+.dark select:focus {
+  border-color: #22d3ee !important;
+  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.2) !important;
+}
+
+.dark select option {
+  background-color: #18181b !important;
+  color: #f4f4f5 !important;
+  padding: 10px 14px !important;
+}
+
+.dark select option:hover,
+.dark select option:focus,
+.dark select option:active,
+.dark select option:checked {
+  background-color: #27272a !important;
+  color: #22d3ee !important;
 }
 
 .dark .bg-zinc-50\/30 {
-  background-color: rgba(39, 39, 42, 0.3) !important;
+  background-color: transparent !important;
 }
 
 .dark .border-zinc-150 {
@@ -872,6 +958,113 @@ select.input-field option {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
+
+/* Login Page Input Autofill Overrides */
+.login-input:-webkit-autofill,
+.login-input:-webkit-autofill:hover, 
+.login-input:-webkit-autofill:focus, 
+.login-input:-webkit-autofill:active {
+  -webkit-text-fill-color: #ffffff !important;
+  -webkit-box-shadow: 0 0 0px 1000px #090d16 inset !important;
+  box-shadow: 0 0 0px 1000px #090d16 inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+.login-input::-webkit-contacts-auto-fill-button, 
+.login-input::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  display: none !important;
+  pointer-events: none;
+}
+
+/* ─── Super Smooth Page Transitions & Animations ─── */
+@keyframes smoothPageEnter {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.page-enter,
+.animate-fadeInUp {
+  animation: smoothPageEnter 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Butter smooth transition for sidebar collapse and nav links */
+aside, 
+aside *, 
+nav, 
+nav * {
+  transition-property: width, max-width, min-width, transform, opacity, background-color, border-color, color, box-shadow, translate, scale !important;
+  transition-duration: 350ms !important;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Force light mode colors for printable ID card preview in dark mode */
+.dark #printable-id-card-wrap {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+.dark #printable-id-card-wrap .bg-slate-50\/80 {
+  background-color: rgba(248, 250, 252, 0.8) !important;
+}
+.dark #printable-id-card-wrap .border-slate-100 {
+  border-color: #f1f5f9 !important;
+}
+.dark #printable-id-card-wrap .text-slate-900 {
+  color: #0f172a !important;
+}
+.dark #printable-id-card-wrap .text-slate-800 {
+  color: #1e293b !important;
+}
+.dark #printable-id-card-wrap .text-slate-450 {
+  color: #64748b !important;
+}
+.dark #printable-id-card-wrap .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+/* ─── Premium 3D Solid Tech Card Effect (No Glassmorphism) ─── */
+.tech-card-3d {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  border-bottom: 4px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transform-style: preserve-3d;
+  transform: translate3d(0, 0, 0);
+}
+
+.dark .tech-card-3d {
+  background: #18181b; /* solid dark gray zinc-900 */
+  border: 1px solid #27272a; /* zinc-800 */
+  border-bottom: 4px solid #3f3f46; /* zinc-700 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.tech-card-3d:hover {
+  transform: none;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.dark .tech-card-3d:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.tech-card-3d:active {
+  transform: none;
+}
+
+
 
 
 

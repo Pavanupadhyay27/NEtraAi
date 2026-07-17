@@ -85,26 +85,41 @@ def get_attendance_trends(
     # Generate list of dates
     date_list = [start_date + timedelta(days=i) for i in range(days)]
     
-    # Get total active employees
-    total_active = db.query(func.count(models.Employee.id)).filter(
+    # Get total active employees for this company
+    query = db.query(func.count(models.Employee.id)).filter(
         models.Employee.status == "Active"
-    ).scalar() or 0
+    )
+    if current_user.company_id is not None:
+        query = query.filter(models.Employee.company_id == current_user.company_id)
+    total_active = query.scalar() or 0
     
     trends = []
     for d in date_list:
-        present = db.query(func.count(models.Attendance.id)).filter(
+        # Present status checks (include WFH as active)
+        present_query = db.query(func.count(models.Attendance.id)).join(
+            models.Employee, models.Attendance.employee_id == models.Employee.id
+        ).filter(
             and_(
                 models.Attendance.date == d,
-                models.Attendance.status.in_(["Present", "Late", "Half Day"])
+                models.Attendance.status.in_(["Present", "Late", "Half Day", "WFH"])
             )
-        ).scalar() or 0
+        )
+        if current_user.company_id is not None:
+            present_query = present_query.filter(models.Employee.company_id == current_user.company_id)
+        present = present_query.scalar() or 0
         
-        late = db.query(func.count(models.Attendance.id)).filter(
+        # Late status check
+        late_query = db.query(func.count(models.Attendance.id)).join(
+            models.Employee, models.Attendance.employee_id == models.Employee.id
+        ).filter(
             and_(
                 models.Attendance.date == d,
                 models.Attendance.status == "Late"
             )
-        ).scalar() or 0
+        )
+        if current_user.company_id is not None:
+            late_query = late_query.filter(models.Employee.company_id == current_user.company_id)
+        late = late_query.scalar() or 0
         
         absent = max(0, total_active - present)
         
@@ -126,7 +141,10 @@ def get_department_distribution(
     Returns employee and attendance counts by department for ECharts.
     """
     today = date.today()
-    departments = db.query(models.Department).all()
+    if current_user.company_id is not None:
+        departments = db.query(models.Department).filter(models.Department.company_id == current_user.company_id).all()
+    else:
+        departments = db.query(models.Department).all()
     
     dist = []
     for dept in departments:
@@ -228,7 +246,93 @@ def get_attendance_heatmap(
     else:
         query = query.filter(models.Attendance.status.in_(["Present", "Late", "Half Day"]))
         
-    results = query.group_by(models.Attendance.date).all()
+    results = query.group_by(models.AttendanceDate).all() if hasattr(models, 'AttendanceDate') else query.group_by(models.Attendance.date).all()
     
     heatmap_data = {r[0].isoformat(): r[1] for r in results}
     return heatmap_data
+
+@router.get("/recognition")
+def get_recognition_analytics(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(checker_view)
+):
+    company_id = current_user.company_id
+    logs_query = db.query(models.AttendanceLog)
+    if company_id is not None:
+        logs_query = logs_query.join(models.Employee).filter(models.Employee.company_id == company_id)
+        
+    total_scans = logs_query.count()
+    spoofs = logs_query.filter(models.AttendanceLog.is_spoof == True).count()
+    
+    avg_confidence = db.query(func.avg(models.AttendanceLog.confidence))
+    if company_id is not None:
+        avg_confidence = avg_confidence.join(models.Employee).filter(models.Employee.company_id == company_id)
+    avg_confidence_val = avg_confidence.scalar() or 0.0
+    
+    avg_proc_time = db.query(func.avg(models.AttendanceLog.processing_time_ms))
+    if company_id is not None:
+        avg_proc_time = avg_proc_time.join(models.Employee).filter(models.Employee.company_id == company_id)
+    avg_proc_val = avg_proc_time.scalar() or 120.0  # fallback baseline ms
+    
+    return {
+        "total_scans": total_scans,
+        "spoof_attempts": spoofs,
+        "average_confidence": round(float(avg_confidence_val), 2),
+        "average_processing_time_ms": round(float(avg_proc_val), 1)
+    }
+
+@router.get("/occupancy")
+def get_office_occupancy(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(checker_view)
+):
+    company_id = current_user.company_id
+    today = date.today()
+    
+    active_emp_query = db.query(models.Employee).filter(models.Employee.status == "Active")
+    if company_id is not None:
+        active_emp_query = active_emp_query.filter(models.Employee.company_id == company_id)
+    total_strength = active_emp_query.count()
+    
+    present_query = db.query(models.Attendance).join(models.Employee).filter(
+        and_(
+            models.Attendance.date == today,
+            models.Attendance.check_in.isnot(None),
+            models.Attendance.check_out.is_(None)
+        )
+    )
+    if company_id is not None:
+        present_query = present_query.filter(models.Employee.company_id == company_id)
+        
+    occupied_count = present_query.count()
+    
+    return {
+        "total_strength": total_strength,
+        "occupied_count": occupied_count,
+        "occupancy_rate_percentage": round((occupied_count / total_strength * 100) if total_strength > 0 else 0.0, 1)
+    }
+
+@router.get("/late-trends")
+def get_late_trends(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(checker_view)
+):
+    company_id = current_user.company_id
+    today = date.today()
+    start_date = today - timedelta(days=30)
+    
+    query = db.query(
+        models.Attendance.date,
+        func.avg(models.Attendance.late_minutes)
+    ).join(models.Employee).filter(
+        and_(
+            models.Attendance.date >= start_date,
+            models.Attendance.late_minutes > 0
+        )
+    )
+    if company_id is not None:
+        query = query.filter(models.Employee.company_id == company_id)
+        
+    results = query.group_by(models.Attendance.date).order_by(models.Attendance.date.asc()).all()
+    
+    return [{"date": r[0].isoformat(), "average_late_minutes": round(float(r[1]), 1)} for r in results]

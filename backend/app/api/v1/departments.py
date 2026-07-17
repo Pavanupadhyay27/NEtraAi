@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app.core.database import get_db
 from app.core import security
@@ -18,10 +18,12 @@ checker_manage = security.RoleChecker(["Super Admin", "Admin"])
 def read_departments(
     skip: int = 0,
     limit: int = 100,
+    company_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(checker_view)
 ):
-    return crud.get_departments(db, company_id=current_user.company_id, skip=skip, limit=limit)
+    target_company_id = current_user.company_id if current_user.company_id is not None else company_id
+    return crud.get_departments(db, company_id=target_company_id, skip=skip, limit=limit)
 
 @router.get("/{id}", response_model=schemas.DepartmentOut)
 def read_department(

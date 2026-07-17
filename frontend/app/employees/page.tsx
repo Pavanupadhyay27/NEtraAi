@@ -7,7 +7,8 @@ import { fetchApi, getBackendUrl, parseDateTime, getLocalDateString } from "@/ap
 import { 
   Plus, Search, Trash2, Camera, Upload, FileSpreadsheet,
   X, Users, CheckCircle2, XCircle, ChevronDown, UserCheck, ShieldAlert,
-  Download, Mail, Phone, Calendar, Briefcase, Clock, TrendingUp, MapPin
+  Download, Mail, Phone, Calendar, Briefcase, Clock, TrendingUp, MapPin,
+  Eye, EyeOff
 } from "lucide-react";
 import { useToast } from "@/app/utils/toast";
 import Link from "next/link";
@@ -69,6 +70,7 @@ export default function EmployeesPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [deptFilter, setDeptFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -92,6 +94,7 @@ export default function EmployeesPage() {
   const [deptId, setDeptId] = useState("");
   const [createUserLogin, setCreateUserLogin] = useState(false);
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [allowWfh, setAllowWfh] = useState(false);
   const [wfhAddress, setWfhAddress] = useState("");
   const [wfhLat, setWfhLat] = useState<number | null>(null);
@@ -137,6 +140,19 @@ export default function EmployeesPage() {
       toast.success("Employee record deleted successfully.");
     },
     onError: (err: any) => toast.error(err.message || "Failed to delete employee.")
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (id: number) => fetchApi(`/employees/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ status: "Active" })
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      toast.success("Employee approved successfully!");
+    },
+    onError: (err: any) => toast.error(err.message || "Failed to approve employee.")
   });
 
   const resetForm = () => {
@@ -221,9 +237,9 @@ export default function EmployeesPage() {
         body: formData 
       });
       queryClient.invalidateQueries({ queryKey: ["employees"] });
-      showToast.success("Profile photo uploaded successfully!");
+      toast.success("Profile photo uploaded successfully!");
     } catch (err: any) {
-      showToast.error(err.message || "Failed to upload photo");
+      toast.error(err.message || "Failed to upload photo");
     }
   };
 
@@ -300,6 +316,23 @@ export default function EmployeesPage() {
             <h1 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">Staff Management</h1>
           </div>
           <div className="flex items-center gap-2.5 shrink-0">
+            {employees?.some((emp: any) => selectedIds.includes(emp.id) && emp.status === "Pending Approval") && (
+              <button
+                onClick={async () => {
+                  const pendingSelected = employees.filter((emp: any) => selectedIds.includes(emp.id) && emp.status === "Pending Approval");
+                  for (const emp of pendingSelected) {
+                    await approveMutation.mutateAsync(emp.id);
+                  }
+                  setSelectedIds([]);
+                  toast.success(`Approved ${pendingSelected.length} employee accounts.`);
+                }}
+                disabled={approveMutation.isPending}
+                className="btn-primary bg-emerald-600 hover:bg-emerald-700 text-white border-transparent text-[12px] h-9.5 px-4 flex items-center gap-2 rounded-xl cursor-pointer"
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+                Approve Selected ({employees.filter((emp: any) => selectedIds.includes(emp.id) && emp.status === "Pending Approval").length})
+              </button>
+            )}
             <button
               onClick={() => setShowImportDialog(true)}
               className="btn-ghost text-[12px] h-9.5 px-4 flex items-center gap-2 rounded-xl cursor-pointer hover:bg-white/[0.04]"
@@ -351,23 +384,38 @@ export default function EmployeesPage() {
               <option value="">All Statuses</option>
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
+              <option value="Pending Approval">Pending Approval</option>
             </select>
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
           </div>
         </div>
 
         {/* Table List Card */}
-        <div className="glass-card rounded-2xl border border-white/6 overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-white/5 bg-white/[0.005] flex items-center justify-between">
+        <div className="tech-card-3d-minimal bg-white overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-slate-200/80 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-900/50 flex items-center justify-between">
             <p className="text-[11px] text-slate-500 font-mono">
               {loadingEmployees ? "Fetching..." : `${employees?.length || 0} registered personnel`}
             </p>
           </div>
           
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-h-[350px]">
             <table className="data-table">
               <thead>
                 <tr>
+                  <th className="py-3.5 px-4 w-[40px] text-center">
+                    <input
+                      type="checkbox"
+                      checked={employees?.length > 0 && selectedIds.length === employees.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds(employees.map((emp: any) => emp.id));
+                        } else {
+                          setSelectedIds([]);
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
+                    />
+                  </th>
                   <th className="text-left py-3.5 px-5">Employee Info</th>
                   <th className="text-left py-3.5 px-5">Department</th>
                   <th className="text-left py-3.5 px-5">Designation</th>
@@ -379,7 +427,7 @@ export default function EmployeesPage() {
                 {loadingEmployees ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 5 }).map((_, j) => (
+                      {Array.from({ length: 6 }).map((_, j) => (
                         <td key={j} className="py-4.5 px-5">
                           <div className="skeleton h-4 w-28" />
                         </td>
@@ -388,7 +436,7 @@ export default function EmployeesPage() {
                   ))
                 ) : employees?.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-20 text-center">
+                    <td colSpan={6} className="py-20 text-center">
                       <div className="flex flex-col items-center gap-3 max-w-xs mx-auto">
                         <div className="w-12 h-12 rounded-2xl bg-white/4 flex items-center justify-center">
                           <Users className="w-5 h-5 text-slate-600" />
@@ -403,6 +451,20 @@ export default function EmployeesPage() {
                     const avatarColor = avatarColors[emp.id % avatarColors.length];
                     return (
                       <tr key={emp.id} className="group/row cursor-pointer hover:bg-white/[0.015]" onClick={() => router.push(`/employees/${emp.id}`)}>
+                        <td className="py-3.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(emp.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedIds(prev => [...prev, emp.id]);
+                              } else {
+                                setSelectedIds(prev => prev.filter(id => id !== emp.id));
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
+                          />
+                        </td>
                         <td className="py-3.5 px-5">
                           <div className="flex items-center gap-3">
                             <EmployeeAvatar emp={emp} size="md" />
@@ -421,14 +483,33 @@ export default function EmployeesPage() {
                           {emp.designation || <span className="text-slate-400">—</span>}
                         </td>
                         <td className="py-3.5 px-5">
-                          <span className={`badge ${emp.status === "Active" ? "badge-emerald" : "badge-slate"} flex items-center gap-1 w-fit`}>
-                            {emp.status === "Active" && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
-                            {emp.status}
-                          </span>
+                          {emp.status === "Pending Approval" ? (
+                            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-amber-500/10 border border-amber-500/25 text-amber-500 w-fit">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                              Pending Approval
+                            </span>
+                          ) : (
+                            <span className={`badge ${emp.status === "Active" ? "badge-emerald" : "badge-slate"} flex items-center gap-1 w-fit`}>
+                              {emp.status === "Active" && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+                              {emp.status}
+                            </span>
+                          )}
                         </td>
                         <td className="py-3.5 px-5" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center gap-2">
-                            {emp.images && emp.images.length > 0 ? (
+                            {emp.status === "Pending Approval" ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  approveMutation.mutate(emp.id);
+                                }}
+                                disabled={approveMutation.isPending}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10.5px] font-bold text-emerald-500 bg-emerald-500/8 hover:bg-emerald-500/15 border border-emerald-500/15 hover:border-emerald-500/25 transition-all cursor-pointer"
+                              >
+                                <UserCheck className="w-3.5 h-3.5 animate-pulse" />
+                                Approve Account
+                              </button>
+                            ) : emp.images && emp.images.length > 0 ? (
                               <Link
                                 href={`/enroll/${emp.id}`}
                                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10.5px] font-bold text-emerald-500 bg-emerald-500/8 hover:bg-emerald-500/15 border border-emerald-500/15 hover:border-emerald-500/25 transition-all"
@@ -602,8 +683,24 @@ export default function EmployeesPage() {
                 </label>
                 {createUserLogin && (
                   <InputField label="Initial Password" required>
-                    <input type="password" required placeholder="Minimum 8 characters" value={password}
-                      onChange={(e) => setPassword(e.target.value)} className={inputCls} />
+                    <div className="relative">
+                      <input 
+                        type={showPassword ? "text" : "password"} 
+                        required 
+                        placeholder="Minimum 8 characters" 
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)} 
+                        className={`${inputCls} pr-10`} 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 cursor-pointer"
+                        title={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </InputField>
                 )}
               </div>

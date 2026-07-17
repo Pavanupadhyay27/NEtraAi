@@ -2,8 +2,14 @@ import os
 import threading
 import time
 
+import sys
+
 # Enforce IST Timezone for all attendance date calculations (important for HuggingFace / UTC cloud servers)
-os.environ["TZ"] = "Asia/Kolkata"
+if sys.platform == "win32":
+    os.environ["TZ"] = "IST-5:30"
+else:
+    os.environ["TZ"] = "Asia/Kolkata"
+
 if hasattr(time, "tzset"):
     time.tzset()
 from datetime import datetime, timedelta
@@ -16,7 +22,8 @@ from sqlalchemy import delete
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.init_db import init_db
-from app.api.v1 import auth, employees, departments, enrollment, kiosk, attendance, reports, analytics, settings as settings_api, audit, companies, tickets
+from app.models import models
+from app.api.v1 import auth, employees, departments, enrollment, kiosk, attendance, reports, analytics, settings as settings_api, audit, companies, tickets, devices, notifications, timeline, policy
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -31,29 +38,53 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+from fastapi import Request
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; img-src 'self' data: blob: https:; connect-src 'self' ws: wss: https:;"
+    return response
+
 # Mount uploads directory as static files
 # Dynamic uploads endpoint: serves images from database (fallback to local disk)
 from app.core.database import get_db
 
 @app.get("/uploads/{employee_id}/{filename}")
 def get_upload_file(employee_id: str, filename: str, db: Session = Depends(get_db)):
+    # Sanitize inputs to prevent directory traversal
+    clean_emp_id = os.path.basename(employee_id.replace("..", "").replace("/", "").replace("\\", ""))
+    clean_filename = os.path.basename(filename.replace("..", "").replace("/", "").replace("\\", ""))
+    
+    if not clean_emp_id or not clean_filename:
+        raise HTTPException(status_code=400, detail="Invalid request parameters")
+        
     # Parse pose type from filename (e.g. "front.jpg" -> "front")
-    pose_type = filename.split(".")[0].lower()
+    pose_type = clean_filename.split(".")[0].lower()
     
     # Query database for this employee and pose_type
     db_img = db.query(models.EmployeeImage).join(models.Employee).filter(
-        models.Employee.employee_id == employee_id,
+        models.Employee.employee_id == clean_emp_id,
         models.EmployeeImage.pose_type.ilike(pose_type)
     ).first()
     
     if db_img and db_img.image_bytes:
         return Response(content=db_img.image_bytes, media_type="image/jpeg")
         
-    # Fallback to local file system if not in DB (e.g. legacy/development)
-    local_path = os.path.join(settings.UPLOAD_DIR, employee_id, filename)
-    if os.path.exists(local_path):
+    # Fallback to local file system with strict path canonicalization
+    upload_dir_abs = os.path.abspath(settings.UPLOAD_DIR)
+    local_path_abs = os.path.abspath(os.path.join(upload_dir_abs, clean_emp_id, clean_filename))
+    
+    if not local_path_abs.startswith(upload_dir_abs):
+        raise HTTPException(status_code=403, detail="Access denied: Path traversal attempt detected")
+        
+    if os.path.exists(local_path_abs):
         try:
-            with open(local_path, "rb") as f:
+            with open(local_path_abs, "rb") as f:
                 return Response(content=f.read(), media_type="image/jpeg")
         except Exception:
             pass
@@ -194,5 +225,9 @@ app.include_router(settings_api.router, prefix=f"{settings.API_V1_STR}/settings"
 app.include_router(audit.router, prefix=f"{settings.API_V1_STR}/audit", tags=["System Audit Logs"])
 app.include_router(companies.router, prefix=f"{settings.API_V1_STR}/companies", tags=["Company Management"])
 app.include_router(tickets.router, prefix=f"{settings.API_V1_STR}/tickets", tags=["Support Tickets & Helpdesk"])
+app.include_router(devices.router, prefix=f"{settings.API_V1_STR}/devices", tags=["Kiosk Devices"])
+app.include_router(notifications.router, prefix=f"{settings.API_V1_STR}/notifications", tags=["In-App Notifications"])
+app.include_router(timeline.router, prefix=f"{settings.API_V1_STR}/timeline", tags=["Activity History Timeline"])
+app.include_router(policy.router, prefix=f"{settings.API_V1_STR}/policy", tags=["Attendance Rules Policy Engine"])
 # Trigger reload - reload 2
 

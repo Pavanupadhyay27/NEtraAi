@@ -127,7 +127,15 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}): Pro
   
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: "Unknown server error" }));
-    throw new Error(errorData.detail || "Server error occurred");
+    let errMsg = "Server error occurred";
+    if (typeof errorData.detail === "string") {
+      errMsg = errorData.detail;
+    } else if (Array.isArray(errorData.detail)) {
+      errMsg = errorData.detail.map((err: any) => `${err.loc[err.loc.length - 1] || "field"}: ${err.msg}`).join(", ");
+    } else if (errorData.detail && typeof errorData.detail === "object") {
+      errMsg = JSON.stringify(errorData.detail);
+    }
+    throw new Error(errMsg);
   }
   
   // Handle file responses (PDF, Excel, CSV)
@@ -141,7 +149,6 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}): Pro
 
 export function parseDateTime(dateStr: string | null | undefined): Date | null {
   if (!dateStr) return null;
-  // Hugging Face backend stores datetimes in UTC. Append 'Z' to properly convert to the user's local timezone.
   const hasTimezone = dateStr.endsWith("Z") || dateStr.includes("+") || /-\d{2}:\d{2}$/.test(dateStr);
   const formattedStr = hasTimezone ? dateStr : dateStr.replace(" ", "T") + "Z";
   return new Date(formattedStr);

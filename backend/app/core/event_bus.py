@@ -53,3 +53,40 @@ def _publish_to_all(payload: dict) -> None:
             dead.append(q)
     for q in dead:
         unsubscribe(q)
+
+
+# --- Ticket Chat Broadcast Bus ---
+_ticket_subscribers: List[asyncio.Queue] = []
+
+def subscribe_tickets() -> asyncio.Queue:
+    global _loop
+    try:
+        _loop = asyncio.get_running_loop()
+    except RuntimeError:
+        pass
+    q: asyncio.Queue = asyncio.Queue(maxsize=50)
+    _ticket_subscribers.append(q)
+    return q
+
+def unsubscribe_tickets(q: asyncio.Queue) -> None:
+    try:
+        _ticket_subscribers.remove(q)
+    except ValueError:
+        pass
+
+def publish_ticket_message(payload: dict) -> None:
+    global _loop
+    if _loop is not None:
+        _loop.call_soon_threadsafe(_publish_ticket_to_all, payload)
+    else:
+        _publish_ticket_to_all(payload)
+
+def _publish_ticket_to_all(payload: dict) -> None:
+    dead: List[asyncio.Queue] = []
+    for q in _ticket_subscribers:
+        try:
+            q.put_nowait(payload)
+        except asyncio.QueueFull:
+            dead.append(q)
+    for q in dead:
+        unsubscribe_tickets(q)

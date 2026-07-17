@@ -19,20 +19,15 @@ import {
   Sun,
   Moon,
   Building2,
-  MessageSquare
+  MessageSquare,
+  User,
+  TrendingUp,
+  Calendar,
+  FileText,
+  Shield
 } from "lucide-react";
 import { getAccessToken, getUserProfile, clearTokens } from "@/app/utils/api";
-
-const navItems = [
-  { name: "Dashboard",       href: "/dashboard",  icon: LayoutDashboard },
-  { name: "Organizations",   href: "/tenants",    icon: Building2 },
-  { name: "Attendance",      href: "/attendance", icon: Clock },
-  { name: "Employees",       href: "/employees",  icon: Users },
-  { name: "Helpdesk Support",href: "/tickets",    icon: MessageSquare },
-  { name: "Reports",         href: "/reports",    icon: FileSpreadsheet },
-  { name: "Audit Logs",      href: "/audit",      icon: History },
-  { name: "Settings",        href: "/settings",   icon: Settings },
-];
+import CommandPalette from "@/components/CommandPalette";
 
 function NavLink({ 
   item, 
@@ -40,7 +35,7 @@ function NavLink({
   isCollapsed, 
   onClick 
 }: { 
-  item: typeof navItems[0], 
+  item: { name: string; href: string; icon: any }, 
   isActive: boolean, 
   isCollapsed: boolean, 
   onClick?: () => void 
@@ -51,20 +46,15 @@ function NavLink({
       href={item.href}
       onClick={onClick}
       data-tooltip={isCollapsed ? item.name : undefined}
-      className={`group relative flex items-center ${isCollapsed ? "justify-center px-2" : "gap-3 px-3"} py-2.5 rounded-xl transition-all duration-200 ${
+      className={`group relative flex items-center ${isCollapsed ? "justify-center px-2" : "gap-2.5 px-2.5 mx-1"} py-2.5 rounded-xl transition-all duration-200 ${
         isActive
-          ? "bg-[var(--border-subtle)] text-[var(--text-primary)] font-semibold"
+          ? "bg-zinc-950 text-white dark:bg-zinc-100 dark:text-zinc-950 font-bold"
           : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--border-subtle)]"
       }`}
     >
-      {/* Active indicator */}
-      {isActive && (
-        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full bg-[var(--text-primary)]" />
-      )}
-
-      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all ${
+      <div className={`w-7.5 h-7.5 rounded-lg flex items-center justify-center shrink-0 transition-all ${
         isActive
-          ? "bg-[var(--text-primary)] text-[var(--bg-base)]"
+          ? "bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900"
           : "bg-[var(--border-subtle)] text-[var(--text-muted)] group-hover:bg-[var(--border-strong)] group-hover:text-[var(--text-secondary)]"
       }`}>
         <Icon className="w-4 h-4" />
@@ -77,8 +67,6 @@ function NavLink({
           </p>
         </div>
       )}
-
-      {isActive && !isCollapsed && <ChevronRight className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />}
     </Link>
   );
 }
@@ -92,6 +80,20 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
   const [authorized, setAuthorized] = useState(false);
 
   const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  const [currentTime, setCurrentTime] = useState("");
+  const [currentDate, setCurrentDate] = useState("");
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setCurrentTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      setCurrentDate(now.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Load theme and sidebar state from localStorage on client side
   useEffect(() => {
@@ -141,13 +143,42 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
       setAuthorized(true);
       
        // Auto-redirect employees to dashboard if they attempt to access any admin views
-      if (profile?.role?.name === "Employee" && pathname !== "/dashboard" && pathname !== "/tickets") {
+      if (profile?.role?.name === "Employee" && pathname !== "/dashboard" && pathname !== "/tickets" && pathname !== "/profile" && pathname !== "/calendar") {
         router.push("/dashboard");
-      } else if (profile?.role?.name !== "Super Admin" && pathname === "/tenants") {
+      } else if (profile?.role?.name !== "Super Admin" && (pathname === "/tenants" || pathname === "/users" || pathname === "/analytics")) {
         router.push("/dashboard");
       }
     }
   }, [router, pathname]);
+
+  const [currentQuery, setCurrentQuery] = useState("");
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const handleUpdate = () => {
+        setCurrentQuery(window.location.search);
+      };
+      handleUpdate();
+      const interval = setInterval(handleUpdate, 200);
+      return () => clearInterval(interval);
+    }
+  }, []);
+
+  const isLinkActive = (href: string) => {
+    if (href.includes("?")) {
+      const [linkPath, linkSearch] = href.split("?");
+      if (pathname !== linkPath) return false;
+      const linkParams = new URLSearchParams(linkSearch);
+      const currentParams = new URLSearchParams(currentQuery);
+      return linkParams.get("tab") === currentParams.get("tab");
+    } else {
+      if (href === "/dashboard") {
+        const currentParams = new URLSearchParams(currentQuery);
+        if (currentParams.has("tab")) return false;
+        return pathname === "/dashboard";
+      }
+      return pathname === href || pathname.startsWith(href + "/");
+    }
+  };
 
   if (!authorized) {
     return (
@@ -171,14 +202,56 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
   const initials = user?.email ? user.email[0].toUpperCase() : "A";
   const isEmployee = user?.role?.name === "Employee";
   const isSuperAdmin = user?.role?.name === "Super Admin";
-  const visibleNavItems = isEmployee 
-    ? navItems.filter(item => item.href === "/dashboard" || item.href === "/tickets") 
-    : isSuperAdmin
-      ? navItems
-      : navItems.filter(item => item.href !== "/tenants");
+
+  const getVisibleNavItems = () => {
+    const role = user?.role?.name;
+    if (role === "Super Admin") {
+      return [
+        { name: "Dashboard",       href: "/dashboard",  icon: LayoutDashboard },
+        { name: "Organizations",   href: "/tenants",    icon: Building2 },
+        { name: "Analytics",       href: "/analytics",  icon: TrendingUp },
+        { name: "Helpdesk",        href: "/tickets",    icon: MessageSquare },
+        { name: "Audit Logs",      href: "/audit",      icon: History },
+        { name: "Settings",        href: "/settings",   icon: Settings },
+        { name: "Kiosk Mode",      href: "/kiosk",      icon: Scan },
+      ];
+    } else if (role === "Admin") {
+      return [
+        { name: "Dashboard",       href: "/dashboard",  icon: LayoutDashboard },
+        { name: "Attendance",      href: "/attendance", icon: Clock },
+        { name: "Employees",       href: "/employees",  icon: Users },
+        { name: "Leave",           href: "/leaves",     icon: Calendar },
+        { name: "Helpdesk",        href: "/tickets",    icon: MessageSquare },
+        { name: "Reports",         href: "/reports",    icon: FileSpreadsheet },
+        { name: "Settings",        href: "/settings",   icon: Settings },
+        { name: "Kiosk Mode",      href: "/kiosk",      icon: Scan },
+      ];
+    } else if (role === "HR") {
+      return [
+        { name: "Dashboard",       href: "/dashboard",  icon: LayoutDashboard },
+        { name: "Attendance",      href: "/attendance", icon: Clock },
+        { name: "Employees",       href: "/employees",  icon: Users },
+        { name: "Leave",           href: "/leaves",     icon: Calendar },
+        { name: "Helpdesk",        href: "/tickets",    icon: MessageSquare },
+        { name: "Reports",         href: "/reports",    icon: FileSpreadsheet },
+        { name: "Kiosk Mode",      href: "/kiosk",      icon: Scan },
+      ];
+    } else {
+      return [
+        { name: "Dashboard",       href: "/dashboard",  icon: LayoutDashboard },
+        { name: "Attendance",      href: "/dashboard?tab=attendance", icon: Clock },
+        { name: "Leave",           href: "/dashboard?tab=leave",      icon: Calendar },
+        { name: "Calendar",        href: "/calendar",                 icon: Calendar },
+        { name: "Contact HR",      href: "/tickets",                  icon: MessageSquare },
+      ];
+    }
+  };
+
+  const visibleNavItems = getVisibleNavItems();
 
   return (
     <div className="min-h-screen flex bg-[var(--bg-base)] text-[var(--text-primary)] font-sans relative">
+      <CommandPalette />
       {/* Ambient background */}
       <div className="ambient-bg" />
 
@@ -255,58 +328,28 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
           )}
 
           {/* Navigation */}
-          <nav className="flex-1 space-y-0.5">
+          <nav className="flex-1 space-y-4">
             {visibleNavItems.map((item) => (
               <NavLink
                 key={item.href}
                 item={item}
-                isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
+                isActive={isLinkActive(item.href)}
                 isCollapsed={isCollapsed}
               />
             ))}
-            
-            {!isEmployee && (
-              <>
-                {/* Separator */}
-                <div className="my-3 border-t border-[var(--border-subtle)]" />
-
-                {/* Kiosk Launch */}
-                <a
-                  href="/kiosk"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  data-tooltip={isCollapsed ? "Launch Kiosk" : undefined}
-                  className={`group flex items-center ${isCollapsed ? "justify-center px-2" : "gap-3 px-3"} py-2.5 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--border-subtle)] transition-all duration-200`}
-                >
-                  <div className="w-8 h-8 rounded-lg bg-[var(--border-subtle)] flex items-center justify-center group-hover:bg-[var(--text-primary)] transition-all">
-                    <Monitor className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[var(--bg-base)]" />
-                  </div>
-                  {!isCollapsed && (
-                    <>
-                      <div className="flex-1">
-                        <p className="text-sm">Launch Kiosk</p>
-                      </div>
-                      <span className="text-[9px] font-mono text-[var(--text-secondary)] bg-[var(--border-subtle)] px-1.5 py-0.5 rounded uppercase tracking-wider font-semibold">
-                        Live
-                      </span>
-                    </>
-                  )}
-                </a>
-              </>
-            )}
           </nav>
 
           {/* User Profile Footer */}
           <div className="pt-3 border-t border-[var(--border-subtle)]">
             <div className={`flex items-center ${isCollapsed ? "justify-center" : "gap-3"} p-2 rounded-xl hover:bg-[var(--border-subtle)] transition-all group cursor-default`}>
-              <div className="relative shrink-0">
-                <div className="w-8 h-8 rounded-full bg-[var(--text-primary)] flex items-center justify-center font-bold text-sm text-[var(--bg-base)] shadow-sm">
-                  {initials}
+              <Link href="/profile" className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="relative shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-[var(--text-primary)] flex items-center justify-center font-bold text-sm text-[var(--bg-base)] shadow-sm">
+                    {initials}
+                  </div>
+                  <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white" />
                 </div>
-                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white" />
-              </div>
-              {!isCollapsed && (
-                <>
+                {!isCollapsed && (
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-[var(--text-primary)] truncate leading-none">
                       {user?.role?.name || "Admin"}
@@ -315,19 +358,37 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
                       {user?.email}
                     </p>
                   </div>
+                )}
+              </Link>
+              {!isCollapsed && (
+                <div className="flex items-center gap-1 shrink-0">
+                  <Link
+                    href="/profile"
+                    title="View Profile"
+                    className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--border-subtle)] transition-all opacity-80 hover:opacity-100 cursor-pointer"
+                  >
+                    <User className="w-3.5 h-3.5" />
+                  </Link>
                   <button
                     onClick={handleLogout}
                     title="Sign out"
-                    className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-rose-600 hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                    className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-rose-600 hover:bg-rose-50 transition-all opacity-80 hover:opacity-100 cursor-pointer"
                   >
                     <LogOut className="w-3.5 h-3.5" />
                   </button>
-                </>
+                </div>
               )}
             </div>
             
             {isCollapsed && (
-              <div className="flex justify-center mt-2">
+              <div className="flex flex-col items-center gap-2 mt-2">
+                <Link
+                  href="/profile"
+                  title="View Profile"
+                  className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--border-subtle)] transition-all cursor-pointer"
+                >
+                  <User className="w-4 h-4" />
+                </Link>
                 <button
                   onClick={handleLogout}
                   title="Sign out"
@@ -358,6 +419,11 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
             </svg>
           </div>
           <span className="font-extrabold text-[17px] text-[var(--text-primary)] tracking-tight">NetraID</span>
+          {currentTime && (
+            <span className="text-[10px] font-mono bg-[var(--border-subtle)] px-2 py-0.5 rounded-lg text-[var(--text-secondary)] tabular-nums font-semibold">
+              {currentTime.split(" ")[0]} {currentTime.split(" ")[1] || ""}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {/* Theme Toggle Mobile */}
@@ -410,45 +476,34 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
             </button>
           </div>
 
-          <nav className="flex-1 overflow-y-auto space-y-1 p-4">
+          <nav className="flex-1 overflow-y-auto space-y-4 p-4">
             <div className="mb-2 px-3 text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase">Menu</div>
             {visibleNavItems.map((item) => (
               <NavLink
                 key={item.href}
                 item={item}
-                isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
+                isActive={isLinkActive(item.href)}
                 isCollapsed={false}
                 onClick={() => setSidebarOpen(false)}
               />
             ))}
             
-            {!isEmployee && (
-              <>
-                <div className="mt-6 mb-2 px-3 text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase">System</div>
-                <a
-                  href="/kiosk"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 px-3 py-3 rounded-xl text-[var(--text-secondary)] hover:text-white hover:bg-slate-800 transition-all border border-transparent hover:border-slate-700 shadow-sm"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
-                    <Monitor className="w-4 h-4 text-cyan-400" />
-                  </div>
-                  <span className="text-sm font-medium">Launch Kiosk</span>
-                </a>
-              </>
-            )}
           </nav>
 
           <div className="p-4 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)]">
             <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--border-subtle)]/50 border border-[var(--border-subtle)]">
-              <div className="w-9 h-9 rounded-full bg-[var(--text-primary)] flex items-center justify-center font-bold text-sm text-[var(--bg-base)] shadow-md">
-                {initials}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-[var(--text-primary)] truncate">{user?.role?.name}</p>
-                <p className="text-[10px] text-[var(--text-muted)] truncate">{user?.email}</p>
-              </div>
+              <Link href="/profile" onClick={() => setSidebarOpen(false)} className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="w-9 h-9 rounded-full bg-[var(--text-primary)] flex items-center justify-center font-bold text-sm text-[var(--bg-base)] shadow-md">
+                  {initials}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-[var(--text-primary)] truncate">{user?.role?.name}</p>
+                  <p className="text-[10px] text-[var(--text-muted)] truncate">{user?.email}</p>
+                </div>
+              </Link>
+              <Link href="/profile" onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer transition-all">
+                <User className="w-4 h-4" />
+              </Link>
               <button onClick={handleLogout} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10 cursor-pointer transition-all">
                 <LogOut className="w-4 h-4" />
               </button>
@@ -460,8 +515,21 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
       {/* ─── Main Content ─── */}
       <main className="flex-1 min-h-screen overflow-y-auto relative z-10 pt-14 md:pt-0">
         {/* Desktop Top Navbar */}
-        <header className="hidden md:flex h-14 border-b border-[var(--border-subtle)] px-8 items-center justify-end bg-[var(--bg-surface)]/95 backdrop-blur-xl sticky top-0 z-30">
-          <div className="flex items-center gap-2">
+        <header className="hidden md:flex h-14 border-b border-[var(--border-subtle)] px-8 items-center justify-between bg-[var(--bg-surface)]/95 backdrop-blur-xl sticky top-0 z-30">
+          <div className="flex-1" />
+          
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2 font-mono text-[12px] text-[var(--text-secondary)] font-medium">
+              <Clock className="w-4 h-4 text-cyan-500 animate-pulse" />
+              <span>{currentDate}</span>
+              {currentTime && (
+                <>
+                  <span className="text-[var(--border-subtle)] px-1">|</span>
+                  <span className="tabular-nums font-bold text-[var(--text-primary)]">{currentTime}</span>
+                </>
+              )}
+            </div>
+
             <button
               onClick={toggleTheme}
               className="p-2 rounded-lg hover:bg-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all cursor-pointer"
@@ -472,7 +540,10 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
           </div>
         </header>
 
-        <div className="max-w-7xl mx-auto px-5 py-6 md:px-8 md:py-8">
+        <div 
+          key={pathname}
+          className="max-w-7xl mx-auto px-5 py-6 md:px-8 md:py-8 page-enter"
+        >
           {children}
         </div>
       </main>

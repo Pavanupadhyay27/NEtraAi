@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
     # Seeding
-    INITIAL_ADMIN_EMAIL: str = "admin@netraid.ai"
+    INITIAL_ADMIN_EMAIL: str = "pavanupadhyay027@gmail.com"
     INITIAL_ADMIN_PASSWORD: str = "Admin@NetraID2026"
     
     # Face recognition & liveness detection parameters

@@ -223,14 +223,14 @@ export default function AttendancePage() {
 
         {/* Table */}
         {activeTab === "feed" ? (
-          <div className="glass-card rounded-2xl border border-white/6 overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-white/5 bg-white/[0.005]">
+          <div className="tech-card-3d-minimal bg-white overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-slate-200/80 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-900/50">
               <p className="text-[11px] text-slate-500 font-mono">
                 {loadingFeed ? "Fetching..." : `${filtered?.length || 0} ledger records for ${selectedDate}`}
               </p>
             </div>
             
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto min-h-[350px]">
               <table className="data-table">
                 <thead>
                   <tr>
@@ -307,14 +307,14 @@ export default function AttendancePage() {
             </div>
           </div>
         ) : (
-          <div className="glass-card rounded-2xl border border-white/6 overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-white/5 bg-white/[0.005]">
+          <div className="tech-card-3d-minimal bg-white overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-slate-200/80 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-900/50">
               <p className="text-[11px] text-slate-500 font-mono">
                 {loadingLogs ? "Fetching..." : `${rawLogs?.length || 0} swipe events for ${selectedDate}`}
               </p>
             </div>
             
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto min-h-[350px]">
               <table className="data-table">
                 <thead>
                   <tr>

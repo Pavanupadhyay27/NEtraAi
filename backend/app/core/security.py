@@ -10,6 +10,19 @@ from app.core.database import get_db
 from app.models import models
 from app.crud import crud
 
+import bcrypt
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    try:
+        # Convert password strings to bytes for bcrypt
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    except Exception:
+        return False
+
+def get_password_hash(password: str) -> str:
+    # Hash password using bcrypt salt
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/auth/login"
 )

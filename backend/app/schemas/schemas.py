@@ -24,7 +24,10 @@ class CompanyBase(BaseModel):
     address: Optional[str] = None
 
 class CompanyCreate(CompanyBase):
-    pass
+    logo: Optional[str] = None
+    latitude: Optional[str] = None
+    longitude: Optional[str] = None
+    admin_password: Optional[str] = None
 
 class CompanyUpdate(BaseModel):
     name: Optional[str] = None
@@ -35,6 +38,9 @@ class CompanyUpdate(BaseModel):
     admin_email: Optional[EmailStr] = None
     phone: Optional[str] = None
     address: Optional[str] = None
+    logo: Optional[str] = None
+    latitude: Optional[str] = None
+    longitude: Optional[str] = None
 
 class CompanyOut(CompanyBase):
     id: int
@@ -53,6 +59,22 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
     role_id: Optional[int] = None
     is_active: Optional[bool] = None
+
+class AdminRegister(BaseModel):
+    company_name: str
+    email: EmailStr
+    password: str
+    phone: Optional[str] = None
+    address: Optional[str] = None
+
+class EmployeeRegister(BaseModel):
+    company_id: int
+    name: str
+    email: EmailStr
+    password: str
+    employee_id: str
+    phone: Optional[str] = None
+    designation: Optional[str] = None
 
 
 # Token Schemas
@@ -204,6 +226,14 @@ class AttendanceOut(AttendanceBase):
     early_departure: bool
     overtime: float
     emergency_allowed: bool = False
+    late_minutes: Optional[int] = 0
+    early_exit_minutes: Optional[int] = 0
+    break_time_minutes: Optional[int] = 0
+    attendance_streak: Optional[int] = 0
+    attendance_percentage: Optional[float] = 0.0
+    shift_info: Optional[str] = None
+    geofence_result: Optional[str] = None
+    policy_version: Optional[str] = None
     employee: Optional[EmployeeOut] = None
     model_config = ConfigDict(from_attributes=True)
 
@@ -227,6 +257,15 @@ class AttendanceLogOut(BaseModel):
     location_text: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    face_quality: Optional[float] = None
+    blur_score: Optional[float] = None
+    brightness_score: Optional[float] = None
+    is_occluded: bool
+    has_mask: bool
+    recognition_time_ms: Optional[float] = None
+    processing_time_ms: Optional[float] = None
+    embedding_version: Optional[str] = None
+    device_id: Optional[int] = None
     employee: Optional[EmployeeOut] = None
     model_config = ConfigDict(from_attributes=True)
 
@@ -329,4 +368,77 @@ class TicketOut(TicketBase):
     created_at: datetime
     employee: Optional[EmployeeOut] = None
     messages: List[TicketMessageOut] = []
+    model_config = ConfigDict(from_attributes=True)
+
+# Device Schemas
+class DeviceBase(BaseModel):
+    name: str
+    device_type: str = "Kiosk"
+    branch: str = "Main Headquarters"
+    camera: str = "Main Camera"
+    ip_address: Optional[str] = None
+    os_info: Optional[str] = None
+    app_version: Optional[str] = None
+
+class DeviceCreate(DeviceBase):
+    pass
+
+class DeviceUpdate(BaseModel):
+    name: Optional[str] = None
+    status: Optional[str] = None
+    cpu_usage: Optional[float] = None
+    memory_usage: Optional[float] = None
+    disk_usage: Optional[float] = None
+    battery_level: Optional[int] = None
+    network_status: Optional[str] = None
+
+class DeviceOut(DeviceBase):
+    id: int
+    company_id: Optional[int] = None
+    status: str
+    heartbeat: datetime
+    cpu_usage: float
+    memory_usage: float
+    disk_usage: float
+    battery_level: int
+    network_status: str
+    last_sync: datetime
+    restart_count: int
+    model_config = ConfigDict(from_attributes=True)
+
+# Notification Schemas
+class NotificationBase(BaseModel):
+    title: str
+    message: str
+    category: str = "General"
+    priority: str = "Medium"
+    expires_at: Optional[datetime] = None
+
+class NotificationCreate(NotificationBase):
+    recipient_id: Optional[int] = None
+
+class NotificationOut(NotificationBase):
+    id: int
+    company_id: Optional[int] = None
+    recipient_id: Optional[int] = None
+    sender_id: Optional[int] = None
+    is_read: bool
+    is_archived: bool
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+# ActivityTimeline Schemas
+class ActivityTimelineOut(BaseModel):
+    id: int
+    company_id: Optional[int] = None
+    actor_id: Optional[int] = None
+    action: str
+    entity_type: str
+    entity_id: Optional[int] = None
+    previous_value: Optional[str] = None
+    new_value: Optional[str] = None
+    timestamp: datetime
+    ip_address: Optional[str] = None
+    device_info: Optional[str] = None
+    browser_info: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)

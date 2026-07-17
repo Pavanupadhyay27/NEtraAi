@@ -59,6 +59,7 @@ class Company(Base):
     settings = relationship("Setting", back_populates="company", cascade="all, delete-orphan")
     audit_logs = relationship("AuditLog", back_populates="company", cascade="all, delete-orphan")
     tickets = relationship("Ticket", back_populates="company", cascade="all, delete-orphan")
+    devices = relationship("Device", back_populates="company", cascade="all, delete-orphan")
 
 class Role(Base):
     __tablename__ = "roles"
@@ -193,6 +194,16 @@ class Attendance(Base):
     status = Column(String(20), default="Absent")  # Present, Absent, Late, Half Day, Leave, Holiday, WFH
     emergency_allowed = Column(Boolean, default=False)
 
+    # Enterprise Extensions
+    late_minutes = Column(Integer, default=0)
+    early_exit_minutes = Column(Integer, default=0)
+    break_time_minutes = Column(Integer, default=0)
+    attendance_streak = Column(Integer, default=0)
+    attendance_percentage = Column(Float, default=100.0)
+    shift_info = Column(String(255), nullable=True)
+    geofence_result = Column(String(100), nullable=True)
+    policy_version = Column(String(50), nullable=True)
+
     employee = relationship("Employee", back_populates="attendance_records")
 
 class AttendanceLog(Base):
@@ -200,7 +211,7 @@ class AttendanceLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=True)  # Null if not recognized
-    timestamp = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     camera = Column(String(100), default="Kiosk")
     confidence = Column(Float, nullable=True)
     liveness_score = Column(Float, nullable=True)
@@ -210,6 +221,17 @@ class AttendanceLog(Base):
     location_text = Column(String(255), nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
+
+    # Recognition Analytics Extensions
+    face_quality = Column(Float, nullable=True)
+    blur_score = Column(Float, nullable=True)
+    brightness_score = Column(Float, nullable=True)
+    is_occluded = Column(Boolean, default=False)
+    has_mask = Column(Boolean, default=False)
+    recognition_time_ms = Column(Float, nullable=True)
+    processing_time_ms = Column(Float, nullable=True)
+    embedding_version = Column(String(50), nullable=True)
+    device_id = Column(Integer, ForeignKey("devices.id", ondelete="SET NULL"), nullable=True)
 
     employee = relationship("Employee", back_populates="attendance_logs")
 
@@ -257,7 +279,7 @@ class AuditLog(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     action = Column(String(100), nullable=False)  # Login, Logout, Create Employee, Mark Attendance, etc.
-    timestamp = Column(DateTime, default=datetime.datetime.now)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
     ip_address = Column(String(50), nullable=True)
     user_agent = Column(String(255), nullable=True)
     details = Column(Text, nullable=True)
@@ -293,3 +315,66 @@ class TicketMessage(Base):
 
     ticket = relationship("Ticket", back_populates="messages")
     sender = relationship("User")
+
+class Device(Base):
+    __tablename__ = "devices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    device_type = Column(String(50), default="Kiosk")  # Kiosk, Mobile, Gateway
+    company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=True)
+    branch = Column(String(100), default="Main Headquarters")
+    camera = Column(String(100), default="Main Camera")
+    ip_address = Column(String(50), nullable=True)
+    os_info = Column(String(100), nullable=True)
+    app_version = Column(String(50), nullable=True)
+    status = Column(String(50), default="Online")  # Online, Offline, Maintenance
+    heartbeat = Column(DateTime, default=datetime.datetime.utcnow)
+    cpu_usage = Column(Float, default=0.0)
+    memory_usage = Column(Float, default=0.0)
+    disk_usage = Column(Float, default=0.0)
+    battery_level = Column(Integer, default=100)
+    network_status = Column(String(50), default="Good")
+    last_sync = Column(DateTime, default=datetime.datetime.utcnow)
+    restart_count = Column(Integer, default=0)
+
+    company = relationship("Company", back_populates="devices")
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=True)
+    recipient_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)  # Null if broadcast
+    sender_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+    category = Column(String(100), default="General")  # Attendance, HR, Leave, Alert, System
+    priority = Column(String(50), default="Medium")  # Low, Medium, High
+    is_read = Column(Boolean, default=False)
+    is_archived = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    expires_at = Column(DateTime, nullable=True)
+
+    company = relationship("Company")
+    recipient = relationship("User", foreign_keys=[recipient_id])
+    sender = relationship("User", foreign_keys=[sender_id])
+
+class ActivityTimeline(Base):
+    __tablename__ = "activity_timelines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=True)
+    actor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    action = Column(String(100), nullable=False)  # Create, Update, Delete, Authenticate, Scan
+    entity_type = Column(String(100), nullable=False)  # Employee, Organization, Device, Attendance, Ticket
+    entity_id = Column(Integer, nullable=True)
+    previous_value = Column(Text, nullable=True)
+    new_value = Column(Text, nullable=True)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    ip_address = Column(String(50), nullable=True)
+    device_info = Column(String(255), nullable=True)
+    browser_info = Column(String(255), nullable=True)
+
+    company = relationship("Company")
+    actor = relationship("User")

@@ -642,10 +642,10 @@ export default function KioskPage() {
             const currentZoom = track.getSettings().zoom || 1;
             if (faceWidth < 120 && currentZoom < (caps.zoom.max || 3)) {
                // Too far - zoom in
-               track.applyConstraints({ advanced: [{ zoom: Math.min(currentZoom + 0.3, caps.zoom.max || 3) }] });
+               track.applyConstraints({ advanced: [{ zoom: Math.min(currentZoom + 0.3, caps.zoom.max || 3) }] } as any);
             } else if (faceWidth > 250 && currentZoom > (caps.zoom.min || 1)) {
                // Too close - zoom out
-               track.applyConstraints({ advanced: [{ zoom: Math.max(currentZoom - 0.3, caps.zoom.min || 1) }] });
+               track.applyConstraints({ advanced: [{ zoom: Math.max(currentZoom - 0.3, caps.zoom.min || 1) }] } as any);
             }
           }
         }

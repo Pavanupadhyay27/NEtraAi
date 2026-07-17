@@ -18,6 +18,112 @@ router = APIRouter()
 
 checker_manage = security.RoleChecker(["Super Admin", "Admin", "HR"])
 
+def enroll_employee_face_pose(
+    db: Session,
+    employee: models.Employee,
+    pose_type: str,
+    contents: bytes,
+    ip_address: str = None,
+    user_agent: str = None,
+    creator_user_id: int = None
+):
+    nparr = np.frombuffer(contents, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if img is None:
+        raise HTTPException(status_code=400, detail="OpenCV failed to decode the image. The format might be unsupported.")
+
+    faces = face_engine.detect_faces(img)
+    if not faces:
+        logger.error("No face detected in the image.")
+        raise HTTPException(status_code=400, detail="No face detected in the captured image. Please ensure your face is clearly visible and well-lit.")
+    if len(faces) > 1:
+        logger.error("Multiple faces detected in the image.")
+        raise HTTPException(status_code=400, detail="Multiple faces detected. Please ensure only one person is in the frame.")
+        
+    face = faces[0]
+    confidence = face["confidence"]
+    
+    if confidence < 0.5:
+        logger.error(f"Face detection confidence too low: {confidence:.2f}")
+        raise HTTPException(status_code=400, detail=f"Face detection confidence too low ({confidence:.2f}). Please upload a clearer image.")
+
+    quality = face_engine.validate_image_quality(img)
+    if not quality["is_valid"]:
+        logger.error(f"Image quality validation failed: {quality['reason']}")
+        raise HTTPException(status_code=400, detail=f"Image Quality Error: {quality['reason']}")
+
+    liveness_enabled_setting = crud.get_setting_by_key(db, "ENROLLMENT_LIVENESS_CHECK")
+    liveness_enabled = liveness_enabled_setting.value.lower() == "true" if liveness_enabled_setting else True
+
+    liveness_threshold_setting = crud.get_setting_by_key(db, "ENROLLMENT_LIVENESS_THRESHOLD")
+    liveness_threshold = float(liveness_threshold_setting.value) if liveness_threshold_setting else 0.70
+
+    liveness_score, is_live = face_engine.check_liveness(img, face["bbox"], threshold=liveness_threshold)
+    
+    if liveness_enabled and not is_live and not face_engine.mock_mode:
+        if pose_type.strip().lower() == "front":
+            logger.warning(f"Liveness check failed ({liveness_score:.2f}) on FRONT pose. Bypassing for now.")
+        else:
+            logger.warning(
+                f"Liveness check failed during enrollment for non-frontal pose '{pose_type}' "
+                f"(score: {liveness_score:.2f}, threshold: {liveness_threshold:.2f}). "
+                f"Bypassing check to prevent false rejection."
+            )
+
+    aligned_face = face_engine.align_face(img, face["landmarks"])
+    embedding = face_engine.extract_embedding(aligned_face)
+    
+    emp_upload_dir = os.path.join(settings.UPLOAD_DIR, str(employee.employee_id))
+    os.makedirs(emp_upload_dir, exist_ok=True)
+    
+    filename = f"{pose_type.replace(' ', '_').lower()}.jpg"
+    dest_path = os.path.join(emp_upload_dir, filename)
+    
+    cv2.imwrite(dest_path, img)
+    
+    for existing_img in employee.images:
+        if existing_img.pose_type == pose_type:
+            db.delete(existing_img)
+            
+    db.commit()
+
+    db_img = crud.save_employee_image(
+        db=db,
+        employee_id=employee.id,
+        file_path=dest_path,
+        pose_type=pose_type,
+        image_bytes=contents
+    )
+    
+    embedding_list = embedding.tolist()
+    crud.save_face_embedding(
+        db=db,
+        employee_id=employee.id,
+        image_id=db_img.id,
+        embedding=embedding_list
+    )
+    
+    face_engine.invalidate_cache()
+    
+    audit_user_id = creator_user_id or employee.user_id
+    if audit_user_id:
+        crud.create_audit_log(
+            db=db,
+            user_id=audit_user_id,
+            action="Enroll Face Pose",
+            ip_address=ip_address,
+            user_agent=user_agent,
+            details=f"Enrolled pose '{pose_type}' for employee ID: {employee.employee_id}"
+        )
+        
+    return {
+        "message": f"Successfully enrolled pose '{pose_type}' for employee {employee.name}",
+        "pose_type": pose_type,
+        "confidence": confidence,
+        "liveness_score": liveness_score,
+        "image_id": db_img.id
+    }
+
 @router.post("/upload")
 async def upload_face_image(
     request: Request,
@@ -27,156 +133,60 @@ async def upload_face_image(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(checker_manage)
 ):
-    # Validate employee exists
     employee = crud.get_employee_by_id(db, id=employee_id)
     if not employee:
-        all_emps = db.query(models.Employee).all()
-        emp_ids = [e.id for e in all_emps]
-        emp_uuids = [e.employee_id for e in all_emps]
-        raise HTTPException(
-            status_code=404,
-            detail=f"Employee not found. Received employee_id: {employee_id} (type: {type(employee_id).__name__}). Existing PK IDs: {emp_ids}, String IDs: {emp_uuids}"
-        )
+        raise HTTPException(status_code=404, detail="Employee not found")
         
-    # Read file bytes
     try:
         contents = await file.read()
         if not contents:
             raise HTTPException(status_code=400, detail="Received empty file. No image data was sent.")
-        nparr = np.frombuffer(contents, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if img is None:
-            raise HTTPException(status_code=400, detail="OpenCV failed to decode the image. The format might be unsupported.")
-    except HTTPException as e:
-        raise e
     except Exception as e:
-        logger.error(f"Image decode failed: {e}")
-        raise HTTPException(status_code=400, detail=f"Invalid image file format: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid image file: {str(e)}")
 
-    # Detect faces
-    faces = face_engine.detect_faces(img)
-    if not faces:
-        logger.error("No face detected in the image.")
-        raise HTTPException(status_code=400, detail="No face detected in the captured image. Please ensure your face is clearly visible and well-lit.")
-    if len(faces) > 1:
-        logger.error("Multiple faces detected in the image.")
-        raise HTTPException(status_code=400, detail="Multiple faces detected. Please ensure only one person is in the frame.")
-        
-    # Process face
-    face = faces[0]
-    confidence = face["confidence"]
-    
-    # Check if confidence is high enough
-    if confidence < 0.5:
-        logger.error(f"Face detection confidence too low: {confidence:.2f}")
-        raise HTTPException(status_code=400, detail=f"Face detection confidence too low ({confidence:.2f}). Please upload a clearer image.")
-
-    # Image Quality Validation
-    quality = face_engine.validate_image_quality(img)
-    if not quality["is_valid"]:
-        logger.error(f"Image quality validation failed: {quality['reason']}")
-        raise HTTPException(status_code=400, detail=f"Image Quality Error: {quality['reason']}")
-
-    # Optional liveness check on enrollment (preventing enroll spoofing)
-    liveness_enabled_setting = crud.get_setting_by_key(db, "ENROLLMENT_LIVENESS_CHECK")
-    liveness_enabled = liveness_enabled_setting.value.lower() == "true" if liveness_enabled_setting else True
-
-    liveness_threshold_setting = crud.get_setting_by_key(db, "ENROLLMENT_LIVENESS_THRESHOLD")
-    liveness_threshold = float(liveness_threshold_setting.value) if liveness_threshold_setting else 0.70
-
-    liveness_score, is_live = face_engine.check_liveness(img, face["bbox"], threshold=liveness_threshold)
-    
-    # In enrollment we want to prevent spoofing. However, liveness models are calibrated for direct frontal views.
-    # Profile/tilted views (left, right, up, down) often yield lower liveness scores and cause false rejections.
-    # Therefore, we strictly enforce liveness on the "front" pose only, and bypass it for other poses.
-    if liveness_enabled and not is_live and not face_engine.mock_mode:
-        if pose_type.strip().lower() == "front":
-            logger.warning(f"Liveness check failed ({liveness_score:.2f}) on FRONT pose. Bypassing for now.")
-            # raise HTTPException(status_code=400, detail=f"Liveness check failed ({liveness_score:.2f}). Please upload a real photo.")
-        else:
-            logger.warning(
-                f"Liveness check failed during enrollment for non-frontal pose '{pose_type}' "
-                f"(score: {liveness_score:.2f}, threshold: {liveness_threshold:.2f}). "
-                f"Bypassing check to prevent false rejection."
-            )
-
-    # Align face (112x112)
-    aligned_face = face_engine.align_face(img, face["landmarks"])
-    
-    # Generate 512-D embedding
-    embedding = face_engine.extract_embedding(aligned_face)
-    
-    # Save image to disk
-    emp_upload_dir = os.path.join(settings.UPLOAD_DIR, str(employee.employee_id))
-    os.makedirs(emp_upload_dir, exist_ok=True)
-    
-    # Save the raw uploaded photo (or aligned photo, raw photo is better for archive)
-    filename = f"{pose_type.replace(' ', '_').lower()}.jpg"
-    dest_path = os.path.join(emp_upload_dir, filename)
-    
-    # Save the file (we compress/save as JPG)
-    cv2.imwrite(dest_path, img)
-    
-    # Check if this pose already exists for the employee, delete it if it does
-    # (to allow re-enrolling a specific pose)
-    for existing_img in employee.images:
-        if existing_img.pose_type == pose_type:
-            db.delete(existing_img)
-            
-    db.commit()
-
-    # Save EmployeeImage
-    db_img = crud.save_employee_image(
+    return enroll_employee_face_pose(
         db=db,
-        employee_id=employee.id,
-        file_path=dest_path,
+        employee=employee,
         pose_type=pose_type,
-        image_bytes=contents
-    )
-    
-    # Save FaceEmbedding (convert numpy array to python list)
-    embedding_list = embedding.tolist()
-    db_emb = crud.save_face_embedding(
-        db=db,
-        employee_id=employee.id,
-        image_id=db_img.id,
-        embedding=embedding_list
-    )
-    
-    # Invalidate face engine embeddings cache
-    face_engine.invalidate_cache()
-    
-    # Log Audit
-    crud.create_audit_log(
-        db=db,
-        user_id=current_user.id,
-        action="Enroll Face Pose",
+        contents=contents,
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
-        details=f"Enrolled pose '{pose_type}' for employee ID: {employee.employee_id}"
+        creator_user_id=current_user.id
     )
-    
-    return {
-        "message": f"Successfully enrolled pose '{pose_type}' for employee {employee.name}",
-        "pose_type": pose_type,
-        "confidence": confidence,
-        "liveness_score": liveness_score,
-        "image_id": db_img.id
-    }
 
 @router.get("/status/{employee_id}")
 def get_enrollment_status(
+    request: Request,
     employee_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(checker_manage)
+    db: Session = Depends(get_db)
 ):
     employee = crud.get_employee_by_id(db, id=employee_id)
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
         
+    auth_header = request.headers.get("Authorization")
+    current_user = None
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        try:
+            current_user = security.get_current_user_from_token(token, db)
+        except Exception:
+            pass
+
+    if current_user is None:
+        if employee.status != "Pending Approval":
+            raise HTTPException(status_code=403, detail="Access denied")
+    else:
+        user_role = current_user.role.name
+        if user_role not in ["Super Admin", "Admin", "HR"]:
+            if user_role == "Employee":
+                if not current_user.employee or current_user.employee.id != employee_id:
+                    raise HTTPException(status_code=403, detail="Access denied")
+            else:
+                raise HTTPException(status_code=403, detail="Access denied")
+        
     poses = [img.pose_type for img in employee.images]
     
-    # Required poses list
     required_poses = [
         "front", "left", "right", "up", "down", 
         "smile", "neutral", "indoor", "outdoor"
@@ -185,7 +195,8 @@ def get_enrollment_status(
     missing_poses = [p for p in required_poses if p not in [x.lower() for x in poses]]
     
     return {
-        "employee_id": employee.employee_id,
+        "employee_id": employee.id,
+        "employee_uuid": employee.employee_id,
         "name": employee.name,
         "total_enrolled": len(poses),
         "enrolled_poses": poses,
@@ -218,3 +229,46 @@ def delete_all_enrollments(
     )
     
     return {"message": "All face enrollments and images cleared successfully"}
+
+@router.delete("/{employee_id}/pose/{pose_type}")
+def delete_single_pose(
+    request: Request,
+    employee_id: int,
+    pose_type: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(checker_manage)
+):
+    employee = crud.get_employee_by_id(db, id=employee_id)
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+        
+    pose_img = next((img for img in employee.images if img.pose_type.lower() == pose_type.lower()), None)
+    if not pose_img:
+        raise HTTPException(status_code=404, detail=f"Pose '{pose_type}' not found for this employee")
+        
+    db.execute(
+        models.FaceEmbedding.__table__.delete().where(
+            models.FaceEmbedding.image_id == pose_img.id
+        )
+    )
+    db.delete(pose_img)
+    db.commit()
+    
+    face_engine.invalidate_cache()
+    
+    try:
+        if os.path.exists(pose_img.file_path):
+            os.remove(pose_img.file_path)
+    except Exception as e:
+        logger.warning(f"Could not remove physical file {pose_img.file_path}: {e}")
+        
+    crud.create_audit_log(
+        db=db,
+        user_id=current_user.id,
+        action="Clear Single Pose",
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+        details=f"Cleared pose '{pose_type}' for employee ID: {employee.employee_id}"
+    )
+    
+    return {"message": f"Pose '{pose_type}' cleared successfully"}
