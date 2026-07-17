@@ -115,10 +115,11 @@ def get_upload_file(employee_id: str, filename: str, db: Session = Depends(get_d
             
     raise HTTPException(status_code=404, detail="File not found")
 
-# CORS — restrict to explicit methods and headers only
+# CORS — explicit origins required for credentials (wildcard breaks SameSite cookie auth)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
+    allow_origin_regex=settings.cors_origin_regex,  # Covers Vercel preview deployments
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],

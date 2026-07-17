@@ -79,8 +79,21 @@ class Settings(BaseSettings):
     AUDIT_LOG_RETENTION_DAYS: int = 90
     
     # CORS Origins
-    # We load them as a list of strings
+    # Comma-separated list of allowed origins, e.g. https://n-etra-ai-rjn3.vercel.app
+    # CRITICAL: Do NOT set this to "*" in production — wildcard is incompatible with
+    # allow_credentials=True and will break cookie-based auth (CORS spec requirement).
     ALLOWED_HOSTS: str = "*"
+
+    # Known production origins — always allowed regardless of ALLOWED_HOSTS value
+    _STATIC_ORIGINS: List[str] = [
+        "https://n-etra-ai-rjn3.vercel.app",
+        "https://netraai07-netra.hf.space",
+        "https://pawankr007-netra.hf.space",
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8000",
+    ]
 
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"),
@@ -90,8 +103,23 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> List[str]:
-        if not self.ALLOWED_HOSTS:
-            return ["*"]
-        return [origin.strip() for origin in self.ALLOWED_HOSTS.split(",")]
+        """
+        Returns the list of allowed CORS origins.
+
+        IMPORTANT: Never returns ["*"] — wildcard origins are incompatible with
+        allow_credentials=True (CORS spec). When ALLOWED_HOSTS is "*" or unset,
+        we fall back to the known static origin list so credentials still work.
+        """
+        extra: List[str] = []
+        if self.ALLOWED_HOSTS and self.ALLOWED_HOSTS.strip() not in ("", "*"):
+            extra = [o.strip() for o in self.ALLOWED_HOSTS.split(",") if o.strip()]
+        # Merge static + configured origins, deduplicated
+        combined = list(dict.fromkeys(self._STATIC_ORIGINS + extra))
+        return combined
+
+    @property
+    def cors_origin_regex(self) -> str:
+        """Regex to allow all Vercel preview deployments for this project."""
+        return r"https://n-etra-ai.*\.vercel\.app"
 
 settings = Settings()
