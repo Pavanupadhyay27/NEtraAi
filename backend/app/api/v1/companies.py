@@ -125,16 +125,82 @@ def delete_company(
     db_company = crud.get_company_by_id(db, id)
     if not db_company:
         raise HTTPException(status_code=404, detail="Company not found")
-        
-    db.delete(db_company)
-    db.commit()
-    
-    crud.create_audit_log(
-        db=db,
-        user_id=current_user.id,
-        action="Delete Company",
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
-        details=f"De-onboarded / Deleted company ID: {id} and name: {db_company.name}"
-    )
-    return {"message": "Company deleted successfully"}
+
+    company_name = db_company.name
+
+    try:
+        from sqlalchemy import select, delete as sql_delete
+
+        # 1. Get all employee IDs under this company
+        emp_ids = db.execute(
+            select(models.Employee.id).where(models.Employee.company_id == id)
+        ).scalars().all()
+
+        if emp_ids:
+            # 2. Delete ticket messages for tickets belonging to these employees
+            ticket_ids = db.execute(
+                select(models.Ticket.id).where(models.Ticket.company_id == id)
+            ).scalars().all()
+            if ticket_ids:
+                db.execute(sql_delete(models.TicketMessage).where(models.TicketMessage.ticket_id.in_(ticket_ids)))
+
+            # 3. Delete face embeddings for employee images
+            image_ids = db.execute(
+                select(models.EmployeeImage.id).where(models.EmployeeImage.employee_id.in_(emp_ids))
+            ).scalars().all()
+            if image_ids:
+                db.execute(sql_delete(models.FaceEmbedding).where(models.FaceEmbedding.image_id.in_(image_ids)))
+            db.execute(sql_delete(models.FaceEmbedding).where(models.FaceEmbedding.employee_id.in_(emp_ids)))
+
+            # 4. Delete employee images
+            db.execute(sql_delete(models.EmployeeImage).where(models.EmployeeImage.employee_id.in_(emp_ids)))
+
+            # 5. Delete attendance records and logs
+            db.execute(sql_delete(models.Attendance).where(models.Attendance.employee_id.in_(emp_ids)))
+            db.execute(sql_delete(models.AttendanceLog).where(models.AttendanceLog.employee_id.in_(emp_ids)))
+
+            # 6. Delete leave requests
+            db.execute(sql_delete(models.LeaveRequest).where(models.LeaveRequest.employee_id.in_(emp_ids)))
+
+            # 7. Delete tickets
+            db.execute(sql_delete(models.Ticket).where(models.Ticket.company_id == id))
+
+        # 8. Delete notifications
+        db.execute(sql_delete(models.Notification).where(models.Notification.company_id == id))
+
+        # 9. Delete activity timelines
+        db.execute(sql_delete(models.ActivityTimeline).where(models.ActivityTimeline.company_id == id))
+
+        # 10. Null out employee user_id FK before deleting users
+        if emp_ids:
+            db.execute(
+                models.Employee.__table__.update()
+                .where(models.Employee.id.in_(emp_ids))
+                .values(user_id=None)
+            )
+            db.flush()
+
+        # 11. Delete employees
+        db.execute(sql_delete(models.Employee).where(models.Employee.company_id == id))
+
+        # 12. Delete users (employees' login accounts)
+        db.execute(sql_delete(models.User).where(models.User.company_id == id))
+
+        # 13. Delete departments and shifts
+        db.execute(sql_delete(models.Department).where(models.Department.company_id == id))
+        db.execute(sql_delete(models.Shift).where(models.Shift.company_id == id))
+
+        # 14. Delete settings, audit logs, devices
+        db.execute(sql_delete(models.Setting).where(models.Setting.company_id == id))
+        db.execute(sql_delete(models.AuditLog).where(models.AuditLog.company_id == id))
+        db.execute(sql_delete(models.Device).where(models.Device.company_id == id))
+
+        # 15. Finally delete the company itself
+        db.execute(sql_delete(models.Company).where(models.Company.id == id))
+        db.commit()
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete company: {str(e)}")
+
+    return {"message": f"Company '{company_name}' and all associated data deleted successfully"}
