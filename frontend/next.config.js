@@ -28,8 +28,8 @@ const nextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           // Force HTTPS for 2 years
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
-          // Restrict browser feature APIs
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
+          // Restrict browser feature APIs — allow camera/mic/geo for kiosk face recognition
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=(self), payment=()" },
           // Content Security Policy for the Next.js frontend
           // Allows inline scripts (needed by Next.js hydration) but blocks external untrusted origins
           {
@@ -40,8 +40,8 @@ const nextConfig = {
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
-              // Allow API calls to the backend and WebSocket connections
-              `connect-src 'self' ${process.env.NEXT_PUBLIC_API_URL || "https://netraai07-netra.hf.space"} ws: wss:`,
+              // Allow API calls to both HuggingFace backends and WebSocket connections
+              `connect-src 'self' https://netraai07-netra.hf.space https://pawankr007-netra.hf.space ${process.env.NEXT_PUBLIC_API_URL || ""} ws: wss:`,
               "img-src 'self' data: blob: https:",
               "media-src 'self' blob:",
               "object-src 'none'",

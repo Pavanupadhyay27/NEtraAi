@@ -57,8 +57,9 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     # Force HTTPS for 2 years including subdomains
     response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
-    # Restrict browser feature access
-    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
+    # Note: Permissions-Policy is NOT set here because this is an API server.
+    # Permissions-Policy only applies to the page origin (Next.js/Vercel sets it in next.config.js).
+    # Setting camera=() here incorrectly blocks the kiosk's camera and geolocation.
     # Tighter CSP for API-only backend
     response.headers["Content-Security-Policy"] = (
         "default-src 'none'; "
