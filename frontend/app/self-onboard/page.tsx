@@ -31,7 +31,7 @@ const POSES: Record<string, PoseInfo> = {
 
 const POSE_KEYS = Object.keys(POSES);
 
-export default function SelfOnboardPage() {
+function SelfOnboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const employeeId = searchParams.get("employee_id");
@@ -750,5 +750,17 @@ export default function SelfOnboardPage() {
         © {new Date().getFullYear()} NetraID Inc. All rights reserved.
       </footer>
     </div>
+  );
+}
+
+export default function SelfOnboardPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+        <p className="text-xs font-mono animate-pulse">Loading Self-Onboarding Portal...</p>
+      </div>
+    }>
+      <SelfOnboardContent />
+    </React.Suspense>
   );
 }
