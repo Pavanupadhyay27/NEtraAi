@@ -55,14 +55,18 @@ def create_company(db: Session, company: schemas.CompanyCreate):
         {"name": "Operations", "code": "OPS", "description": "Office administration and business facilities"}
     ]
     for d in default_depts:
-        db_dept = models.Department(
-            name=d["name"],
-            code=d["code"],
-            description=d["description"],
-            company_id=db_company.id
-        )
-        db.add(db_dept)
-    db.commit()
+        try:
+            db_dept = models.Department(
+                name=d["name"],
+                code=d["code"],
+                description=d["description"],
+                company_id=db_company.id
+            )
+            db.add(db_dept)
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.warning(f"Could not auto-seed department {d['name']} for company {db_company.id}: {e}")
     db.refresh(db_company)
     return db_company
 

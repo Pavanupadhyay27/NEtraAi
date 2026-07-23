@@ -47,10 +47,12 @@ def init_db(db: Session):
         try:
             logger.info("Dropping old settings_key_key constraint if exists...")
             db.execute(text("ALTER TABLE settings DROP CONSTRAINT IF EXISTS settings_key_key;"))
+            db.execute(text("ALTER TABLE departments DROP CONSTRAINT IF EXISTS departments_name_key;"))
+            db.execute(text("ALTER TABLE departments DROP CONSTRAINT IF EXISTS departments_code_key;"))
             db.commit()
         except Exception as e:
             db.rollback()
-            logger.warning(f"Could not drop settings_key_key constraint: {e}")
+            logger.warning(f"Could not drop legacy constraints: {e}")
             
         try:
             logger.info("Ensuring face_embeddings pgvector HNSW index is present...")
