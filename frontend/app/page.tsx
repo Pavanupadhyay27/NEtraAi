@@ -70,8 +70,13 @@ export default function LoginPage() {
     setError(null);
     try {
       const company = await fetchApi(`/auth/companies/check?name=${encodeURIComponent(lookupName.trim())}`);
-      setMatchedCompany({ id: company.id, name: company.name });
-      setError(null);
+      if (company.exists === false || !company.id) {
+        setError(company.message || "Organization not found. Verify name.");
+        setMatchedCompany(null);
+      } else {
+        setMatchedCompany({ id: company.id, name: company.name });
+        setError(null);
+      }
     } catch (err: any) {
       setError(err.message || "Organization not found. Verify name.");
       setMatchedCompany(null);

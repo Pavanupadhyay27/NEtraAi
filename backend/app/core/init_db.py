@@ -112,6 +112,47 @@ def init_db(db: Session):
             db.execute(text("ALTER TABLE employee_images ADD COLUMN image_bytes BLOB"))
         db.commit()
 
+    # Ensure attendance_logs extension columns exist
+    attendance_log_cols = [
+        ("face_quality", "FLOAT DEFAULT NULL"),
+        ("blur_score", "FLOAT DEFAULT NULL"),
+        ("brightness_score", "FLOAT DEFAULT NULL"),
+        ("is_occluded", "BOOLEAN DEFAULT FALSE"),
+        ("has_mask", "BOOLEAN DEFAULT FALSE"),
+        ("recognition_time_ms", "FLOAT DEFAULT NULL"),
+        ("processing_time_ms", "FLOAT DEFAULT NULL"),
+        ("embedding_version", "VARCHAR(50) DEFAULT NULL"),
+        ("device_id", "INTEGER DEFAULT NULL"),
+    ]
+    for col_name, col_def in attendance_log_cols:
+        try:
+            db.execute(text(f"SELECT {col_name} FROM attendance_logs LIMIT 1"))
+        except Exception:
+            db.rollback()
+            logger.info(f"Adding {col_name} column to attendance_logs table...")
+            db.execute(text(f"ALTER TABLE attendance_logs ADD COLUMN {col_name} {col_def}"))
+            db.commit()
+
+    # Ensure attendance extension columns exist
+    attendance_cols = [
+        ("late_minutes", "INTEGER DEFAULT 0"),
+        ("early_exit_minutes", "INTEGER DEFAULT 0"),
+        ("break_time_minutes", "INTEGER DEFAULT 0"),
+        ("attendance_streak", "INTEGER DEFAULT 0"),
+        ("attendance_percentage", "FLOAT DEFAULT 100.0"),
+        ("shift_info", "VARCHAR(255) DEFAULT NULL"),
+        ("geofence_result", "VARCHAR(100) DEFAULT NULL"),
+        ("policy_version", "VARCHAR(50) DEFAULT NULL"),
+    ]
+    for col_name, col_def in attendance_cols:
+        try:
+            db.execute(text(f"SELECT {col_name} FROM attendance LIMIT 1"))
+        except Exception:
+            db.rollback()
+            logger.info(f"Adding {col_name} column to attendance table...")
+            db.execute(text(f"ALTER TABLE attendance ADD COLUMN {col_name} {col_def}"))
+            db.commit()
+
     # Seed Default Company
     default_company = db.execute(select(models.Company).where(models.Company.name == "NetraID Base")).scalar_one_or_none()
     if not default_company:

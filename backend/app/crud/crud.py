@@ -32,6 +32,7 @@ def create_company(db: Session, company: schemas.CompanyCreate):
     logo = dump.pop("logo", None)
     latitude = dump.pop("latitude", None)
     longitude = dump.pop("longitude", None)
+    admin_password = dump.pop("admin_password", None)
     db_company = models.Company(**dump)
     db.add(db_company)
     db.commit()

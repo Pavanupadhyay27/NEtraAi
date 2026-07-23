@@ -289,10 +289,10 @@ def check_company_name(name: str, db: Session = Depends(get_db)):
         select(models.Company).where(func.lower(models.Company.name) == name.strip().lower())
     ).scalar_one_or_none()
     if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
+        return {"exists": False, "message": "Company not found"}
     if company.status != "Active":
-        raise HTTPException(status_code=400, detail=f"Company status is '{company.status}'. Please contact support.")
-    return {"id": company.id, "name": company.name, "status": company.status}
+        return {"exists": False, "message": f"Company status is '{company.status}'. Please contact support."}
+    return {"exists": True, "id": company.id, "name": company.name, "status": company.status}
 
 @router.post("/register-pending", status_code=status.HTTP_201_CREATED)
 def register_pending_employee(
