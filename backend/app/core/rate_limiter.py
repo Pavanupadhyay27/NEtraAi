@@ -74,6 +74,9 @@ def check_login_rate_limit(request: Request) -> None:
     Dependency for auth endpoints.
     Blocks after 5 failed/total login attempts in 5 minutes.
     """
+    if getattr(settings, "DISABLE_RATE_LIMIT", False):
+        return
+
     client_ip = _get_client_ip(request)
     if login_rate_limiter.is_rate_limited(client_ip):
         remaining_seconds = login_rate_limiter.window_seconds
@@ -92,6 +95,9 @@ def check_api_rate_limit(request: Request) -> None:
     Global API rate limiter dependency.
     Applied as a router-level dependency in main.py.
     """
+    if getattr(settings, "DISABLE_RATE_LIMIT", False):
+        return
+
     client_ip = _get_client_ip(request)
     if api_rate_limiter.is_rate_limited(client_ip):
         raise HTTPException(

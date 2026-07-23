@@ -14,6 +14,35 @@ const nextConfig = {
   // ─── Security Headers ──────────────────────────────────────────────────────
   // Applied to every page & API route served by Next.js
   async headers() {
+    const isDev = process.env.NODE_ENV === "development";
+    const connectSrc = [
+      "'self'",
+      "https://netraai07-netra.hf.space",
+      "https://pawankr007-netra.hf.space",
+      process.env.NEXT_PUBLIC_API_URL || "",
+      "ws:",
+      "wss:",
+      isDev ? "http://localhost:8000 http://127.0.0.1:8000 ws://localhost:8000 ws://127.0.0.1:8000" : "",
+    ].filter(Boolean).join(" ");
+
+    const cspDirectives = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com",
+      `connect-src ${connectSrc}`,
+      "img-src 'self' data: blob: https:",
+      "media-src 'self' blob:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+    ];
+
+    if (!isDev) {
+      cspDirectives.push("upgrade-insecure-requests");
+    }
+
     return [
       {
         source: "/(.*)",
@@ -31,25 +60,9 @@ const nextConfig = {
           // Restrict browser feature APIs — allow camera/mic/geo for kiosk face recognition
           { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=(self), payment=()" },
           // Content Security Policy for the Next.js frontend
-          // Allows inline scripts (needed by Next.js hydration) but blocks external untrusted origins
           {
             key: "Content-Security-Policy",
-            value: [
-              "default-src 'self'",
-              // Next.js needs 'unsafe-inline' and 'unsafe-eval' for hydration — locked to self only
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "font-src 'self' https://fonts.gstatic.com",
-              // Allow API calls to both HuggingFace backends and WebSocket connections
-              `connect-src 'self' https://netraai07-netra.hf.space https://pawankr007-netra.hf.space ${process.env.NEXT_PUBLIC_API_URL || ""} ws: wss:`,
-              "img-src 'self' data: blob: https:",
-              "media-src 'self' blob:",
-              "object-src 'none'",
-              "base-uri 'self'",
-              "form-action 'self'",
-              "frame-ancestors 'none'",
-              "upgrade-insecure-requests",
-            ].join("; "),
+            value: cspDirectives.join("; "),
           },
         ],
       },
@@ -58,3 +71,4 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
+

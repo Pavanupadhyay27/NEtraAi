@@ -38,6 +38,7 @@ services:
       - UPLOAD_DIR=/workspace/uploads
       - MODELS_DIR=/workspace/models
       - ALLOWED_HOSTS=*
+      - DISABLE_RATE_LIMIT=true
     ports:
       - "8000:8000"
     volumes:

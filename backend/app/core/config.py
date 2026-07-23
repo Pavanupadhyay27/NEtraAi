@@ -75,6 +75,7 @@ class Settings(BaseSettings):
     
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 200
+    DISABLE_RATE_LIMIT: bool = False
     # Audit log retention in days (default: 90 days)
     AUDIT_LOG_RETENTION_DAYS: int = 90
     

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, Mail, Eye, EyeOff, ShieldAlert, Shield, Building2, Users, ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
-import { fetchApi, setUserProfile, getAccessToken } from "@/app/utils/api";
+import { fetchApi, setUserProfile, setTokens, getAccessToken } from "@/app/utils/api";
 
 type RoleType = "Super Admin" | "Admin" | "Employee";
 
@@ -124,8 +124,12 @@ export default function LoginPage() {
         body: params,
       });
 
-      // Cookies (access_token + refresh_token) are set by the backend automatically.
-      // We only store the user profile (non-secret) in localStorage for UI rendering.
+      // Store tokens from login response (Bearer auth for cross-origin setup)
+      if (response.access_token) {
+        setTokens(response.access_token, response.refresh_token || "");
+      }
+
+      // Now fetch user profile using the stored token
       const profile = await fetchApi("/auth/me");
       
       const userRole = profile?.role?.name;

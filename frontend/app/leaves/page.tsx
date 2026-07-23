@@ -56,21 +56,13 @@ export default function LeavesManagementPage() {
       });
     },
     onSuccess: (data) => {
-      toast({
-        title: "Status Updated",
-        description: `Leave request has been successfully ${data.status.toLowerCase()}.`,
-        type: "success"
-      });
+      toast.success(`Leave request has been successfully ${data.status.toLowerCase()}.`);
       queryClient.invalidateQueries({ queryKey: ["company-leaves"] });
       // Update selected leave state if open
       setSelectedLeave((prev: any) => prev?.id === data.id ? { ...prev, status: data.status } : prev);
     },
     onError: (err: any) => {
-      toast({
-        title: "Action Failed",
-        description: err.message || "Failed to update leave status.",
-        type: "error"
-      });
+      toast.error(err.message || "Failed to update leave status.");
     },
     onSettled: () => {
       setUpdatingId(null);
@@ -196,11 +188,7 @@ export default function LeavesManagementPage() {
       URL.revokeObjectURL(url);
     }
     
-    toast({
-      title: "File Downloaded",
-      description: `${fileName} downloaded successfully.`,
-      type: "success"
-    });
+    toast.success(`${fileName} downloaded successfully.`);
   };
 
   // Filter & Search Logic

@@ -202,9 +202,14 @@ export default function TicketsPage() {
     };
 
     eventSource.onerror = (err) => {
-      console.error("SSE connection closed or error encountered:", err);
       setSseConnected(false);
-      eventSource.close();
+      if (eventSource.readyState === EventSource.CLOSED) {
+        console.error("SSE connection closed permanently.");
+      } else if (eventSource.readyState === EventSource.CONNECTING) {
+        console.warn("SSE connection lost. Reconnecting...");
+      } else {
+        console.error("SSE connection error:", err);
+      }
     };
 
     return () => {

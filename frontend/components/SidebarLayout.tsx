@@ -26,7 +26,7 @@ import {
   FileText,
   Shield
 } from "lucide-react";
-import { getAccessToken, getUserProfile, clearSession } from "@/app/utils/api";
+import { getAccessToken, getUserProfile, clearTokens } from "@/app/utils/api";
 import CommandPalette from "@/components/CommandPalette";
 
 function NavLink({ 
@@ -194,10 +194,8 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
     );
   }
 
-  const handleLogout = async () => {
-    // clearSession() calls backend /auth/logout to delete HttpOnly cookies server-side.
-    // HttpOnly cookies CANNOT be deleted from the client — only the server can clear them.
-    await clearSession();
+  const handleLogout = () => {
+    clearTokens();
     router.push("/");
   };
 

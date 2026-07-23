@@ -1895,7 +1895,13 @@ function AdminDashboardView({ profile }: { profile: any }) {
     };
 
     eventSource.onerror = (err) => {
-      console.error("SSE connection error:", err);
+      if (eventSource.readyState === EventSource.CLOSED) {
+        console.error("SSE connection closed permanently.");
+      } else if (eventSource.readyState === EventSource.CONNECTING) {
+        console.warn("SSE connection lost. Reconnecting...");
+      } else {
+        console.error("SSE connection error:", err);
+      }
     };
 
     return () => {

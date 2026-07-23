@@ -28,7 +28,6 @@ export function getBackendUrl(): string {
 
 /**
  * Wraps fetch with an AbortController timeout.
- * Always sends credentials (cookies) for automatic HttpOnly cookie attachment.
  */
 async function fetchWithTimeout(
   url: string,
@@ -41,18 +40,52 @@ async function fetchWithTimeout(
     return await fetch(url, {
       ...options,
       signal: controller.signal,
-      // SECURITY: Always include credentials so HttpOnly cookies are sent automatically.
-      // This is safe because CORS restricts which origins can trigger credentialed requests.
-      credentials: "include",
     });
   } finally {
     clearTimeout(timer);
   }
 }
 
-// ─── User profile (non-sensitive, stored in localStorage for UI) ──────────────
-// Note: TOKENS are now stored in HttpOnly cookies (set by backend, unreadable by JS).
-// Only non-secret UI data (name, role, email) is kept in localStorage.
+// ─── Token storage ────────────────────────────────────────────────────────────
+// Tokens are stored in localStorage because frontend (Vercel) and backend
+// (HuggingFace) are on different domains — cross-origin HttpOnly cookies
+// are treated as third-party cookies and blocked by modern browsers.
+
+export function setTokens(access: string, refresh: string) {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("access_token", access);
+    localStorage.setItem("refresh_token", refresh);
+  }
+}
+
+export function getAccessToken(): string | null {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("access_token");
+  }
+  return null;
+}
+
+export function getRefreshToken(): string | null {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("refresh_token");
+  }
+  return null;
+}
+
+export function clearTokens() {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("user_profile");
+  }
+}
+
+if (typeof window !== "undefined") {
+  (window as any).clearTokens = clearTokens;
+}
+
+
+// ─── User profile (non-sensitive, for UI rendering) ───────────────────────────
 
 export function setUserProfile(user: any) {
   if (typeof window !== "undefined") {
@@ -79,46 +112,10 @@ export function clearUserProfile() {
 }
 
 /**
- * Clear session: removes user profile from localStorage and calls backend to clear cookies.
- * This is the secure logout — cookies cannot be cleared client-side (they're HttpOnly).
+ * Clear session: removes tokens + profile from localStorage.
  */
 export async function clearSession() {
-  clearUserProfile();
-  try {
-    // Ask the backend to delete the HttpOnly cookies
-    await fetchWithTimeout(`${getBackendUrl()}/auth/logout`, { method: "POST" });
-  } catch {
-    // Best-effort — even if this fails, the local profile is cleared
-  }
-}
-
-// ─── DEPRECATED: localStorage token functions (kept for kiosk backward compat) ─
-// Browser sessions now use HttpOnly cookies. These functions are only used
-// by kiosk/SSE flows that cannot use cookie-based auth.
-
-export function setTokens(access: string, refresh: string) {
-  // No-op for browser sessions — tokens are now stored in HttpOnly cookies by backend.
-  // Kiosk clients that need the token can read from the response body directly.
-}
-
-export function getAccessToken(): string | null {
-  // HttpOnly cookies cannot be read by JS — this is intentional.
-  // Return a truthy sentinel if user_profile exists (means user is logged in).
-  // Actual token validation happens server-side via the cookie.
-  if (typeof window !== "undefined") {
-    const profile = localStorage.getItem("user_profile");
-    return profile ? "cookie-session" : null;
-  }
-  return null;
-}
-
-export function getRefreshToken(): string | null {
-  // Refresh token is in HttpOnly cookie — cannot be read by JS (by design).
-  return null;
-}
-
-export function clearTokens() {
-  // For backward compat — calls clearUserProfile
+  clearTokens();
   clearUserProfile();
 }
 
@@ -128,9 +125,12 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}): Pro
   const url = `${getBackendUrl()}${endpoint}`;
   const headers = new Headers(options.headers || {});
 
-  // NOTE: We do NOT set Authorization header here for browser sessions.
-  // The HttpOnly access_token cookie is sent automatically by the browser.
-  // Kiosk clients that need Bearer auth should set Authorization header themselves.
+  // Attach Bearer token for authentication
+  const token = getAccessToken();
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
   if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
@@ -138,25 +138,38 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}): Pro
   const response = await fetchWithTimeout(url, { ...options, headers });
 
   if (response.status === 401 && endpoint !== "/auth/login") {
-    // Attempt silent token refresh via cookie (backend reads refresh_token cookie,
-    // sets new access_token cookie — no tokens ever touch JS memory)
-    try {
-      const refreshResponse = await fetchWithTimeout(
-        `${getBackendUrl()}/auth/refresh`,
-        { method: "POST", headers: { "Content-Type": "application/json" } }
-      );
-      if (refreshResponse.ok) {
-        // New access_token cookie is now set — retry the original request
-        const retryResponse = await fetchWithTimeout(url, { ...options, headers });
-        if (retryResponse.ok) {
-          return await retryResponse.json();
+    // Attempt silent token refresh
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      try {
+        const refreshResponse = await fetchWithTimeout(
+          `${getBackendUrl()}/auth/refresh`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${refreshToken}`,
+            },
+          }
+        );
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json();
+          if (refreshData.access_token) {
+            setTokens(refreshData.access_token, refreshData.refresh_token || refreshToken);
+            // Retry the original request with the new token
+            headers.set("Authorization", `Bearer ${refreshData.access_token}`);
+            const retryResponse = await fetchWithTimeout(url, { ...options, headers });
+            if (retryResponse.ok) {
+              return await retryResponse.json();
+            }
+          }
         }
+      } catch {
+        // Silent — refresh failed
       }
-    } catch {
-      // Silent — don't log anything sensitive
     }
     // Refresh failed — clear session and redirect to login
-    clearUserProfile();
+    clearTokens();
     if (typeof window !== "undefined" && window.location.pathname !== "/") {
       window.location.href = "/";
     }
