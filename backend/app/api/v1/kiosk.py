@@ -636,7 +636,7 @@ def scan_face(
             liveness_score=liveness_score,
             is_spoof=False,
             status="Attendance Locked",
-            timestamp=now_utc,
+            timestamp=now,
             location_text=location_text if 'location_text' in locals() else None,
             latitude=payload.latitude if hasattr(payload, 'latitude') else None,
             longitude=payload.longitude if hasattr(payload, 'longitude') else None
@@ -681,7 +681,7 @@ def scan_face(
             liveness_score=liveness_score,
             is_spoof=False,
             status=log_status_success,
-            timestamp=now_utc,
+            timestamp=now,
             location_text=location_text,
             latitude=payload.latitude,
             longitude=payload.longitude
@@ -750,7 +750,7 @@ def scan_face(
                     liveness_score=liveness_score,
                     is_spoof=False,
                     status=log_status_success,
-                    timestamp=now_utc,
+                    timestamp=now,
             location_text=location_text if 'location_text' in locals() else None,
             latitude=payload.latitude if hasattr(payload, 'latitude') else None,
             longitude=payload.longitude if hasattr(payload, 'longitude') else None
@@ -808,7 +808,7 @@ def scan_face(
                     liveness_score=liveness_score,
                     is_spoof=False,
                     status="Attendance Locked",
-                    timestamp=now_utc,
+                    timestamp=now,
             location_text=location_text if 'location_text' in locals() else None,
             latitude=payload.latitude if hasattr(payload, 'latitude') else None,
             longitude=payload.longitude if hasattr(payload, 'longitude') else None
@@ -898,7 +898,7 @@ def scan_face(
                     liveness_score=liveness_score,
                     is_spoof=False,
                     status=log_status_success,
-                    timestamp=now_utc,
+                    timestamp=now,
             location_text=location_text if 'location_text' in locals() else None,
             latitude=payload.latitude if hasattr(payload, 'latitude') else None,
             longitude=payload.longitude if hasattr(payload, 'longitude') else None

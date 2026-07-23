@@ -14,12 +14,24 @@ function formatTime12h(timeStr: string | null | undefined): string {
   if (!timeStr) return "";
   if (timeStr.includes("AM") || timeStr.includes("PM")) return timeStr;
   
-  const parts = timeStr.split(":");
+  let timePart = timeStr;
+  if (timeStr.includes("T")) {
+    timePart = timeStr.split("T")[1];
+  } else if (timeStr.includes(" ")) {
+    const spaceParts = timeStr.trim().split(" ");
+    if (spaceParts.length > 1 && spaceParts[1].includes(":")) {
+      timePart = spaceParts[1];
+    }
+  }
+
+  const parts = timePart.split(":");
   if (parts.length < 2) return timeStr;
   
   const hr = parseInt(parts[0], 10);
   const mn = parseInt(parts[1], 10);
-  const sc = parts[2] ? parseInt(parts[2], 10) : 0;
+  const sc = parts[2] ? parseInt(parts[2].split(".")[0], 10) : 0;
+  
+  if (isNaN(hr) || isNaN(mn)) return timeStr;
   
   const suffix = hr >= 12 ? "PM" : "AM";
   const hour12 = hr % 12 || 12;

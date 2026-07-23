@@ -216,9 +216,7 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}): Pro
 
 export function parseDateTime(dateStr: string | null | undefined): Date | null {
   if (!dateStr) return null;
-  const hasTimezone =
-    dateStr.endsWith("Z") || dateStr.includes("+") || /-\d{2}:\d{2}$/.test(dateStr);
-  const formattedStr = hasTimezone ? dateStr : dateStr.replace(" ", "T") + "Z";
+  const formattedStr = dateStr.replace(" ", "T");
   return new Date(formattedStr);
 }
 
