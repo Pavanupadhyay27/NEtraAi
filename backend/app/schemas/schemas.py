@@ -156,7 +156,7 @@ class EmployeeBase(BaseModel):
     email: EmailStr
     phone: Optional[str] = None
     designation: Optional[str] = None
-    joining_date: date
+    joining_date: Optional[date] = None
     status: str = "Active"
     department_id: Optional[int] = None
     shift_id: Optional[int] = None

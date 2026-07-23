@@ -1,7 +1,8 @@
 const DEFAULT_BACKEND_URL = "https://netraai07-netra.hf.space/api/v1";
 
-// Request timeout in milliseconds (10 seconds)
-const REQUEST_TIMEOUT_MS = 10_000;
+// Request timeout in milliseconds (45 seconds default, 90 seconds for AI heavy endpoints)
+const DEFAULT_REQUEST_TIMEOUT_MS = 45_000;
+const HEAVY_REQUEST_TIMEOUT_MS = 90_000;
 
 export function getBackendUrl(): string {
   if (process.env.NEXT_PUBLIC_API_URL) {
@@ -32,7 +33,7 @@ export function getBackendUrl(): string {
 async function fetchWithTimeout(
   url: string,
   options: RequestInit,
-  timeoutMs = REQUEST_TIMEOUT_MS
+  timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS
 ): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -41,6 +42,11 @@ async function fetchWithTimeout(
       ...options,
       signal: controller.signal,
     });
+  } catch (err: any) {
+    if (err?.name === "AbortError" || String(err).includes("aborted")) {
+      throw new Error("Request timed out while processing AI facial models. Please try again.");
+    }
+    throw err;
   } finally {
     clearTimeout(timer);
   }
@@ -135,7 +141,10 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}): Pro
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetchWithTimeout(url, { ...options, headers });
+  const isHeavy = endpoint.includes("/enrollment/") || endpoint.includes("/kiosk/") || endpoint.includes("/analytics/") || options.body instanceof FormData;
+  const timeoutMs = isHeavy ? HEAVY_REQUEST_TIMEOUT_MS : DEFAULT_REQUEST_TIMEOUT_MS;
+
+  const response = await fetchWithTimeout(url, { ...options, headers }, timeoutMs);
 
   if (response.status === 401 && endpoint !== "/auth/login") {
     // Attempt silent token refresh

@@ -5,7 +5,7 @@ from app.models import models
 from app.crud import crud
 from app.schemas import schemas
 from app.core.config import settings
-from datetime import time
+from datetime import time, date
 import logging
 
 logger = logging.getLogger("InitDB")
@@ -305,6 +305,7 @@ def init_db(db: Session):
             email=default_emp_email,
             designation="Software Engineer",
             department_id=dept_id,
+            joining_date=date.today(),
             status="Active"
         )
         crud.create_employee(db, employee_in, user_id=db_user.id, company_id=default_company.id)
