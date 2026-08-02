@@ -20,6 +20,7 @@ export const metadata: Metadata = {
   description: "Enterprise-grade AI face recognition attendance system. 100% open source & self-hosted.",
   authors: [{ name: "NetraID" }],
   keywords: ["face recognition", "attendance", "biometric", "AI", "open source"],
+  manifest: "/manifest.json",
   icons: {
     icon: "/favicon.ico",
   },
