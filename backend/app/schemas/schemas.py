@@ -92,6 +92,7 @@ class EmployeeRegister(BaseModel):
     employee_id: str = Field(..., min_length=1, max_length=50, pattern=r'^[A-Za-z0-9_\-]+$')
     phone: Optional[str] = None
     designation: Optional[str] = Field(None, max_length=100)
+    department_id: Optional[int] = None
 
     @field_validator('password')
     @classmethod

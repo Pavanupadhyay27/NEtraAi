@@ -1,6 +1,7 @@
 "use client";
   
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import QRCode from "qrcode";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import SidebarLayout from "@/components/SidebarLayout";
@@ -194,6 +195,9 @@ export default function EmployeeDetailPage() {
   const [wfhLat, setWfhLat] = useState<number | null>(null);
   const [wfhLng, setWfhLng] = useState<number | null>(null);
   const [wfhGeocoding, setWfhGeocoding] = useState(false);
+  const [wfhLockType, setWfhLockType] = useState<"auto" | "address">("address");
+  const [isManualCoords, setIsManualCoords] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
   const skipNextGeocodeRef = useRef(false);
 
   useEffect(() => {
@@ -201,8 +205,25 @@ export default function EmployeeDetailPage() {
       setWfhAddress(employee.wfh_address || "");
       setWfhLat(employee.wfh_lat || null);
       setWfhLng(employee.wfh_lng || null);
+      
+      if (employee.allow_wfh) {
+        if (!employee.wfh_lat && !employee.wfh_lng) {
+          setWfhLockType("auto");
+        } else {
+          setWfhLockType("address");
+        }
+      }
+      
+      if (employee.employee_id) {
+        QRCode.toDataURL(employee.employee_id, {
+          margin: 1,
+          width: 150,
+        })
+        .then(url => setQrCodeUrl(url))
+        .catch(err => console.error("QR Code generation error:", err));
+      }
     }
-  }, [employee?.wfh_address, employee?.wfh_lat, employee?.wfh_lng]);
+  }, [employee]);
 
   const updateWfhDetailsMutation = useMutation({
     mutationFn: (payload: any) =>
@@ -264,6 +285,7 @@ export default function EmployeeDetailPage() {
   };
 
   useEffect(() => {
+    if (isManualCoords) return;
     if (!employee?.allow_wfh || !wfhAddress || wfhAddress.trim().length < 5) {
       return;
     }
@@ -299,7 +321,34 @@ export default function EmployeeDetailPage() {
     }, 800);
     
     return () => clearTimeout(delay);
-  }, [wfhAddress, employee?.allow_wfh, employee?.wfh_address]);
+  }, [wfhAddress, employee?.allow_wfh, employee?.wfh_address, isManualCoords]);
+
+  // Reverse geocode when manual coordinates change
+  useEffect(() => {
+    if (!isManualCoords || wfhLat === null || wfhLng === null) return;
+    if (wfhLat < -90 || wfhLat > 90 || wfhLng < -180 || wfhLng > 180) return;
+    if (isNaN(wfhLat) || isNaN(wfhLng)) return;
+
+    const delay = setTimeout(async () => {
+      setWfhGeocoding(true);
+      try {
+        const url = `${getBackendUrl().replace('/api/v1', '')}/api/v1/kiosk/reverse-geocode?lat=${wfhLat}&lng=${wfhLng}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.address) {
+            setWfhAddress(data.address);
+          }
+        }
+      } catch (err) {
+        console.error("Reverse geocoding manual input failed:", err);
+      } finally {
+        setWfhGeocoding(false);
+      }
+    }, 1200);
+
+    return () => clearTimeout(delay);
+  }, [wfhLat, wfhLng, isManualCoords]);
 
   // Departments query for dropdown list
   const { data: departments } = useQuery({
@@ -565,7 +614,7 @@ export default function EmployeeDetailPage() {
 
       let qrImg: HTMLImageElement | null = null;
       try {
-        qrImg = await loadImage(qrSrc);
+        qrImg = await loadImage(qrCodeUrl || qrSrc);
       } catch {}
 
       // Logo rendering
@@ -897,49 +946,198 @@ export default function EmployeeDetailPage() {
                     </button>
                   </div>
                   
-                  {/* Animated WFH Address Input */}
+                  {/* Animated WFH Settings Container */}
                   <div 
                     className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                      employee.allow_wfh ? "max-h-[300px] opacity-100 mt-3" : "max-h-0 opacity-0 mt-0"
+                      employee.allow_wfh ? "max-h-[500px] opacity-100 mt-3" : "max-h-0 opacity-0 mt-0"
                     }`}
                   >
-                    <div className="p-3.5 rounded-xl bg-indigo-500/5 border border-indigo-500/10 space-y-2.5">
+                    <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800 space-y-4 text-left">
+                      
+                      {/* Segmented control for GPS mode */}
                       <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <label className="block text-[9.5px] font-bold text-slate-500 uppercase tracking-wider">
-                            Home Address (For WFH GPS Lock) <span className="text-blue-400">*</span>
-                          </label>
+                        <label className="block text-[9.5px] font-bold text-slate-500 uppercase tracking-wider">
+                          WFH GPS Verification Mode
+                        </label>
+                        <div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-zinc-900/60 p-1 rounded-xl border border-slate-200/60 dark:border-zinc-800/80">
                           <button
                             type="button"
-                            onClick={handleSetCurrentWfhLocation}
-                            disabled={wfhGeocoding}
-                            className="flex items-center gap-1.5 bg-white text-slate-900 border border-slate-200 hover:border-slate-400 text-[10px] font-bold px-2 py-1 rounded-lg transition-all disabled:opacity-50"
+                            onClick={() => setWfhLockType("address")}
+                            className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                              wfhLockType === "address"
+                                ? "bg-white dark:bg-zinc-800 text-zinc-955 dark:text-white shadow-sm border border-zinc-200/80 dark:border-zinc-700"
+                                : "text-zinc-550 dark:text-zinc-400 hover:text-zinc-805 dark:hover:text-zinc-200"
+                            }`}
                           >
-                            <MapPin className="w-3 h-3" />
-                            Set to Current GPS Location
+                            Pre-Registered Address
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setWfhLockType("auto");
+                              setWfhAddress("");
+                              setWfhLat(null);
+                              setWfhLng(null);
+                            }}
+                            className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                              wfhLockType === "auto"
+                                ? "bg-white dark:bg-zinc-800 text-zinc-955 dark:text-white shadow-sm border border-zinc-200/80 dark:border-zinc-700"
+                                : "text-zinc-550 dark:text-zinc-400 hover:text-zinc-805 dark:hover:text-zinc-200"
+                            }`}
+                          >
+                            Auto-Lock on First Scan
                           </button>
                         </div>
-                        <textarea 
-                          rows={2}
-                          placeholder="e.g., 123 Main St, Springfield. Be specific for accurate GPS geocoding." 
-                          value={wfhAddress}
-                          onChange={(e) => setWfhAddress(e.target.value)} 
-                          className="w-full text-[11.5px] bg-white border-slate-200 focus:border-indigo-400 text-slate-900 rounded-lg p-2.5 outline-none transition-all resize-none shadow-sm"
-                        />
                       </div>
-                      
-                      <div className="text-[10px] flex items-center justify-between border-t border-indigo-500/10 pt-2">
-                        {wfhGeocoding ? (
-                          <span className="text-indigo-400 animate-pulse font-medium">Autodetecting coordinates...</span>
-                        ) : wfhLat && wfhLng ? (
-                          <span className="text-emerald-600 font-mono font-bold flex items-center gap-1.5 uppercase tracking-wider">
-                            <MapPin className="w-3 h-3" />
-                            GPS Locked: {wfhLat.toFixed(5)}, {wfhLng.toFixed(5)}
+
+                      {wfhLockType === "address" && (
+                        <div className="space-y-3.5 animate-fadeInUp">
+                          <div className="flex items-center justify-between">
+                            <label className="block text-[9.5px] font-bold text-slate-500 uppercase tracking-wider">
+                              Home Address (For WFH GPS Lock) *
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (navigator.geolocation) {
+                                  setWfhGeocoding(true);
+                                  navigator.geolocation.getCurrentPosition(
+                                    async (position) => {
+                                      const { latitude, longitude } = position.coords;
+                                      setWfhLat(latitude);
+                                      setWfhLng(longitude);
+                                      try {
+                                        const url = `${getBackendUrl().replace('/api/v1', '')}/api/v1/kiosk/reverse-geocode?lat=${latitude}&lng=${longitude}`;
+                                        const res = await fetch(url);
+                                        if (res.ok) {
+                                          const data = await res.json();
+                                          if (data.address) {
+                                            setWfhAddress(data.address);
+                                          }
+                                        }
+                                      } catch (err) {
+                                        console.error("Reverse geocoding failed:", err);
+                                      } finally {
+                                        setWfhGeocoding(false);
+                                      }
+                                    },
+                                    (err) => {
+                                      setWfhGeocoding(false);
+                                      toast.error("Geolocation denied or unavailable. Please enter coordinates manually.");
+                                    }
+                                  );
+                                } else {
+                                  toast.error("Geolocation is not supported by your browser.");
+                                }
+                              }}
+                              className="flex items-center gap-1 text-[9.5px] font-bold text-cyan-600 hover:text-cyan-500 transition-colors cursor-pointer"
+                            >
+                              <MapPin className="w-3 h-3" />
+                              Auto-Detect GPS
+                            </button>
+                          </div>
+
+                          <textarea 
+                            rows={2}
+                            placeholder="e.g., 123 Main St, Springfield. Be specific for accurate GPS geocoding." 
+                            value={wfhAddress}
+                            onChange={(e) => setWfhAddress(e.target.value)} 
+                            className="w-full text-[11.5px] bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 focus:border-slate-800 dark:focus:border-zinc-500 text-slate-900 dark:text-white rounded-xl transition-all p-2.5 outline-none resize-none shadow-inner" 
+                          />
+
+                          {/* Manual coordinates override checkbox */}
+                          <label className="flex items-center gap-2 text-[10px] font-semibold text-zinc-650 dark:text-zinc-400 cursor-pointer select-none hover:text-zinc-850 dark:hover:text-zinc-200 transition-colors border-t border-zinc-200/50 dark:border-zinc-800/60 pt-3">
+                            <input
+                              type="checkbox"
+                              checked={isManualCoords}
+                              onChange={(e) => {
+                                const nextState = e.target.checked;
+                                setIsManualCoords(nextState);
+                                if (!nextState) {
+                                  setWfhLat(null);
+                                  setWfhLng(null);
+                                }
+                              }}
+                              className="w-3.5 h-3.5 rounded border-zinc-300 dark:border-zinc-700 text-cyan-600 focus:ring-cyan-500 bg-transparent cursor-pointer"
+                            />
+                            <span>Set coordinates manually (GPS override)</span>
+                          </label>
+
+                          {isManualCoords ? (
+                            <div className="grid grid-cols-2 gap-3.5 animate-fadeInUp">
+                              <div className="space-y-1">
+                                <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Custom Latitude</label>
+                                <input 
+                                  type="number" 
+                                  step="any" 
+                                  required 
+                                  placeholder="e.g. 28.6139" 
+                                  value={wfhLat !== null ? wfhLat : ""} 
+                                  onChange={(e) => setWfhLat(e.target.value ? parseFloat(e.target.value) : null)}
+                                  className="w-full text-[11.5px] bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 focus:border-slate-800 dark:focus:border-zinc-500 text-slate-950 dark:text-white rounded-xl transition-all h-9 px-3 outline-none"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Custom Longitude</label>
+                                <input 
+                                  type="number" 
+                                  step="any" 
+                                  required 
+                                  placeholder="e.g. 77.2090" 
+                                  value={wfhLng !== null ? wfhLng : ""} 
+                                  onChange={(e) => setWfhLng(e.target.value ? parseFloat(e.target.value) : null)}
+                                  className="w-full text-[11.5px] bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 focus:border-slate-800 dark:focus:border-zinc-500 text-slate-950 dark:text-white rounded-xl transition-all h-9 px-3 outline-none"
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-[10px] flex items-center justify-between border-t border-zinc-200 dark:border-zinc-800 pt-2.5">
+                               {wfhGeocoding ? (
+                                 <span className="text-cyan-500 animate-pulse font-medium">Resolving coordinates...</span>
+                               ) : wfhLat && wfhLng ? (
+                                 <span className="text-emerald-500 font-mono font-bold flex items-center gap-1.5 uppercase tracking-wider">
+                                   <MapPin className="w-3.5 h-3.5 animate-bounce" />
+                                   GPS Locked: {wfhLat.toFixed(6)}, {wfhLng.toFixed(6)}
+                                 </span>
+                               ) : (
+                                 <span className="text-slate-455 dark:text-zinc-500 font-medium">Enter full address or auto-detect to lock GPS</span>
+                               )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {wfhLockType === "auto" && (
+                        <div className="p-3.5 rounded-xl bg-cyan-500/5 border border-cyan-500/10 text-[10.5px] text-cyan-600 dark:text-cyan-400 animate-fadeInUp flex items-start gap-2 leading-relaxed">
+                          <Shield className="w-3.5 h-3.5 shrink-0 mt-0.5 text-cyan-500" />
+                          <span>
+                            <strong>Auto-Lock Active:</strong> The system will lock WFH geofence coordinates to the employee's exact physical scan position upon their first punch-in.
                           </span>
-                        ) : (
-                          <span className="text-slate-500 font-medium">Enter full address to lock GPS</span>
-                        )}
-                      </div>
+                        </div>
+                      )}
+
+                      {/* Explicit WFH Update Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const payload = {
+                            allow_wfh: true,
+                            wfh_address: wfhLockType === "address" ? wfhAddress : "",
+                            wfh_lat: wfhLockType === "address" ? wfhLat : null,
+                            wfh_lng: wfhLockType === "address" ? wfhLng : null
+                          };
+                          updateWfhDetailsMutation.mutate(payload, {
+                            onSuccess: () => {
+                              toast.success("WFH configuration updated successfully!");
+                            }
+                          });
+                        }}
+                        disabled={updateWfhDetailsMutation.isPending}
+                        className={`w-full py-2 px-4 rounded-xl text-white font-bold text-[11px] uppercase tracking-wider transition-all shadow-xs cursor-pointer ${themeStyles.headerBg} hover:opacity-90 active:scale-[0.98] disabled:opacity-50`}
+                      >
+                        {updateWfhDetailsMutation.isPending ? "Saving..." : "Save WFH Settings"}
+                      </button>
+
                     </div>
                   </div>
                 </div>
@@ -1170,7 +1368,7 @@ export default function EmployeeDetailPage() {
                 <div className="bg-slate-50/80 border-t border-slate-100 h-[90px] flex items-center justify-center pb-1 shrink-0 z-10">
                   <div className="w-[60px] h-[60px] bg-white rounded-lg border border-slate-200/80 p-1 flex items-center justify-center shadow-2xs shrink-0">
                     <img 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${employee.employee_id}`}
+                      src={qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${employee.employee_id}`}
                       alt="QR"
                       className="w-full h-full object-contain"
                     />

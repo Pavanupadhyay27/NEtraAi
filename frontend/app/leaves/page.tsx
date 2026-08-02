@@ -7,7 +7,8 @@ import SidebarLayout from "@/components/SidebarLayout";
 import { fetchApi, getBackendUrl, getUserProfile } from "@/app/utils/api";
 import { 
   Calendar, Check, X, Users, AlertCircle, FileText, CheckCircle, Clock,
-  ArrowRight, Search, Filter, Info, ShieldAlert, ArrowLeftRight, Download, Eye, FileDown
+  ArrowRight, Search, Filter, Info, ShieldAlert, ArrowLeftRight, Download, Eye, FileDown,
+  Loader2
 } from "lucide-react";
 import { useToast } from "@/app/utils/toast";
 
@@ -18,6 +19,47 @@ const avatarColors = [
   "from-purple-50 to-pink-150 text-purple-600 border-purple-200 dark:from-purple-950/20 dark:to-pink-950/20 dark:text-purple-400 dark:border-purple-900/40",
   "from-cyan-50 to-blue-150 text-cyan-600 border-cyan-200 dark:from-cyan-950/20 dark:to-blue-950/20 dark:text-cyan-400 dark:border-cyan-900/40",
 ];
+
+function EmployeeAvatar({ 
+  employee, 
+  baseUrl, 
+  size = "md", 
+  avatarColor 
+}: { 
+  employee: any; 
+  baseUrl: string; 
+  size?: "sm" | "md" | "lg"; 
+  avatarColor: string 
+}) {
+  const [imgError, setImgError] = useState(false);
+  const initials = (employee?.name || "?").charAt(0).toUpperCase();
+  
+  const sizeClasses = {
+    sm: "w-8 h-8 rounded-lg text-[10px]",
+    md: "w-10 h-10 rounded-xl text-xs",
+    lg: "w-12 h-12 rounded-2xl text-sm"
+  };
+
+  const hasPhoto = employee?.images?.some((img: any) => img.pose_type.toLowerCase() === "front");
+
+  if (hasPhoto && !imgError) {
+    return (
+      <img
+        src={`${baseUrl}/uploads/${employee.employee_id}/front.jpg`}
+        alt={employee.name}
+        onError={() => setImgError(true)}
+        className={`${sizeClasses[size]} object-cover border border-zinc-200 dark:border-zinc-800 shadow-3xs`}
+      />
+    );
+  }
+
+  return (
+    <div className={`${sizeClasses[size]} bg-gradient-to-br ${avatarColor} flex items-center justify-center border font-bold shadow-3xs uppercase`}>
+      {initials}
+    </div>
+  );
+}
+
 function formatDateDMY(dateInput: string | Date | null | undefined): string {
   if (!dateInput) return "";
   const d = new Date(dateInput);
@@ -217,66 +259,66 @@ export default function LeavesManagementPage() {
     <SidebarLayout>
       <div className="space-y-6 max-w-6xl mx-auto text-slate-800 dark:text-zinc-100 font-sans">
         
-        {/* Header Block */}
-        <div className="pb-4 border-b border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Sleek Minimalist Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-zinc-150 dark:border-zinc-800/80 gap-4">
           <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-zinc-100 tracking-tight flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700/60 shadow-2xs">
-                <Calendar className="w-5 h-5 text-cyan-500" />
-              </div>
-              Time-Off Approval Center
+            <div className="flex items-center gap-2.5">
+              <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-widest font-mono bg-cyan-50 dark:bg-cyan-950/30 px-2.5 py-1 rounded-md border border-cyan-100/60 dark:border-cyan-900/30">
+                Administration Panel
+              </span>
+            </div>
+            <h1 className="text-xl font-black text-slate-900 dark:text-zinc-50 tracking-tight mt-2.5 flex items-center gap-2">
+              Time-Off Center
             </h1>
-            <p className="text-xs text-slate-400 dark:text-zinc-400 mt-1.5">
-              Review and manage employee leave applications. Approvals automatically sync with attendance logs.
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">
+              Review, approve, and manage employee leave requests with automatic biometrics synchronization.
             </p>
           </div>
         </div>
 
-        {/* Stats Section */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="tech-card-3d p-4 flex items-center justify-between bg-white dark:bg-zinc-900">
-            <div>
-              <p className="text-[10px] font-bold text-slate-455 dark:text-zinc-500 uppercase tracking-wider font-mono">Total Requests</p>
-              <p className="text-2xl font-black text-slate-900 dark:text-zinc-100 mt-1">{leaves.length}</p>
-            </div>
-            <div className="p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-800 rounded-xl text-zinc-400">
-              <FileText className="w-5 h-5" />
+        {/* Stats Grid Section */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-zinc-50/40 dark:bg-zinc-950/10 p-4 rounded-2xl border border-zinc-200/40 dark:border-zinc-850/60 flex flex-col justify-between h-[90px] transition-all hover:border-zinc-300 dark:hover:border-zinc-700">
+            <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-mono">Total Requests</span>
+            <div className="flex items-baseline justify-between mt-auto">
+              <span className="text-2xl font-black text-slate-900 dark:text-zinc-100 leading-none">{leaves.length}</span>
+              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">100% Volume</span>
             </div>
           </div>
 
-          <div className="tech-card-3d p-4 flex items-center justify-between bg-white dark:bg-zinc-900">
-            <div>
-              <p className="text-[10px] font-bold text-amber-600 dark:text-amber-500 uppercase tracking-wider font-mono">Pending Action</p>
-              <p className="text-2xl font-black text-amber-600 dark:text-amber-500 mt-1">{pendingCount}</p>
-            </div>
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200/40 rounded-xl text-amber-500">
-              <Clock className="w-5 h-5" />
-            </div>
-          </div>
-
-          <div className="tech-card-3d p-4 flex items-center justify-between bg-white dark:bg-zinc-900">
-            <div>
-              <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-500 uppercase tracking-wider font-mono">Approved Leaves</p>
-              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-500 mt-1">{approvedCount}</p>
-            </div>
-            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-250/30 rounded-xl text-emerald-500">
-              <CheckCircle className="w-5 h-5" />
+          <div className="bg-zinc-50/40 dark:bg-zinc-950/10 p-4 rounded-2xl border border-zinc-200/40 dark:border-zinc-855/60 flex flex-col justify-between h-[90px] transition-all hover:border-zinc-300 dark:hover:border-zinc-700">
+            <span className="text-[9px] font-bold text-amber-600 dark:text-amber-500 uppercase tracking-wider font-mono">Pending Action</span>
+            <div className="flex items-baseline justify-between mt-auto">
+              <span className="text-2xl font-black text-amber-600 dark:text-amber-500 leading-none">{pendingCount}</span>
+              <span className="text-[10px] text-amber-500/80 font-mono">
+                {leaves.length ? Math.round((pendingCount / leaves.length) * 100) : 0}% Active
+              </span>
             </div>
           </div>
 
-          <div className="tech-card-3d p-4 flex items-center justify-between bg-white dark:bg-zinc-900">
-            <div>
-              <p className="text-[10px] font-bold text-rose-600 dark:text-rose-500 uppercase tracking-wider font-mono">Rejected Requests</p>
-              <p className="text-2xl font-black text-rose-600 dark:text-rose-500 mt-1">{rejectedCount}</p>
+          <div className="bg-zinc-50/40 dark:bg-zinc-950/10 p-4 rounded-2xl border border-zinc-200/40 dark:border-zinc-850/60 flex flex-col justify-between h-[90px] transition-all hover:border-zinc-300 dark:hover:border-zinc-700">
+            <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-500 uppercase tracking-wider font-mono">Approved Leaves</span>
+            <div className="flex items-baseline justify-between mt-auto">
+              <span className="text-2xl font-black text-emerald-600 dark:text-emerald-500 leading-none">{approvedCount}</span>
+              <span className="text-[10px] text-emerald-500/80 font-mono">
+                {leaves.length ? Math.round((approvedCount / leaves.length) * 100) : 0}% Ratio
+              </span>
             </div>
-            <div className="p-3 bg-rose-50 dark:bg-rose-950/20 border border-rose-250/30 rounded-xl text-rose-500">
-              <ShieldAlert className="w-5 h-5" />
+          </div>
+
+          <div className="bg-zinc-50/40 dark:bg-zinc-950/10 p-4 rounded-2xl border border-zinc-200/40 dark:border-zinc-850/60 flex flex-col justify-between h-[90px] transition-all hover:border-zinc-300 dark:hover:border-zinc-700">
+            <span className="text-[9px] font-bold text-rose-600 dark:text-rose-500 uppercase tracking-wider font-mono">Rejected Requests</span>
+            <div className="flex items-baseline justify-between mt-auto">
+              <span className="text-2xl font-black text-rose-600 dark:text-rose-500 leading-none">{rejectedCount}</span>
+              <span className="text-[10px] text-rose-500/80 font-mono">
+                {leaves.length ? Math.round((rejectedCount / leaves.length) * 100) : 0}% Ratio
+              </span>
             </div>
           </div>
         </div>
 
         {/* Filter Controls Row */}
-        <div className="tech-card-3d-minimal flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-white dark:bg-zinc-900 shadow-none">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-3 bg-zinc-50/30 dark:bg-zinc-900/20 border border-zinc-100 dark:border-zinc-800/60 rounded-2xl shadow-none">
           {/* Search bar */}
           <div className="relative w-full sm:max-w-xs">
             <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -317,19 +359,19 @@ export default function LeavesManagementPage() {
           </div>
         </div>
 
-        {/* Requests Table / Cards */}
-        <div className="space-y-4">
+        {/* Requests List */}
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-3xs divide-y divide-zinc-200/40 dark:divide-zinc-850">
           {isLoading ? (
             Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="p-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl space-y-3">
+              <div key={i} className="p-4.5 space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="skeleton w-10 h-10 rounded-xl" />
+                  <div className="skeleton w-10 h-10 rounded-xl animate-pulse" />
                   <div className="space-y-1.5 flex-1">
-                    <div className="skeleton h-3 w-1/4" />
-                    <div className="skeleton h-2 w-1/3" />
+                    <div className="skeleton h-3 w-1/4 animate-pulse" />
+                    <div className="skeleton h-2 w-1/3 animate-pulse" />
                   </div>
                 </div>
-                <div className="skeleton h-2 w-2/3" />
+                <div className="skeleton h-2 w-2/3 animate-pulse" />
               </div>
             ))
           ) : filteredLeaves.length > 0 ? (
@@ -343,44 +385,34 @@ export default function LeavesManagementPage() {
                 <div 
                   key={leave.id}
                   onClick={() => setSelectedLeave(leave)}
-                  className="tech-card-3d-minimal bg-white dark:bg-zinc-900 p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 group cursor-pointer hover:-translate-y-0.5 active:translate-y-0 transition-all shadow-none"
+                  className="p-4.5 flex flex-col md:flex-row md:items-center justify-between gap-4 group cursor-pointer hover:bg-zinc-50/50 dark:hover:bg-zinc-950/20 transition-all"
                 >
                   <div className="flex items-start gap-3.5 min-w-0">
                     {/* Avatar */}
                     <div className="shrink-0">
-                      {leave.employee?.images?.some((img: any) => img.pose_type.toLowerCase() === "front") ? (
-                        <img
-                          src={`${baseUrl}/uploads/${leave.employee.employee_id}/front.jpg`}
-                          alt={leave.employee.name}
-                          className="w-10 h-10 rounded-xl object-cover border border-zinc-200 dark:border-zinc-800 shadow-3xs"
-                        />
-                      ) : (
-                        <div className={`w-10 h-10 bg-gradient-to-br ${avatarColor} flex items-center justify-center border font-bold text-xs rounded-xl shadow-3xs`}>
-                          {(leave.employee?.name || "?").charAt(0).toUpperCase()}
-                        </div>
-                      )}
+                      <EmployeeAvatar employee={leave.employee} baseUrl={baseUrl} avatarColor={avatarColor} size="md" />
                     </div>
 
                     <div className="space-y-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-black text-slate-900 dark:text-zinc-100">{leave.employee?.name}</span>
-                        <span className="text-[10px] text-slate-455 font-mono">({leave.employee?.designation || "Staff"})</span>
+                        <span className="text-xs font-bold text-slate-900 dark:text-zinc-100">{leave.employee?.name}</span>
+                        <span className="text-[10px] text-slate-450 dark:text-zinc-400 font-mono">({leave.employee?.designation || "Staff"})</span>
                         <span className={`text-[8.5px] font-mono font-bold uppercase px-2 py-0.25 rounded-md border ${
-                          leave.leave_type === "Sick" ? "bg-rose-500/10 border-rose-500/25 text-rose-600 dark:text-rose-400" :
-                          leave.leave_type === "Casual" ? "bg-amber-500/10 border-amber-500/25 text-amber-600 dark:text-amber-400" :
-                          leave.leave_type === "Annual" ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-600 dark:text-emerald-400" :
-                          "bg-zinc-500/10 border-zinc-500/25 text-zinc-650 dark:text-zinc-400"
+                          leave.leave_type === "Sick" ? "bg-rose-500/10 border-rose-500/25 text-rose-600 dark:text-rose-455" :
+                          leave.leave_type === "Casual" ? "bg-amber-500/10 border-amber-500/25 text-amber-600 dark:text-amber-455" :
+                          leave.leave_type === "Annual" ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-600 dark:text-emerald-455" :
+                          "bg-zinc-500/10 border-zinc-500/25 text-zinc-650 dark:text-zinc-450"
                         }`}>
                           {leave.leave_type}
                         </span>
                       </div>
                       
-                      <div className="flex items-center gap-1.5 text-[10.5px] text-slate-455 dark:text-zinc-400">
-                        <span className="font-semibold text-slate-800 dark:text-zinc-250">
+                      <div className="flex items-center gap-1.5 text-[10.5px] text-slate-500 dark:text-zinc-400">
+                        <span className="font-semibold text-slate-800 dark:text-zinc-200">
                           {formatDateDMY(leave.start_date)}
                         </span>
                         <ArrowRight className="w-3 h-3 text-zinc-400" />
-                        <span className="font-semibold text-slate-800 dark:text-zinc-250">
+                        <span className="font-semibold text-slate-800 dark:text-zinc-200">
                           {formatDateDMY(leave.end_date)}
                         </span>
                         <span className="text-[9px] font-bold text-cyan-600 dark:text-cyan-400 font-mono bg-cyan-50 dark:bg-cyan-950/20 px-1.5 py-0.25 rounded border border-cyan-150 dark:border-cyan-900/30">
@@ -394,7 +426,7 @@ export default function LeavesManagementPage() {
                       </div>
 
                       {parsed.cleanReason && (
-                        <p className="text-[10.5px] text-slate-400 dark:text-zinc-400 mt-1.5 leading-normal max-w-2xl bg-zinc-50 dark:bg-zinc-950/30 border border-zinc-200/30 dark:border-zinc-850 p-2 rounded-xl italic">
+                        <p className="text-[10.5px] text-zinc-500 dark:text-zinc-400 mt-1.5 leading-normal max-w-2xl bg-zinc-50/50 dark:bg-zinc-950/30 border border-zinc-200/30 dark:border-zinc-850 p-2 rounded-xl italic">
                           " {parsed.cleanReason} "
                         </p>
                       )}
@@ -408,26 +440,26 @@ export default function LeavesManagementPage() {
                         <button
                           onClick={() => handleAction(leave.id, "Rejected")}
                           disabled={updatingId === leave.id}
-                          className="p-1.5 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-600 rounded-xl cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+                          className="p-2 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-500 hover:text-white dark:hover:bg-rose-950/25 text-rose-600 rounded-xl cursor-pointer transition-all active:scale-95 disabled:opacity-50"
                           title="Reject Request"
                         >
-                          {updatingId === leave.id ? <span className="w-4 h-4 block animate-spin">⏳</span> : <X className="w-4 h-4" />}
+                          {updatingId === leave.id ? <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-600" /> : <X className="w-3.5 h-3.5" />}
                         </button>
                         <button
                           onClick={() => handleAction(leave.id, "Approved")}
                           disabled={updatingId === leave.id}
-                          className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl flex items-center gap-1 cursor-pointer transition-all active:scale-95 disabled:opacity-50 shadow-xs shadow-emerald-500/10"
+                          className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-955 text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 disabled:opacity-50 shadow-xs"
                           title="Approve Request"
                         >
-                          {updatingId === leave.id ? <span className="w-3.5 h-3.5 block animate-spin">⏳</span> : <Check className="w-3.5 h-3.5" />}
+                          {updatingId === leave.id ? <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-950 dark:text-white" /> : <Check className="w-3.5 h-3.5" />}
                           <span>Approve</span>
                         </button>
                       </>
                     ) : (
                       <span className={`text-[9.5px] font-mono font-bold uppercase px-3 py-1 rounded-xl border ${
                         leave.status === "Approved" 
-                          ? "bg-emerald-50 border-emerald-250 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-455 dark:border-emerald-900/60" 
-                          : "bg-rose-50 border-rose-250 text-rose-700 dark:bg-rose-950/20 dark:text-rose-455 dark:border-rose-900/60"
+                          ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-455" 
+                          : "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-455"
                       }`}>
                         {leave.status}
                       </span>
@@ -437,7 +469,7 @@ export default function LeavesManagementPage() {
               );
             })
           ) : (
-            <div className="text-center py-12 bg-white dark:bg-zinc-900 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl text-zinc-400 text-xs italic font-medium">
+            <div className="text-center py-12 text-zinc-400 dark:text-zinc-500 text-xs italic font-medium">
               No leave requests found under the "{filter}" filter.
             </div>
           )}
@@ -478,17 +510,7 @@ export default function LeavesManagementPage() {
                 <div className="space-y-5 text-xs">
                   {/* Employee Meta Row */}
                   <div className="flex items-center gap-3.5 p-3.5 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200/50 dark:border-zinc-850">
-                    {leave.employee?.images?.some((img: any) => img.pose_type.toLowerCase() === "front") ? (
-                      <img
-                        src={`${baseUrl}/uploads/${leave.employee.employee_id}/front.jpg`}
-                        alt={leave.employee.name}
-                        className="w-12 h-12 rounded-2xl object-cover border border-zinc-200 dark:border-zinc-800 shadow-sm"
-                      />
-                    ) : (
-                      <div className={`w-12 h-12 bg-gradient-to-br ${avatarColor} flex items-center justify-center border font-bold text-sm rounded-2xl shadow-sm`}>
-                        {(leave.employee?.name || "?").charAt(0).toUpperCase()}
-                      </div>
-                    )}
+                    <EmployeeAvatar employee={leave.employee} baseUrl={baseUrl} avatarColor={avatarColor} size="lg" />
                     <div className="min-w-0 flex-1">
                       <p className="text-[13px] font-black text-slate-900 dark:text-zinc-100 leading-none">{leave.employee?.name}</p>
                       <p className="text-[10px] text-slate-450 mt-1">{leave.employee?.email}</p>

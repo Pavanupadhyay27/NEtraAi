@@ -110,12 +110,38 @@ def reply_to_ticket(
         "id": db_message.id,
         "ticket_id": db_message.ticket_id,
         "sender_id": db_message.sender_id,
+        "sender": {
+            "email": db_message.sender.email if db_message.sender else current_user.email
+        },
         "message": db_message.message,
         "timestamp": db_message.timestamp.isoformat()
     }
     event_bus.publish_ticket_message(event_payload)
     
     return db_message
+
+@router.post("/{id}/typing")
+def send_typing_status(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    db_ticket = crud.get_ticket_by_id(db, ticket_id=id)
+    if not db_ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+        
+    if current_user.company_id is not None and db_ticket.company_id != current_user.company_id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this resource")
+        
+    from app.core import event_bus
+    event_payload = {
+        "type": "typing",
+        "ticket_id": id,
+        "sender_id": current_user.id,
+        "email": current_user.email
+    }
+    event_bus.publish_ticket_message(event_payload)
+    return {"status": "ok"}
 
 @router.get("/{id}/stream")
 async def ticket_stream(
@@ -192,3 +218,62 @@ def update_ticket(
         company_id=current_user.company_id
     )
     return updated
+
+from fastapi import UploadFile, File
+from fastapi.responses import FileResponse
+import os
+import shutil
+
+@router.post("/{id}/attachment", response_model=schemas.TicketMessageOut, status_code=status.HTTP_201_CREATED)
+def upload_attachment(
+    id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    db_ticket = crud.get_ticket_by_id(db, ticket_id=id)
+    if not db_ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+        
+    if current_user.company_id is not None and db_ticket.company_id != current_user.company_id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this resource")
+        
+    # Create upload directory
+    upload_dir = f"uploads/tickets/{id}"
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    # Save file
+    file_path = os.path.join(upload_dir, file.filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    # Create attachment message in DB
+    attachment_url = f"/api/v1/tickets/attachments/{id}/{file.filename}"
+    message_text = f"[ATTACHMENT:{file.filename}|{attachment_url}]"
+    
+    msg_schema = schemas.TicketMessageCreate(message=message_text)
+    db_message = crud.create_ticket_message(db, ticket_id=id, msg=msg_schema, sender_id=current_user.id)
+    
+    # Broadcast reply to SSE stream
+    from app.core import event_bus
+    event_payload = {
+        "id": db_message.id,
+        "ticket_id": db_message.ticket_id,
+        "sender_id": db_message.sender_id,
+        "sender": {
+            "email": db_message.sender.email if db_message.sender else current_user.email
+        },
+        "message": db_message.message,
+        "timestamp": db_message.timestamp.isoformat()
+    }
+    event_bus.publish_ticket_message(event_payload)
+    
+    return db_message
+
+@router.get("/attachments/{ticket_id}/{filename}")
+def get_ticket_attachment(ticket_id: int, filename: str):
+    clean_filename = os.path.basename(filename.replace("..", "").replace("/", "").replace("\\", ""))
+    file_path = f"uploads/tickets/{ticket_id}/{clean_filename}"
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    return FileResponse(file_path)

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response, UploadFile, File, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_
 from datetime import timedelta
@@ -343,6 +343,7 @@ def register_pending_employee(
         email=payload.email,
         phone=payload.phone,
         designation=payload.designation,
+        department_id=payload.department_id,
         status="Pending Approval",
         user_id=db_user.id,
         company_id=payload.company_id
@@ -389,3 +390,11 @@ async def self_onboard_upload(
         user_agent=request.headers.get("user-agent"),
         creator_user_id=None
     )
+
+@router.get("/public/departments/{company_id}", response_model=List[schemas.DepartmentOut])
+def get_public_departments(
+    company_id: int,
+    db: Session = Depends(get_db)
+):
+    departments = db.query(models.Department).filter(models.Department.company_id == company_id).all()
+    return departments

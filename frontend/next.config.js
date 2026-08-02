@@ -25,13 +25,22 @@ const nextConfig = {
       isDev ? "http://localhost:8000 http://127.0.0.1:8000 ws://localhost:8000 ws://127.0.0.1:8000" : "",
     ].filter(Boolean).join(" ");
 
+    const imgSrc = [
+      "'self'",
+      "data:",
+      "blob:",
+      "https:",
+      isDev ? "http://localhost:8000 http://127.0.0.1:8000 http:" : "",
+      process.env.NEXT_PUBLIC_API_URL || "",
+    ].filter(Boolean).join(" ");
+
     const cspDirectives = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       `connect-src ${connectSrc}`,
-      "img-src 'self' data: blob: https:",
+      `img-src ${imgSrc}`,
       "media-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",

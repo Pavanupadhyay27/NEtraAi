@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import QRCode from "qrcode";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import SidebarLayout from "@/components/SidebarLayout";
@@ -127,6 +128,19 @@ export default function EnrollPage() {
     queryKey: ["employee", employeeId],
     queryFn: () => fetchApi(`/employees/${employeeId}`)
   });
+
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
+
+  useEffect(() => {
+    if (employee?.employee_id) {
+      QRCode.toDataURL(employee.employee_id, {
+        margin: 1,
+        width: 150,
+      })
+      .then(url => setQrCodeUrl(url))
+      .catch(err => console.error("QR Code generation error:", err));
+    }
+  }, [employee?.employee_id]);
 
   const { data: status, refetch: refetchStatus } = useQuery({
     queryKey: ["enroll-status", employeeId],
@@ -1378,7 +1392,7 @@ export default function EnrollPage() {
                 <div className="space-y-2">
                   <h2 className="text-xl font-bold text-slate-900 tracking-tight">Biometric Profile Secured</h2>
                   <p className="text-xs text-slate-550 leading-relaxed">
-                    All 10 facial profiles and mathematical vectors have been successfully registered for <strong className="text-slate-800">{employee?.name}</strong>. The kiosk scan terminal is now ready to verify attendance.
+                    Face registration is complete for <strong className="text-slate-800">{employee?.name}</strong>. They can now use the kiosk terminal to mark attendance.
                   </p>
                 </div>
 
@@ -1569,7 +1583,7 @@ export default function EnrollPage() {
                     {/* QR Code Container */}
                     <div className="w-[72px] h-[72px] bg-white rounded-lg border border-slate-200/80 p-1 flex items-center justify-center shadow-2xs shrink-0 font-mono">
                       <img 
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${employee?.employee_id}`}
+                        src={qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${employee?.employee_id}`}
                         alt="QR Code"
                         className="w-full h-full object-contain"
                       />
@@ -1601,38 +1615,33 @@ export default function EnrollPage() {
                   overflow: hidden !important;
                   background-color: white !important;
                   background: white !important;
-                  position: relative !important;
+                  display: flex !important;
+                  align-items: center !important;
+                  justify-content: center !important;
                 }
 
-                /* Reset only parent layout hierarchy, leaving internal elements of card intact */
-                main, 
-                body > div,
-                #sidebar-layout-container, 
-                .sidebar-layout-content, 
-                .print-reset-container,
-                .page-enter,
-                .dark main,
-                .dark body > div,
-                .dark #sidebar-layout-container,
-                .dark .sidebar-layout-content,
-                .dark .print-reset-container,
-                .dark .page-enter {
+                /* Target all parent containers of the card wrap to auto-center the layout */
+                div:has(#printable-id-card-wrap),
+                main:has(#printable-id-card-wrap),
+                section:has(#printable-id-card-wrap) {
+                  display: flex !important;
+                  flex-direction: column !important;
+                  align-items: center !important;
+                  justify-content: center !important;
+                  width: 100% !important;
+                  height: 100% !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
                   border: none !important;
                   box-shadow: none !important;
                   background: transparent !important;
                   background-color: transparent !important;
-                  padding: 0 !important;
-                  margin: 0 !important;
-                  height: auto !important;
-                  min-height: 0 !important;
-                  overflow: visible !important;
-                  position: static !important;
-                  width: auto !important;
-                  display: block !important;
-                  /* Clear transform/animations that would trap fixed/absolute positioning context */
                   transform: none !important;
+                  filter: none !important;
                   animation: none !important;
                   transition: none !important;
+                  position: static !important;
+                  overflow: visible !important;
                 }
                 
                 /* Center and display only the card wrapper */
@@ -1640,19 +1649,18 @@ export default function EnrollPage() {
                   display: flex !important;
                   flex-direction: column !important;
                   visibility: visible !important;
-                  position: fixed !important;
-                  left: 50% !important;
-                  top: 50% !important;
-                  transform: translate(-50%, -50%) scale(1.1) !important;
+                  position: relative !important;
                   border: 1px solid #cbd5e1 !important;
                   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
                   border-radius: 24px !important;
                   background-color: white !important;
                   width: 320px !important;
                   height: 500px !important;
-                  margin: 0 !important;
+                  margin: auto !important;
                   overflow: hidden !important;
                   page-break-inside: avoid;
+                  transform: scale(1.15) !important;
+                  transform-origin: center center !important;
                 }
 
                 #printable-id-card-wrap * {

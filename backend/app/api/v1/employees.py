@@ -91,6 +91,23 @@ def apply_leave(
         if not emp or (current_user.company_id is not None and emp.company_id != current_user.company_id):
             raise HTTPException(status_code=404, detail="Employee not found")
 
+    # Check for overlapping leave requests (Pending or Approved)
+    from sqlalchemy import select, and_
+    stmt = select(models.LeaveRequest).where(
+        and_(
+            models.LeaveRequest.employee_id == req.employee_id,
+            models.LeaveRequest.status != "Rejected",
+            models.LeaveRequest.start_date <= req.end_date,
+            models.LeaveRequest.end_date >= req.start_date
+        )
+    )
+    overlapping = db.execute(stmt).scalars().first()
+    if overlapping:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"You already have an active leave request overlapping with this date range ({overlapping.start_date} to {overlapping.end_date})."
+        )
+
     return crud.create_leave_request(db, req, employee_id=req.employee_id)
 
 

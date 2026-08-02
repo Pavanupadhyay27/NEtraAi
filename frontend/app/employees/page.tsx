@@ -8,7 +8,7 @@ import {
   Plus, Search, Trash2, Camera, Upload, FileSpreadsheet,
   X, Users, CheckCircle2, XCircle, ChevronDown, UserCheck, ShieldAlert,
   Download, Mail, Phone, Calendar, Briefcase, Clock, TrendingUp, MapPin,
-  Eye, EyeOff
+  Eye, EyeOff, Shield
 } from "lucide-react";
 import { useToast } from "@/app/utils/toast";
 import Link from "next/link";
@@ -100,6 +100,8 @@ export default function EmployeesPage() {
   const [wfhLat, setWfhLat] = useState<number | null>(null);
   const [wfhLng, setWfhLng] = useState<number | null>(null);
   const [wfhGeocoding, setWfhGeocoding] = useState(false);
+  const [wfhLockType, setWfhLockType] = useState<"auto" | "address">("address");
+  const [isManualCoords, setIsManualCoords] = useState(false);
 
   const { data: departments } = useQuery({
     queryKey: ["departments"],
@@ -160,12 +162,15 @@ export default function EmployeesPage() {
     setJoiningDate(getLocalDateString()); setStatusVal("Active");
     setDeptId(""); setCreateUserLogin(false); setPassword("");
     setAllowWfh(false); setWfhAddress(""); setWfhLat(null); setWfhLng(null);
+    setWfhLockType("address");
+    setIsManualCoords(false);
     setPhoneError(null);
     setSubmissionError(null);
   };
 
   // Auto-detect WFH coordinates when typing address
   useEffect(() => {
+    if (isManualCoords) return;
     if (!allowWfh || !wfhAddress || wfhAddress.trim().length < 5) {
       setWfhLat(null); setWfhLng(null);
       return;
@@ -193,7 +198,34 @@ export default function EmployeesPage() {
     }, 800);
     
     return () => clearTimeout(delay);
-  }, [wfhAddress, allowWfh]);
+  }, [wfhAddress, allowWfh, isManualCoords]);
+
+  // Reverse geocode when manual coordinates change
+  useEffect(() => {
+    if (!isManualCoords || wfhLat === null || wfhLng === null) return;
+    if (wfhLat < -90 || wfhLat > 90 || wfhLng < -180 || wfhLng > 180) return;
+    if (isNaN(wfhLat) || isNaN(wfhLng)) return;
+
+    const delay = setTimeout(async () => {
+      setWfhGeocoding(true);
+      try {
+        const url = `${getBackendUrl().replace('/api/v1', '')}/api/v1/kiosk/reverse-geocode?lat=${wfhLat}&lng=${wfhLng}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.address) {
+            setWfhAddress(data.address);
+          }
+        }
+      } catch (err) {
+        console.error("Reverse geocoding manual input failed:", err);
+      } finally {
+        setWfhGeocoding(false);
+      }
+    }, 1200);
+
+    return () => clearTimeout(delay);
+  }, [wfhLat, wfhLng, isManualCoords]);
 
   // Live duplicate checking against loaded employees
   const getDuplicateWarning = () => {
@@ -705,58 +737,216 @@ export default function EmployeesPage() {
                 )}
               </div>
 
-              {/* WFH Permission Toggle */}
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                <div>
-                  <p className="text-[12.5px] font-bold text-slate-800">Work From Home (WFH) Allowed</p>
-                  <p className="text-[10px] text-slate-450 mt-0.5">Bypasses geofenced location checks for this employee</p>
+              {/* Attendance Location Policy */}
+              <div className="space-y-2">
+                <label className="block text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
+                  Attendance & Location Policy
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                    !allowWfh 
+                      ? "bg-zinc-900/5 dark:bg-zinc-100/5 border-zinc-900 dark:border-zinc-100 text-zinc-900 dark:text-zinc-100" 
+                      : "bg-transparent border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-450 hover:bg-zinc-50 dark:hover:bg-zinc-900/40"
+                  }`}>
+                    <div className="flex flex-col text-left">
+                      <span className="text-[11.5px] font-bold">Office Bound</span>
+                      <span className="text-[9.5px] opacity-75 mt-0.5">Strict Office Geofence</span>
+                    </div>
+                    <input 
+                      type="radio" 
+                      name="wfh_policy" 
+                      checked={!allowWfh} 
+                      onChange={() => { setAllowWfh(false); setWfhAddress(""); setWfhLat(null); setWfhLng(null); }}
+                      className="w-4 h-4 text-cyan-600 focus:ring-cyan-500 border-zinc-300 dark:border-zinc-700 bg-transparent cursor-pointer"
+                    />
+                  </label>
+
+                  <label className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                    allowWfh 
+                      ? "bg-zinc-900/5 dark:bg-zinc-100/5 border-zinc-900 dark:border-zinc-100 text-zinc-900 dark:text-zinc-100" 
+                      : "bg-transparent border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-450 hover:bg-zinc-50 dark:hover:bg-zinc-900/40"
+                  }`}>
+                    <div className="flex flex-col text-left">
+                      <span className="text-[11.5px] font-bold">WFH / Remote</span>
+                      <span className="text-[9.5px] opacity-75 mt-0.5">Bypasses Office Boundary</span>
+                    </div>
+                    <input 
+                      type="radio" 
+                      name="wfh_policy" 
+                      checked={allowWfh} 
+                      onChange={() => setAllowWfh(true)}
+                      className="w-4 h-4 text-cyan-600 focus:ring-cyan-500 border-zinc-300 dark:border-zinc-700 bg-transparent cursor-pointer"
+                    />
+                  </label>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setAllowWfh(!allowWfh)}
-                  className={`relative inline-flex h-5.5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    allowWfh ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800"
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow-xs transition duration-200 ease-in-out ${
-                      allowWfh ? "translate-x-4.5" : "translate-x-0"
-                    }`}
-                  />
-                </button>
               </div>
 
-              {/* WFH Address Input */}
+              {/* WFH Options Dropdown & Textbox */}
               <div 
                 className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                  allowWfh ? "max-h-[300px] opacity-100 mt-3" : "max-h-0 opacity-0 mt-0"
+                  allowWfh ? "max-h-[350px] opacity-100 mt-4" : "max-h-0 opacity-0 mt-0"
                 }`}
               >
-                <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 space-y-3">
-                  <InputField label="Home Address (For WFH GPS Lock)" required={allowWfh}>
-                    <textarea 
-                      required={allowWfh}
-                      rows={2}
-                      placeholder="e.g., 123 Main St, Springfield. Be specific for accurate GPS geocoding." 
-                      value={wfhAddress}
-                      onChange={(e) => setWfhAddress(e.target.value)} 
-                      className={`${inputCls} h-auto py-2`} 
-                    />
-                  </InputField>
-                  
-                  {/* Show detected coords or loading */}
-                  <div className="text-[10px] flex items-center justify-between border-t border-indigo-500/10 pt-2">
-                     {wfhGeocoding ? (
-                       <span className="text-indigo-400 animate-pulse font-medium">Autodetecting coordinates...</span>
-                     ) : wfhLat && wfhLng ? (
-                       <span className="text-emerald-500 font-mono font-bold flex items-center gap-1.5 uppercase tracking-wider">
-                         <MapPin className="w-3 h-3" />
-                         GPS Locked: {wfhLat.toFixed(5)}, {wfhLng.toFixed(5)}
-                       </span>
-                     ) : (
-                       <span className="text-slate-500 font-medium">Enter full address to lock GPS</span>
-                     )}
+                <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800 space-y-4">
+                  <div className="space-y-1.5 text-left">
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
+                      WFH GPS Verification Mode
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 bg-zinc-100 dark:bg-zinc-900/60 p-1.5 rounded-xl border border-zinc-200/60 dark:border-zinc-800/80">
+                      <button
+                        type="button"
+                        onClick={() => setWfhLockType("address")}
+                        className={`py-2 px-2.5 rounded-lg text-[10.5px] font-bold transition-all cursor-pointer ${
+                          wfhLockType === "address"
+                            ? "bg-white dark:bg-zinc-800 text-zinc-955 dark:text-white shadow-sm border border-zinc-200/80 dark:border-zinc-700"
+                            : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-805 dark:hover:text-zinc-200"
+                        }`}
+                      >
+                        Pre-Registered Address
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWfhLockType("auto");
+                          setWfhAddress("");
+                          setWfhLat(null);
+                          setWfhLng(null);
+                        }}
+                        className={`py-2 px-2.5 rounded-lg text-[10.5px] font-bold transition-all cursor-pointer ${
+                          wfhLockType === "auto"
+                            ? "bg-white dark:bg-zinc-800 text-zinc-955 dark:text-white shadow-sm border border-zinc-200/80 dark:border-zinc-700"
+                            : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-805 dark:hover:text-zinc-200"
+                        }`}
+                      >
+                        Auto-Lock on First Scan
+                      </button>
+                    </div>
                   </div>
+
+                  {wfhLockType === "address" && (
+                    <div className="space-y-4 animate-fadeInUp">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
+                          Home Address (For WFH GPS Lock) *
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (navigator.geolocation) {
+                              setWfhGeocoding(true);
+                              navigator.geolocation.getCurrentPosition(
+                                async (position) => {
+                                  const { latitude, longitude } = position.coords;
+                                  setWfhLat(latitude);
+                                  setWfhLng(longitude);
+                                  try {
+                                    const url = `${getBackendUrl().replace('/api/v1', '')}/api/v1/kiosk/reverse-geocode?lat=${latitude}&lng=${longitude}`;
+                                    const res = await fetch(url);
+                                    if (res.ok) {
+                                      const data = await res.json();
+                                      if (data.address) {
+                                        setWfhAddress(data.address);
+                                      }
+                                    }
+                                  } catch (err) {
+                                    console.error("Reverse geocoding failed:", err);
+                                  } finally {
+                                    setWfhGeocoding(false);
+                                  }
+                                },
+                                (err) => {
+                                  setWfhGeocoding(false);
+                                  toast.error("Geolocation denied or unavailable. Please enter coordinates manually.");
+                                }
+                              );
+                            } else {
+                              toast.error("Geolocation is not supported by your browser.");
+                            }
+                          }}
+                          className="flex items-center gap-1 text-[10px] font-bold text-cyan-600 hover:text-cyan-500 transition-colors cursor-pointer"
+                        >
+                          <MapPin className="w-3.5 h-3.5" />
+                          Auto-Detect GPS
+                        </button>
+                      </div>
+
+                      <textarea 
+                        required={allowWfh && wfhLockType === "address"}
+                        rows={2}
+                        placeholder="e.g., 123 Main St, Springfield. Be specific for accurate GPS geocoding." 
+                        value={wfhAddress}
+                        onChange={(e) => setWfhAddress(e.target.value)} 
+                        className="input-field text-[12.5px] bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 focus:border-slate-800 dark:focus:border-zinc-500 text-slate-900 dark:text-white rounded-xl transition-all w-full h-auto py-2.5 px-3.5 resize-none placeholder-zinc-400 dark:placeholder-zinc-650 shadow-inner" 
+                      />
+
+                      {/* Manual coordinate overrides */}
+                      <label className="flex items-center gap-2 text-[10.5px] font-semibold text-zinc-650 dark:text-zinc-400 cursor-pointer select-none hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors border-t border-zinc-200/50 dark:border-zinc-800/60 pt-3">
+                        <input
+                          type="checkbox"
+                          checked={isManualCoords}
+                          onChange={(e) => {
+                            const nextState = e.target.checked;
+                            setIsManualCoords(nextState);
+                            if (!nextState) {
+                              setWfhLat(null);
+                              setWfhLng(null);
+                            }
+                          }}
+                          className="w-3.5 h-3.5 rounded border-zinc-300 dark:border-zinc-700 text-cyan-600 focus:ring-cyan-500 bg-transparent cursor-pointer"
+                        />
+                        <span>Set coordinates manually (GPS override)</span>
+                      </label>
+
+                      {isManualCoords ? (
+                        <div className="grid grid-cols-2 gap-3.5 animate-fadeInUp">
+                          <InputField label="Custom Latitude" required>
+                            <input 
+                              type="number" 
+                              step="any" 
+                              required 
+                              placeholder="e.g. 28.6139" 
+                              value={wfhLat !== null ? wfhLat : ""} 
+                              onChange={(e) => setWfhLat(e.target.value ? parseFloat(e.target.value) : null)}
+                              className="input-field text-[12.5px] bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 focus:border-slate-800 dark:focus:border-zinc-500 text-slate-900 dark:text-white rounded-xl transition-all w-full h-9.5 px-3.5"
+                            />
+                          </InputField>
+                          <InputField label="Custom Longitude" required>
+                            <input 
+                              type="number" 
+                              step="any" 
+                              required 
+                              placeholder="e.g. 77.2090" 
+                              value={wfhLng !== null ? wfhLng : ""} 
+                              onChange={(e) => setWfhLng(e.target.value ? parseFloat(e.target.value) : null)}
+                              className="input-field text-[12.5px] bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 focus:border-slate-800 dark:focus:border-zinc-500 text-slate-900 dark:text-white rounded-xl transition-all w-full h-9.5 px-3.5"
+                            />
+                          </InputField>
+                        </div>
+                      ) : (
+                        <div className="text-[10.5px] flex items-center justify-between border-t border-zinc-200 dark:border-zinc-800 pt-2.5">
+                           {wfhGeocoding ? (
+                             <span className="text-cyan-500 animate-pulse font-medium">Resolving geocode coordinates...</span>
+                           ) : wfhLat && wfhLng ? (
+                             <span className="text-emerald-500 font-mono font-bold flex items-center gap-1.5 uppercase tracking-wider">
+                               <MapPin className="w-3.5 h-3.5 animate-bounce" />
+                               GPS Locked: {wfhLat.toFixed(6)}, {wfhLng.toFixed(6)}
+                             </span>
+                           ) : (
+                             <span className="text-slate-450 dark:text-zinc-500 font-medium">Enter full address or auto-detect to lock GPS</span>
+                           )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {wfhLockType === "auto" && (
+                    <div className="p-3.5 rounded-xl bg-cyan-500/5 border border-cyan-500/10 text-[11px] text-cyan-600 dark:text-cyan-400 animate-fadeInUp flex items-start gap-2.5 leading-relaxed">
+                      <Shield className="w-4 h-4 shrink-0 mt-0.5 text-cyan-500" />
+                      <span>
+                        <strong>Auto-Lock Active:</strong> The system will automatically capture and register the employee's exact GPS coordinates upon their first punch-in. All subsequent punches will be locked to a 500-meter radius around that location.
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 

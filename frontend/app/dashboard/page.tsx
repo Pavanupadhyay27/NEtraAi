@@ -378,6 +378,9 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
 
   // Leave Form States
   const [showLeaveModal, setShowLeaveModal] = React.useState(false);
+  const [selectedLeaveDetail, setSelectedLeaveDetail] = React.useState<any>(null);
+  const [leaveTypeFilter, setLeaveTypeFilter] = React.useState<string>("ALL");
+  const [leaveStatusFilter, setLeaveStatusFilter] = React.useState<string>("ALL");
   const [leaveStartDate, setLeaveStartDate] = React.useState("");
   const [leaveEndDate, setLeaveEndDate] = React.useState("");
   const [leaveType, setLeaveType] = React.useState("Sick");
@@ -486,6 +489,15 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
     queryFn: () => fetchApi(`/employees/leaves?employee_id=${employee?.id}`),
     enabled: !!employee?.id && activeTab === "leave"
   });
+
+  const filteredLeavesList = React.useMemo(() => {
+    if (!leaves || !Array.isArray(leaves)) return [];
+    return leaves.filter((l: any) => {
+      const matchesType = leaveTypeFilter === "ALL" || l.leave_type === leaveTypeFilter;
+      const matchesStatus = leaveStatusFilter === "ALL" || l.status === leaveStatusFilter;
+      return matchesType && matchesStatus;
+    });
+  }, [leaves, leaveTypeFilter, leaveStatusFilter]);
 
   const approvedLeaveDays = React.useMemo(() => {
     const days = { Sick: 0, Casual: 0, Annual: 0, Unpaid: 0 };
@@ -1041,75 +1053,158 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
 
       {activeTab === "leave" && (
         <div className="space-y-6 animate-fadeInUp">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800 gap-3">
-            <div>
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between pb-4 border-b border-zinc-150 dark:border-zinc-800 gap-4">
+            <div className="flex-1">
               <h2 className="text-sm font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-wider font-mono">Leave Requests</h2>
-              <div className="flex flex-wrap gap-1.5 mt-1.5">
-                {(["Sick", "Casual", "Annual"] as const).map((type) => (
-                  <span key={type} className="text-[8.5px] font-bold font-mono px-2 py-0.5 rounded-md bg-slate-50 dark:bg-zinc-950 border border-slate-200/60 dark:border-zinc-850 text-zinc-600 dark:text-zinc-400">
-                    {type}: <span className="text-cyan-600 dark:text-cyan-400 font-extrabold">{getLeaveLeft(type)}</span>
-                  </span>
-                ))}
+              
+              {/* Premium 3-Column Balance Cards Grid */}
+              <div className="grid grid-cols-3 gap-3 mt-3 w-full sm:max-w-lg">
+                {(["Sick", "Casual", "Annual"] as const).map((type) => {
+                  const limit = leaveLimits[type];
+                  const approved = approvedLeaveDays[type] || 0;
+                  const balanceNum = typeof limit === "number" ? Math.max(0, limit - approved) : 0;
+                  const balanceStr = limit === "Limitless" ? "Limitless" : String(balanceNum);
+                  const pct = typeof limit === "number" && limit > 0 ? (balanceNum / limit) * 100 : 100;
+                  
+                  return (
+                    <div key={type} className="bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-200/50 dark:border-zinc-850 p-3 rounded-2xl flex flex-col gap-0.5 transition-all hover:border-zinc-300 dark:hover:border-zinc-700">
+                      <span className="text-[8.5px] font-bold text-zinc-450 dark:text-zinc-505 uppercase tracking-wider font-mono">{type}</span>
+                      <div className="flex items-baseline gap-1 mt-0.5">
+                        <span className="text-base font-black text-slate-900 dark:text-zinc-100 leading-none">{balanceStr}</span>
+                        <span className="text-[9px] text-zinc-400 dark:text-zinc-505 font-mono">/ {limit} Left</span>
+                      </div>
+                      
+                      {/* Visual progress meter */}
+                      <div className="w-full h-1 bg-zinc-150 dark:bg-zinc-900 rounded-full mt-2 overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full transition-all ${
+                            type === "Sick" ? "bg-rose-500" :
+                            type === "Casual" ? "bg-amber-500" :
+                            "bg-emerald-500"
+                          }`}
+                          style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
+            
             <button
               onClick={() => {
                 setLeaveError(null);
                 setShowLeaveModal(true);
               }}
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-950 text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer border border-transparent dark:border-zinc-800 self-start sm:self-auto"
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-950 text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer border border-transparent dark:border-zinc-800 self-start sm:self-auto sm:mt-1"
             >
               Apply Leave
             </button>
           </div>
 
-          <div className="tech-card-3d p-5">
-            <h3 className="text-xs font-bold text-slate-900 dark:text-zinc-200 uppercase tracking-wider mb-4 font-mono">Request Timeline</h3>
-            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
+          <div className="tech-card-3d p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-zinc-100 dark:border-zinc-800/80">
+              <h3 className="text-xs font-bold text-slate-900 dark:text-zinc-200 uppercase tracking-wider font-mono">Request Timeline</h3>
+              
+              <div className="flex items-center gap-2">
+                <select
+                  value={leaveTypeFilter}
+                  onChange={(e) => setLeaveTypeFilter(e.target.value)}
+                  className="h-8 text-[11px] font-semibold bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-2.5 text-zinc-850 dark:text-zinc-200 focus:outline-none focus:border-cyan-500 cursor-pointer"
+                >
+                  <option value="ALL">All Types</option>
+                  <option value="Sick">Sick</option>
+                  <option value="Casual">Casual</option>
+                  <option value="Annual">Annual</option>
+                  <option value="Unpaid">Unpaid</option>
+                </select>
+
+                <select
+                  value={leaveStatusFilter}
+                  onChange={(e) => setLeaveStatusFilter(e.target.value)}
+                  className="h-8 text-[11px] font-semibold bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-2.5 text-zinc-850 dark:text-zinc-200 focus:outline-none focus:border-cyan-500 cursor-pointer"
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Approved">Approved</option>
+                  <option value="Rejected">Rejected</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="relative pl-6 border-l border-dashed border-zinc-200 dark:border-zinc-800 ml-4 space-y-6 max-h-[450px] overflow-y-auto pr-1">
               {loadingLeaves ? (
                 Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="p-3 border border-slate-100 rounded-xl space-y-2">
-                    <div className="skeleton h-3 w-1/3" />
-                    <div className="skeleton h-2 w-2/3" />
+                  <div key={i} className="relative space-y-2">
+                    <div className="absolute -left-[30px] w-3 h-3 rounded-full bg-zinc-200 dark:bg-zinc-800 border-2 border-white dark:border-zinc-900 top-1" />
+                    <div className="skeleton h-3 w-1/4 animate-pulse" />
+                    <div className="skeleton h-2 w-1/2 animate-pulse" />
                   </div>
                 ))
               ) : leaves && leaves.length > 0 ? (
-                leaves.map((l: any) => (
-                  <div key={l.id} className="p-4 border border-slate-100 dark:border-zinc-800/80 rounded-xl hover:border-slate-250 dark:hover:border-zinc-700 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-900 dark:text-zinc-100">{l.leave_type} Leave</span>
-                        <span className="text-[9px] text-slate-400 font-mono">Applied {formatDateDMY(l.created_at)}</span>
-                      </div>
-                      <p className="text-[11px] text-slate-550 dark:text-zinc-350">
-                        Duration: <span className="font-semibold text-slate-800 dark:text-zinc-250">{formatDateDMY(l.start_date)}</span> to <span className="font-semibold text-slate-800 dark:text-zinc-250">{formatDateDMY(l.end_date)}</span>
-                      </p>
-                      {l.reason && (
-                        <p className="text-[10px] text-slate-400 mt-1 italic">" {l.reason} "</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0 self-start md:self-auto">
-                      {l.status === "Pending" && (
-                        <button
-                          onClick={() => handleWithdrawLeave(l.id)}
-                          disabled={withdrawingId === l.id}
-                          className="px-2.5 py-1 border border-rose-250 dark:border-rose-900/40 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-600 dark:text-rose-455 text-[10px] font-bold rounded-lg transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                filteredLeavesList.length > 0 ? (
+                  filteredLeavesList.map((l: any) => {
+                    const isApproved = l.status === "Approved";
+                    const isRejected = l.status === "Rejected";
+                    const isPending = l.status === "Pending";
+                    
+                    return (
+                      <div key={l.id} className="relative group transition-all">
+                        {/* Timeline Dot */}
+                        <div className={`absolute -left-[30px] w-3 h-3 rounded-full border-2 border-white dark:border-zinc-900 transition-all top-[18px] z-10 ${
+                          isApproved ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]" :
+                          isRejected ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.3)]" :
+                          "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.3)] animate-pulse"
+                        }`} />
+
+                        <div 
+                          onClick={() => setSelectedLeaveDetail(l)}
+                          className="flex flex-col md:flex-row md:items-start justify-between gap-4 pl-3.5 pr-3 py-3 rounded-2xl hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 border border-transparent hover:border-zinc-205 dark:hover:border-zinc-805 hover:shadow-3xs duration-200 cursor-pointer"
                         >
-                          {withdrawingId === l.id ? "Withdrawing..." : "Withdraw"}
-                        </button>
-                      )}
-                      <span className={`text-[9px] font-mono px-2.5 py-0.75 rounded border font-bold uppercase ${
-                        l.status === "Approved" ? "bg-emerald-50 border-emerald-150 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900" :
-                        l.status === "Rejected" ? "bg-rose-50 border-rose-150 text-rose-700 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900" :
-                        "bg-amber-50 border-amber-150 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900"
-                      }`}>
-                        {l.status}
-                      </span>
-                    </div>
+                          <div className="space-y-1">
+                            <div className="flex items-center flex-wrap gap-2">
+                              <span className="text-xs font-semibold text-slate-900 dark:text-zinc-150">{l.leave_type} Leave</span>
+                              <span className="text-[10px] text-slate-400 dark:text-zinc-505 font-mono">Applied {formatDateDMY(l.created_at)}</span>
+                            </div>
+                            <p className="text-[11px] text-slate-555 dark:text-zinc-355 font-medium">
+                              Duration: <span className="font-semibold text-slate-800 dark:text-zinc-200">{formatDateDMY(l.start_date)}</span> to <span className="font-semibold text-slate-800 dark:text-zinc-200">{formatDateDMY(l.end_date)}</span>
+                            </p>
+                            {l.reason && (
+                              <p className="text-[11px] text-zinc-450 dark:text-zinc-500 mt-1 pl-3.5 border-l border-zinc-200 dark:border-zinc-800 italic leading-relaxed">
+                                {l.reason.split(" (Emergency Contact:")[0].split(" (Half-Day:")[0]}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-3 shrink-0 self-start md:self-auto" onClick={(e) => e.stopPropagation()}>
+                            {isPending && (
+                              <button
+                                onClick={() => handleWithdrawLeave(l.id)}
+                                disabled={withdrawingId === l.id}
+                                className="px-2.5 py-1 border border-rose-200 dark:border-rose-900/40 hover:bg-rose-500 hover:text-white dark:hover:bg-rose-955/25 text-rose-600 dark:text-rose-400 text-[10px] font-bold rounded-lg transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                              >
+                                {withdrawingId === l.id ? "Withdrawing..." : "Withdraw"}
+                              </button>
+                            )}
+                            <span className={`text-[9.5px] font-mono px-2.5 py-0.5 rounded-full border font-bold uppercase ${
+                              isApproved ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400" :
+                              isRejected ? "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400" :
+                              "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                            }`}>
+                              {l.status}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-10 text-zinc-405 dark:text-zinc-505 text-xs italic">
+                    No leaves found matching the selected filters.
                   </div>
-                ))
+                )
               ) : (
-                <div className="text-center py-10 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-400 text-xs">
+                <div className="text-center py-10 text-zinc-405 dark:text-zinc-505 text-xs italic">
                   No leave requests submitted yet.
                 </div>
               )}
@@ -1465,6 +1560,108 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
         </div>,
         document.body
       )}
+      {selectedLeaveDetail && typeof document !== "undefined" && createPortal(
+        <div className="modal-backdrop z-[999] bg-black/60 backdrop-blur-xs fixed inset-0 flex items-center justify-center p-4" onClick={() => setSelectedLeaveDetail(null)}>
+          <div className="modal-content max-w-md bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-900 dark:text-zinc-100 shadow-2xl p-6 rounded-2xl w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 dark:border-zinc-800">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-zinc-100 font-mono uppercase tracking-wider flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-cyan-500" />
+                  Leave Details
+                </h3>
+                <p className="text-[10px] text-slate-400 mt-0.5 font-mono">Applied {formatDateDMY(selectedLeaveDetail.created_at)}</p>
+              </div>
+              <button 
+                onClick={() => setSelectedLeaveDetail(null)} 
+                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* Status Row */}
+              <div className="flex items-center justify-between p-3.5 bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200/60 dark:border-zinc-800/80 rounded-2xl">
+                <span className="font-semibold text-zinc-500">Request Status</span>
+                <span className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full border font-bold uppercase ${
+                  selectedLeaveDetail.status === "Approved" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400" :
+                  selectedLeaveDetail.status === "Rejected" ? "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400" :
+                  "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                }`}>
+                  {selectedLeaveDetail.status}
+                </span>
+              </div>
+
+              {/* Leave Info */}
+              <div className="grid grid-cols-2 gap-3.5">
+                <div className="p-3 bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-200/50 dark:border-zinc-850 rounded-xl">
+                  <span className="block text-[9px] font-bold text-zinc-405 uppercase tracking-wider mb-1">Leave Type</span>
+                  <span className="font-bold text-zinc-800 dark:text-zinc-200">{selectedLeaveDetail.leave_type} Leave</span>
+                </div>
+                <div className="p-3 bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-200/50 dark:border-zinc-850 rounded-xl">
+                  <span className="block text-[9px] font-bold text-zinc-405 uppercase tracking-wider mb-1">Duration</span>
+                  <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                    {(() => {
+                      const start = new Date(selectedLeaveDetail.start_date);
+                      const end = new Date(selectedLeaveDetail.end_date);
+                      const diffTime = Math.abs(end.getTime() - start.getTime());
+                      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                      return `${diffDays} Day${diffDays > 1 ? "s" : ""}`;
+                    })()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Dates */}
+              <div className="p-3 bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-200/50 dark:border-zinc-850 rounded-xl space-y-2">
+                <div>
+                  <span className="block text-[9px] font-bold text-zinc-405 uppercase tracking-wider mb-0.5">Start Date</span>
+                  <span className="font-mono font-bold text-zinc-700 dark:text-zinc-300">{formatDateDMY(selectedLeaveDetail.start_date)}</span>
+                </div>
+                <div className="border-t border-zinc-200/50 dark:border-zinc-800/40 pt-2">
+                  <span className="block text-[9px] font-bold text-zinc-405 uppercase tracking-wider mb-0.5">End Date</span>
+                  <span className="font-mono font-bold text-zinc-700 dark:text-zinc-300">{formatDateDMY(selectedLeaveDetail.end_date)}</span>
+                </div>
+              </div>
+
+              {/* Leave Reason */}
+              {selectedLeaveDetail.reason && (
+                <div className="p-3 bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-200/50 dark:border-zinc-850 rounded-xl">
+                  <span className="block text-[9px] font-bold text-zinc-405 uppercase tracking-wider mb-1">Reason / Description</span>
+                  <p className="text-zinc-700 dark:text-zinc-300 italic leading-relaxed whitespace-pre-line">
+                    {selectedLeaveDetail.reason}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-2 mt-6 pt-3 border-t border-slate-100 dark:border-zinc-800">
+              {selectedLeaveDetail.status === "Pending" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleWithdrawLeave(selectedLeaveDetail.id);
+                    setSelectedLeaveDetail(null);
+                  }}
+                  disabled={withdrawingId === selectedLeaveDetail.id}
+                  className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs rounded-xl transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                >
+                  {withdrawingId === selectedLeaveDetail.id ? "Withdrawing..." : "Withdraw Request"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setSelectedLeaveDetail(null)}
+                className="px-4 py-2 border border-zinc-200 dark:border-zinc-850 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-650 dark:text-zinc-300 font-bold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Leave Application Modal (Portaled for full screen cover) */}
       {showLeaveModal && typeof document !== "undefined" && createPortal(
@@ -1815,6 +2012,13 @@ function AdminDashboardView({ profile }: { profile: any }) {
     queryKey: ["recognition-analytics"],
     queryFn: () => fetchApi("/analytics/recognition"),
     enabled: dashboardView === "operations"
+  });
+
+  const { data: telemetry } = useQuery({
+    queryKey: ["system-telemetry"],
+    queryFn: () => fetchApi("/analytics/system-telemetry"),
+    enabled: dashboardView === "operations",
+    refetchInterval: 3000
   });
 
   // Presence Board states
@@ -2312,8 +2516,8 @@ function AdminDashboardView({ profile }: { profile: any }) {
               <div className="bg-white border border-zinc-100 rounded-xl p-4 flex flex-col justify-between h-[110px]">
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Device Health Status</p>
                 <div className="flex items-center justify-between mt-auto">
-                  <span className="text-xl font-bold text-slate-900">3 Online</span>
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">0 Offline</span>
+                  <span className="text-xl font-bold text-slate-900">{telemetry?.online_devices ?? 3} Online</span>
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">{telemetry?.offline_devices ?? 0} Offline</span>
                 </div>
               </div>
               <div className="bg-white border border-zinc-100 rounded-xl p-4 flex flex-col justify-between h-[110px]">
@@ -2346,28 +2550,28 @@ function AdminDashboardView({ profile }: { profile: any }) {
                   <div className="space-y-1">
                     <div className="flex justify-between text-[10px] font-bold text-slate-500">
                       <span>CPU LOAD</span>
-                      <span>34.2%</span>
+                      <span>{telemetry?.cpu_load ?? "34.2"}%</span>
                     </div>
                     <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div className="bg-blue-500 h-2" style={{ width: "34.2%" }} />
+                      <div className="bg-blue-500 h-2 transition-all duration-500" style={{ width: `${telemetry?.cpu_load ?? 34.2}%` }} />
                     </div>
                   </div>
                   <div className="space-y-1">
                     <div className="flex justify-between text-[10px] font-bold text-slate-500">
                       <span>MEMORY LOAD</span>
-                      <span>56.1%</span>
+                      <span>{telemetry?.memory_load ?? "56.1"}%</span>
                     </div>
                     <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div className="bg-emerald-500 h-2" style={{ width: "56.1%" }} />
+                      <div className="bg-emerald-500 h-2 transition-all duration-500" style={{ width: `${telemetry?.memory_load ?? 56.1}%` }} />
                     </div>
                   </div>
                   <div className="space-y-1">
                     <div className="flex justify-between text-[10px] font-bold text-slate-500">
                       <span>API GATEWAY LATENCY</span>
-                      <span>12.4 ms</span>
+                      <span>{telemetry?.api_gateway_latency_ms ?? "12.4"} ms</span>
                     </div>
                     <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div className="bg-purple-500 h-2" style={{ width: "12.4%" }} />
+                      <div className="bg-purple-500 h-2 transition-all duration-500" style={{ width: `${Math.min(100, ((telemetry?.api_gateway_latency_ms ?? 12.4) / 50) * 100)}%` }} />
                     </div>
                   </div>
                 </div>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, Eye, EyeOff, ShieldAlert, Shield, Building2, Users, ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Lock, Mail, Eye, EyeOff, ShieldAlert, Shield, Building2, Users, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown } from "lucide-react";
 import { fetchApi, setUserProfile, setTokens, getAccessToken } from "@/app/utils/api";
 
 type RoleType = "Super Admin" | "Admin" | "Employee";
@@ -34,6 +34,24 @@ export default function LoginPage() {
   const [empIdInput, setEmpIdInput] = useState("");
   const [empDesignation, setEmpDesignation] = useState("");
   const [empPhone, setEmpPhone] = useState("");
+  const [empDeptId, setEmpDeptId] = useState("");
+  const [availableDepts, setAvailableDepts] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!matchedCompany?.id) {
+      setAvailableDepts([]);
+      return;
+    }
+    const fetchDepts = async () => {
+      try {
+        const depts = await fetchApi(`/auth/public/departments/${matchedCompany.id}`);
+        setAvailableDepts(depts || []);
+      } catch (err) {
+        console.error("Failed to load departments:", err);
+      }
+    };
+    fetchDepts();
+  }, [matchedCompany?.id]);
 
   useEffect(() => {
     setMounted(true);
@@ -45,6 +63,14 @@ export default function LoginPage() {
     }
     if (getAccessToken()) {
       router.push("/dashboard");
+    }
+    const storedCompany = localStorage.getItem("matchedCompany");
+    if (storedCompany) {
+      try {
+        setMatchedCompany(JSON.parse(storedCompany));
+      } catch (e) {
+        localStorage.removeItem("matchedCompany");
+      }
     }
   }, [router]);
 
@@ -73,13 +99,17 @@ export default function LoginPage() {
       if (company.exists === false || !company.id) {
         setError(company.message || "Organization not found. Verify name.");
         setMatchedCompany(null);
+        localStorage.removeItem("matchedCompany");
       } else {
-        setMatchedCompany({ id: company.id, name: company.name });
+        const matched = { id: company.id, name: company.name };
+        setMatchedCompany(matched);
+        localStorage.setItem("matchedCompany", JSON.stringify(matched));
         setError(null);
       }
     } catch (err: any) {
       setError(err.message || "Organization not found. Verify name.");
       setMatchedCompany(null);
+      localStorage.removeItem("matchedCompany");
     } finally {
       setLoading(false);
     }
@@ -100,7 +130,8 @@ export default function LoginPage() {
           password: empPassword,
           employee_id: empIdInput,
           phone: empPhone || undefined,
-          designation: empDesignation || undefined
+          designation: empDesignation || undefined,
+          department_id: empDeptId ? parseInt(empDeptId) : undefined
         })
       });
       // Redirect to public self-onboarding camera hud page
@@ -186,13 +217,17 @@ export default function LoginPage() {
           
           {/* Left Side: Welcome back info */}
           <div className="space-y-5 text-center md:text-left">
-            <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-tight uppercase tracking-wider">
-              {matchedCompany ? matchedCompany.name : "Welcome back"}
+            <div className="inline-flex items-center gap-2 bg-cyan-950/50 border border-cyan-800/40 px-3 py-1 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-450 animate-pulse animate-duration-1000" />
+              <span className="text-[10px] font-bold text-cyan-400 tracking-wider uppercase font-mono">Biometric Identity Platform</span>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-[1.1] uppercase">
+              {matchedCompany ? matchedCompany.name : "NETRAID\nIDENTITY"}
             </h1>
-            <p className="text-slate-400 text-sm md:text-base font-light leading-relaxed max-w-sm mx-auto md:mx-0">
+            <p className="text-slate-400 text-xs md:text-sm font-medium leading-relaxed max-w-sm mx-auto md:mx-0">
               {matchedCompany 
-                ? "Organization verified. Proceed to sign in to your employee dashboard or complete self-onboarding." 
-                : "Select organization to access your biometric portal dashboard."}
+                ? "Enterprise portal initialized. Access your biometric logs, check-ins, and approval center." 
+                : "Secure single sign-on portal. Locate your enterprise to begin identity validation."}
             </p>
           </div>
 
@@ -202,14 +237,14 @@ export default function LoginPage() {
               <>
                 {selectedRole === "Super Admin" ? (
                   /* ─── SUPER ADMIN LOGIN VIEW ─── */
-                  <div className="relative space-y-6 bg-slate-950/80 border border-slate-800 backdrop-blur-3xl rounded-3xl p-8 md:p-10 shadow-[0_0_50px_rgba(0,0,0,0.65)]">
-                    <div className="flex items-center gap-4 border-b border-slate-850 pb-5 mb-2 text-left">
+                  <div className="relative space-y-6 bg-zinc-950/40 border border-zinc-800/80 backdrop-blur-2xl rounded-3xl p-8 md:p-10 shadow-2xl animate-fadeInUp">
+                    <div className="flex items-center gap-4 border-b border-zinc-900 pb-5 mb-2 text-left">
                       <button
                         onClick={() => {
                           setSelectedRole(null);
                           setError(null);
                         }}
-                        className="w-9 h-9 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-900 shadow-sm flex items-center justify-center text-slate-400 hover:text-white cursor-pointer transition-all active:scale-90"
+                        className="w-9 h-9 rounded-xl border border-zinc-800 bg-zinc-950 hover:bg-zinc-900 shadow-sm flex items-center justify-center text-slate-400 hover:text-white cursor-pointer transition-all active:scale-90"
                       >
                         <ArrowLeft className="w-4 h-4" />
                       </button>
@@ -217,14 +252,14 @@ export default function LoginPage() {
                         <span className="text-[9px] font-bold font-mono px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-400 uppercase tracking-wider">
                           Super Admin Login
                         </span>
-                        <h2 className="text-sm font-extrabold text-slate-350 mt-1 leading-none">
+                        <h2 className="text-sm font-extrabold text-zinc-355 mt-1 leading-none">
                           NetraID Portal Management
                         </h2>
                       </div>
                     </div>
 
                     {error && (
-                      <div className="flex items-start gap-2 bg-rose-500/5 border border-rose-500/15 text-rose-455 p-3 rounded-xl mb-4 text-xs animate-fadeInUp">
+                      <div className="flex items-start gap-2 bg-rose-500/5 border border-rose-500/15 text-rose-400 p-3 rounded-xl mb-4 text-xs animate-fadeInUp">
                         <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
                         <span className="leading-relaxed">{error}</span>
                       </div>
@@ -234,14 +269,14 @@ export default function LoginPage() {
                       <div className="space-y-1.5 text-left">
                         <label className="block text-[9.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">Email Address</label>
                         <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
                           <input
                             type="email"
                             required
                             placeholder="admin@netraid.ai"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="login-input w-full text-xs h-11 pl-9 pr-4 rounded-xl border border-slate-800 bg-slate-950/60 text-white focus:outline-none focus:border-cyan-500 placeholder-slate-500 focus:ring-1 focus:ring-cyan-500/20 transition-all"
+                            className="w-full text-xs h-11 pl-9 pr-4 rounded-xl border border-zinc-800 bg-zinc-900 text-white focus:outline-none focus:border-cyan-500 placeholder-zinc-500 transition-all font-semibold login-input-dark"
                           />
                         </div>
                       </div>
@@ -249,19 +284,19 @@ export default function LoginPage() {
                       <div className="space-y-1.5 text-left">
                         <label className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">Password</label>
                         <div className="relative">
-                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
                           <input
                             type={showPass ? "text" : "password"}
                             required
                             placeholder="••••••••"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="login-input w-full text-xs h-11 pl-9 pr-10 rounded-xl border border-slate-800 bg-slate-950/60 text-white focus:outline-none focus:border-cyan-500 placeholder-slate-500 focus:ring-1 focus:ring-cyan-500/20 transition-all"
+                            className="w-full text-xs h-11 pl-9 pr-10 rounded-xl border border-zinc-800 bg-zinc-900 text-white focus:outline-none focus:border-cyan-500 placeholder-zinc-500 transition-all font-semibold login-input-dark"
                           />
                           <button
                             type="button"
                             onClick={() => setShowPass(!showPass)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors cursor-pointer"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors cursor-pointer"
                           >
                             {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                           </button>
@@ -271,7 +306,7 @@ export default function LoginPage() {
                       <button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-11 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-slate-950 font-black tracking-wider text-xs rounded-xl shadow-md hover:shadow-lg transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center mt-2"
+                        className="w-full h-11 btn-skeuomorphic-white text-xs rounded-xl flex items-center justify-center mt-2 cursor-pointer"
                       >
                         {loading ? "Authenticating..." : "Sign In"}
                       </button>
@@ -279,18 +314,18 @@ export default function LoginPage() {
                   </div>
                 ) : matchedCompany === null ? (
                   /* ─── PHASE 1: ORG LOOKUP ─── */
-                  <div className="relative space-y-6 bg-slate-950/80 border border-slate-800 backdrop-blur-3xl rounded-3xl p-8 md:p-10 shadow-[0_0_50px_rgba(0,0,0,0.65)]">
-                    <div className="text-center lg:text-left space-y-1.5">
-                      <h2 className="text-base font-black text-white tracking-tight uppercase tracking-wider">
+                  <div className="relative space-y-6 bg-zinc-955 border border-zinc-800 backdrop-blur-2xl rounded-3xl p-8 md:p-10 shadow-2xl animate-fadeInUp">
+                    <div className="space-y-2 text-center md:text-left">
+                      <h2 className="text-base font-extrabold text-white tracking-tight uppercase font-mono">
                         Find Your Organization
                       </h2>
-                      <p className="text-[11px] text-slate-400 font-light leading-relaxed">
-                        Enter your company legal name to sign in or perform self-onboarding.
+                      <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
+                        Enter your company name to sign in or perform self-onboarding.
                       </p>
                     </div>
 
                     {error && (
-                      <div className="flex items-start gap-2 bg-rose-500/5 border border-rose-500/15 text-rose-455 p-3 rounded-xl text-xs animate-fadeInUp animate-pulse">
+                      <div className="flex items-start gap-2 bg-rose-500/5 border border-rose-500/15 text-rose-400 p-3 rounded-xl text-xs animate-fadeInUp">
                         <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
                         <span className="leading-relaxed">{error}</span>
                       </div>
@@ -307,26 +342,26 @@ export default function LoginPage() {
                           placeholder="e.g. NetraID Base"
                           value={lookupName}
                           onChange={(e) => setLookupName(e.target.value)}
-                          className="login-input w-full text-xs h-11 px-4 rounded-xl border border-slate-800 bg-slate-950/60 text-white focus:outline-none focus:border-cyan-500 placeholder-slate-600 focus:ring-1 focus:ring-cyan-500/20 transition-all"
+                          className="w-full text-xs h-11 px-4 rounded-xl border border-zinc-800 bg-zinc-900 text-white focus:outline-none focus:border-cyan-500 placeholder-zinc-550 transition-all font-semibold login-input-dark"
                         />
                       </div>
                       <button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-11 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-slate-950 font-black tracking-wider text-xs rounded-xl shadow-md hover:shadow-lg transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-1.5"
+                        className="w-full h-11 btn-skeuomorphic-white text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
                       >
                         {loading ? "Checking..." : "Continue"}
                         <ArrowRight className="w-4 h-4" />
                       </button>
                     </form>
 
-                    <div className="text-center pt-4 border-t border-slate-900/60">
+                    <div className="text-center pt-4 border-t border-zinc-900/60">
                       <button
                         onClick={() => {
                           setSelectedRole("Super Admin");
                           handleRoleSelect("Super Admin");
                         }}
-                        className="text-[10.5px] text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+                        className="text-[10.5px] text-slate-500 hover:text-slate-355 transition-colors cursor-pointer"
                       >
                         Access Super Admin Portal
                       </button>
@@ -334,19 +369,19 @@ export default function LoginPage() {
                   </div>
                 ) : isSelfOnboarding ? (
                   /* ─── PHASE 3: SELF-ONBOARDING DETAILS FORM ─── */
-                  <div className="relative space-y-6 bg-slate-950/80 border border-slate-800 backdrop-blur-3xl rounded-3xl p-8 md:p-10 shadow-[0_0_50px_rgba(0,0,0,0.65)]">
-                    <div className="flex items-center gap-4 border-b border-slate-850 pb-5 mb-2 text-left">
+                  <div className="relative space-y-6 bg-zinc-950/40 border border-zinc-800/80 backdrop-blur-2xl rounded-3xl p-8 md:p-10 shadow-2xl animate-fadeInUp">
+                    <div className="flex items-center gap-4 border-b border-zinc-900 pb-5 mb-2 text-left">
                       <button
                         onClick={() => {
                           setIsSelfOnboarding(false);
                           setError(null);
                         }}
-                        className="w-9 h-9 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-900 shadow-sm flex items-center justify-center text-slate-400 hover:text-white cursor-pointer transition-all active:scale-90"
+                        className="w-9 h-9 rounded-xl border border-zinc-800 bg-zinc-950 hover:bg-zinc-900 shadow-sm flex items-center justify-center text-slate-400 hover:text-white cursor-pointer transition-all active:scale-90"
                       >
                         <ArrowLeft className="w-4 h-4" />
                       </button>
                       <div className="flex-1 min-w-0">
-                        <span className="text-[9px] font-bold font-mono px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-400 uppercase tracking-wider">
+                        <span className="text-[9px] font-bold font-mono px-2 py-0.5 rounded bg-cyan-955 border border-cyan-805 text-cyan-405 uppercase tracking-wider">
                           Self-Onboarding Details
                         </span>
                         <h2 className="text-lg font-black text-white mt-1 leading-tight">
@@ -356,7 +391,7 @@ export default function LoginPage() {
                     </div>
 
                     {error && (
-                      <div className="flex items-start gap-2 bg-rose-500/5 border border-rose-500/15 text-rose-455 p-3 rounded-xl mb-3 text-xs animate-fadeInUp">
+                      <div className="flex items-start gap-2 bg-rose-500/5 border border-rose-500/15 text-rose-400 p-3 rounded-xl mb-3 text-xs animate-fadeInUp">
                         <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
                         <span className="leading-relaxed">{error}</span>
                       </div>
@@ -367,19 +402,19 @@ export default function LoginPage() {
                         <div className="space-y-1.5 text-left">
                           <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Full Name</label>
                           <input type="text" required placeholder="John Doe" value={empName} onChange={e => setEmpName(e.target.value)}
-                            className="login-input w-full text-xs h-10 px-3.5 rounded-xl border border-slate-800 bg-slate-950/60 text-white focus:outline-none focus:border-cyan-500 placeholder-slate-600 focus:ring-1 focus:ring-cyan-500/20 transition-all" />
+                            className="w-full text-xs h-10 px-3.5 rounded-xl border border-zinc-800 bg-zinc-900 text-white focus:outline-none focus:border-cyan-500 placeholder-zinc-500 transition-all font-semibold login-input-dark" />
                         </div>
                         <div className="space-y-1.5 text-left">
                           <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Employee ID</label>
                           <input type="text" required placeholder="EMP102" value={empIdInput} onChange={e => setEmpIdInput(e.target.value)}
-                            className="login-input w-full text-xs h-10 px-3.5 rounded-xl border border-slate-800 bg-slate-950/60 text-white focus:outline-none focus:border-cyan-500 placeholder-slate-600 focus:ring-1 focus:ring-cyan-500/20 transition-all" />
+                            className="w-full text-xs h-10 px-3.5 rounded-xl border border-zinc-800 bg-zinc-900 text-white focus:outline-none focus:border-cyan-500 placeholder-zinc-500 transition-all font-semibold" />
                         </div>
                       </div>
 
                       <div className="space-y-1.5 text-left">
                         <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Email Address</label>
                         <input type="email" required placeholder="john@company.com" value={empEmail} onChange={e => setEmpEmail(e.target.value)}
-                          className="login-input w-full text-xs h-10 px-3.5 rounded-xl border border-slate-800 bg-slate-950/60 text-white focus:outline-none focus:border-cyan-500 placeholder-slate-600 focus:ring-1 focus:ring-cyan-500/20 transition-all" />
+                          className="w-full text-xs h-10 px-3.5 rounded-xl border border-zinc-800 bg-zinc-900 text-white focus:outline-none focus:border-cyan-500 placeholder-zinc-500 transition-all font-semibold login-input-dark" />
                       </div>
 
                       <div className="space-y-1.5 text-left">
@@ -391,7 +426,7 @@ export default function LoginPage() {
                             placeholder="••••••••" 
                             value={empPassword} 
                             onChange={e => setEmpPassword(e.target.value)}
-                            className="login-input w-full text-xs h-10 pl-3.5 pr-10 rounded-xl border border-slate-800 bg-slate-950/60 text-white focus:outline-none focus:border-cyan-500 placeholder-slate-600 focus:ring-1 focus:ring-cyan-500/20 transition-all" 
+                            className="w-full text-xs h-10 pl-3.5 pr-10 rounded-xl border border-zinc-800 bg-zinc-900 text-white focus:outline-none focus:border-cyan-500 placeholder-zinc-500 transition-all font-semibold login-input-dark" 
                           />
                           <button
                             type="button"
@@ -408,19 +443,37 @@ export default function LoginPage() {
                         <div className="space-y-1.5 text-left">
                           <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Designation</label>
                           <input type="text" placeholder="Software Engineer" value={empDesignation} onChange={e => setEmpDesignation(e.target.value)}
-                            className="login-input w-full text-xs h-10 px-3.5 rounded-xl border border-slate-800 bg-slate-950/60 text-white focus:outline-none focus:border-cyan-500 placeholder-slate-600 focus:ring-1 focus:ring-cyan-500/20 transition-all" />
+                            className="w-full text-xs h-10 px-3.5 rounded-xl border border-zinc-800 bg-zinc-900 text-white focus:outline-none focus:border-cyan-500 placeholder-zinc-500 transition-all font-semibold login-input-dark" />
                         </div>
                         <div className="space-y-1.5 text-left">
-                          <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Phone</label>
-                          <input type="text" placeholder="9876543210" value={empPhone} onChange={e => setEmpPhone(e.target.value)}
-                            className="login-input w-full text-xs h-10 px-3.5 rounded-xl border border-slate-800 bg-slate-950/60 text-white focus:outline-none focus:border-cyan-500 placeholder-slate-600 focus:ring-1 focus:ring-cyan-500/20 transition-all" />
+                          <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Department</label>
+                          <div className="relative">
+                            <select 
+                              required 
+                              value={empDeptId} 
+                              onChange={e => setEmpDeptId(e.target.value)}
+                              className="w-full text-xs h-10 pl-3.5 pr-8 rounded-xl border border-zinc-800 bg-zinc-900 text-white focus:outline-none focus:border-cyan-500 appearance-none cursor-pointer font-semibold login-input-dark"
+                            >
+                              <option value="">Select Department</option>
+                              {availableDepts.map((d: any) => (
+                                <option key={d.id} value={d.id}>{d.name}</option>
+                              ))}
+                            </select>
+                            <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                          </div>
                         </div>
+                      </div>
+
+                      <div className="space-y-1.5 text-left">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Phone</label>
+                        <input type="text" placeholder="9876543210" value={empPhone} onChange={e => setEmpPhone(e.target.value)}
+                          className="w-full text-xs h-10 px-3.5 rounded-xl border border-zinc-800 bg-zinc-900 text-white focus:outline-none focus:border-cyan-500 placeholder-zinc-500 transition-all font-semibold login-input-dark" />
                       </div>
 
                       <button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-11 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-slate-950 font-black tracking-wider text-xs rounded-xl shadow-md hover:shadow-lg transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-1.5 mt-2"
+                        className="w-full h-11 btn-skeuomorphic-white text-xs rounded-xl flex items-center justify-center gap-1.5 mt-2 cursor-pointer"
                       >
                         {loading ? "Registering..." : "Continue to Face Scans"}
                         <ArrowRight className="w-4 h-4" />
@@ -429,22 +482,22 @@ export default function LoginPage() {
                   </div>
                 ) : selectedRole !== null ? (
                   /* ─── STANDARD SIGN IN CARD FORM ─── */
-                  <div className="relative space-y-6 bg-slate-950/80 border border-slate-800 backdrop-blur-3xl rounded-3xl p-8 md:p-10 shadow-[0_0_50px_rgba(0,0,0,0.65)]">
-                    <div className="flex items-center gap-4 border-b border-slate-850 pb-5 mb-2 text-left">
+                  <div className="relative space-y-6 bg-zinc-955 border border-zinc-800 backdrop-blur-2xl rounded-3xl p-8 md:p-10 shadow-2xl animate-fadeInUp">
+                    <div className="flex items-center gap-4 border-b border-zinc-900 pb-5 mb-2 text-left">
                       <button
                         onClick={() => {
                           setSelectedRole(null);
                           setError(null);
                         }}
-                        className="w-9 h-9 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-900 shadow-sm flex items-center justify-center text-slate-400 hover:text-white cursor-pointer transition-all active:scale-90"
+                        className="w-9 h-9 rounded-xl border border-zinc-800 bg-zinc-900 hover:bg-zinc-950 shadow-sm flex items-center justify-center text-slate-400 hover:text-white cursor-pointer transition-all active:scale-90"
                       >
                         <ArrowLeft className="w-4 h-4" />
                       </button>
                       <div>
-                        <span className="text-[9px] font-bold font-mono px-2 py-0.5 rounded bg-cyan-955 border border-cyan-850 text-cyan-400 uppercase tracking-wider">
+                        <span className="text-[9px] font-bold font-mono px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-400 uppercase tracking-wider font-mono">
                           {selectedRole} Login
                         </span>
-                        <h2 className="text-sm font-extrabold text-slate-350 mt-1 leading-none">
+                        <h2 className="text-sm font-extrabold text-zinc-355 mt-1 leading-none">
                           {matchedCompany.name}
                         </h2>
                       </div>
@@ -459,40 +512,36 @@ export default function LoginPage() {
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                       <div className="space-y-1.5 text-left">
-                        <label className="block text-[9.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-                          Email Address
-                        </label>
+                        <label className="block text-[9.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">Email Address</label>
                         <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
                           <input
                             type="email"
                             required
                             placeholder="name@organization.com"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="login-input w-full text-xs h-11 pl-9 pr-4 rounded-xl border border-slate-800 bg-slate-950/60 text-white focus:outline-none focus:border-cyan-500 placeholder-slate-500 focus:ring-1 focus:ring-cyan-500/20 transition-all"
+                            className="w-full text-xs h-11 pl-9 pr-4 rounded-xl border border-zinc-800 bg-zinc-900 text-white focus:outline-none focus:border-cyan-500 placeholder-zinc-500 transition-all font-semibold login-input-dark"
                           />
                         </div>
                       </div>
 
                       <div className="space-y-1.5 text-left">
-                        <label className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-                          Password
-                        </label>
+                        <label className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">Password</label>
                         <div className="relative">
-                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
                           <input
                             type={showPass ? "text" : "password"}
                             required
                             placeholder="••••••••"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="login-input w-full text-xs h-11 pl-9 pr-10 rounded-xl border border-slate-800 bg-slate-950/60 text-white focus:outline-none focus:border-cyan-500 placeholder-slate-500 focus:ring-1 focus:ring-cyan-500/20 transition-all"
+                            className="w-full text-xs h-11 pl-9 pr-10 rounded-xl border border-zinc-800 bg-zinc-900 text-white focus:outline-none focus:border-cyan-500 placeholder-zinc-500 transition-all font-semibold login-input-dark"
                           />
                           <button
                             type="button"
                             onClick={() => setShowPass(!showPass)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors cursor-pointer"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-505 hover:text-white transition-colors cursor-pointer"
                           >
                             {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                           </button>
@@ -502,99 +551,80 @@ export default function LoginPage() {
                       <button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-11 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-slate-950 font-black tracking-wider text-xs rounded-xl shadow-md hover:shadow-lg transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center mt-2"
+                        className="w-full h-11 btn-skeuomorphic-white text-xs rounded-xl flex items-center justify-center mt-2 cursor-pointer"
                       >
-                        {loading ? "Authenticating..." : `Sign In`}
+                        {loading ? "Authenticating..." : "Sign In"}
                       </button>
                     </form>
                   </div>
                 ) : (
                   /* ─── PHASE 2: SCOPED OPTIONS FOR MATCHED COMPANY ─── */
-                  <div className="relative space-y-5 bg-slate-950/85 border border-cyan-500/10 backdrop-blur-3xl rounded-3xl p-8 md:p-10 shadow-[0_0_50px_rgba(0,0,0,0.65),0_0_30px_rgba(6,182,212,0.03)] animate-fadeInUp">
-                    <div className="flex items-center gap-4 border-b border-slate-900 pb-5 mb-3 text-left">
+                  <div className="relative space-y-4 bg-zinc-950/35 border border-zinc-900/60 backdrop-blur-xl rounded-2xl p-6 shadow-xl animate-fadeInUp">
+                    <div className="flex items-center gap-3 mb-2 text-left">
                       <button
                         onClick={() => {
                           setMatchedCompany(null);
+                          localStorage.removeItem("matchedCompany");
                           setError(null);
                         }}
-                        className="w-9 h-9 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-900/80 hover:border-slate-700/80 shadow-sm flex items-center justify-center text-slate-400 hover:text-cyan-400 cursor-pointer transition-all active:scale-90"
+                        className="w-8 h-8 rounded-lg border border-zinc-800 bg-zinc-900 hover:bg-zinc-850 shadow-sm flex items-center justify-center text-slate-400 hover:text-white cursor-pointer transition-all active:scale-90"
+                        title="Go back"
                       >
-                        <ArrowLeft className="w-4 h-4" />
+                        <ArrowLeft className="w-3.5 h-3.5" />
                       </button>
-                      <div className="flex-1 min-w-0">
-                        <span className="inline-flex items-center gap-1.5 text-[9px] font-black font-mono px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 uppercase tracking-widest">
-                          <span className="w-1 h-1 rounded-full bg-cyan-400 animate-pulse" />
-                          Organization Verified
-                        </span>
-                        <h2 className="text-2xl font-black text-white mt-1.5 leading-none uppercase tracking-wide">
-                          {matchedCompany.name}
-                        </h2>
-                      </div>
+                      <span className="text-[10px] font-bold font-mono text-zinc-500 uppercase tracking-widest">
+                        Select login route
+                      </span>
                     </div>
 
-                    <div className="space-y-4 pt-1">
-                      <button
-                        onClick={() => {
-                          setSelectedRole("Admin");
-                          handleRoleSelect("Admin");
-                        }}
-                        className="w-full text-left p-5 rounded-2xl border border-slate-800/80 bg-slate-900/20 hover:border-cyan-500/30 hover:bg-slate-900/60 shadow-md hover:shadow-[0_0_25px_rgba(6,182,212,0.04)] transition-all duration-300 flex items-center gap-5 group cursor-pointer"
-                      >
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800/80 flex items-center justify-center text-cyan-400 group-hover:scale-105 transition-all shrink-0 shadow-inner">
-                          <Building2 className="w-5 h-5 text-cyan-400" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-bold text-slate-200 group-hover:text-cyan-400 transition-colors">
-                            Company Admin Sign In
-                          </p>
-                          <p className="text-[11px] text-slate-400 font-light mt-1">
-                            Manage company metrics and logs
-                          </p>
-                        </div>
-                        <ArrowRight className="w-4.5 h-4.5 text-slate-600 group-hover:translate-x-1.5 group-hover:text-cyan-400 transition-all" />
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setSelectedRole("Employee");
-                          handleRoleSelect("Employee");
-                        }}
-                        className="w-full text-left p-5 rounded-2xl border border-slate-800/80 bg-slate-900/20 hover:border-blue-500/30 hover:bg-slate-900/60 shadow-md hover:shadow-[0_0_25px_rgba(59,130,246,0.04)] transition-all duration-300 flex items-center gap-5 group cursor-pointer"
-                      >
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800/80 flex items-center justify-center text-blue-400 group-hover:scale-105 transition-all shrink-0 shadow-inner">
-                          <Users className="w-5 h-5 text-blue-400" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-bold text-slate-200 group-hover:text-blue-400 transition-colors">
-                            Employee Sign In
-                          </p>
-                          <p className="text-[11px] text-slate-455 font-light mt-1">
-                            Access attendance and punches
-                          </p>
-                        </div>
-                        <ArrowRight className="w-4.5 h-4.5 text-slate-600 group-hover:translate-x-1.5 group-hover:text-blue-400 transition-all" />
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setIsSelfOnboarding(true);
-                          setError(null);
-                        }}
-                        className="w-full text-left p-5 rounded-2xl border border-slate-800/80 bg-slate-900/20 hover:border-emerald-500/30 hover:bg-slate-900/60 shadow-md hover:shadow-[0_0_25px_rgba(16,185,129,0.04)] transition-all duration-300 flex items-center gap-5 group cursor-pointer"
-                      >
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-805 flex items-center justify-center text-emerald-455 group-hover:scale-105 transition-all shrink-0 shadow-inner">
-                          <Users className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-bold text-slate-200 group-hover:text-emerald-400 transition-colors">
-                            New Employee Self-Onboarding
-                          </p>
-                          <p className="text-[11px] text-slate-455 font-light mt-1">
-                            Register your account and biometrics
-                          </p>
-                        </div>
-                        <ArrowRight className="w-4.5 h-4.5 text-slate-605 group-hover:translate-x-1.5 group-hover:text-emerald-400 transition-all" />
-                      </button>
+                    <div className="space-y-2 pt-1">
+                      {[
+                        {
+                          role: "Admin",
+                          title: "Enterprise Admin Console",
+                          icon: <Building2 className="w-4 h-4" />,
+                          borderColor: "hover:border-cyan-500/20",
+                          accentColor: "text-cyan-400",
+                        },
+                        {
+                          role: "Employee",
+                          title: "Employee Sign In Portal",
+                          icon: <Users className="w-4 h-4" />,
+                          borderColor: "hover:border-blue-500/20",
+                          accentColor: "text-blue-400",
+                        },
+                        {
+                          role: "Self-Onboard",
+                          title: "Employee Self-Onboarding",
+                          icon: <Users className="w-4 h-4" />,
+                          borderColor: "hover:border-emerald-500/20",
+                          accentColor: "text-emerald-400",
+                        }
+                      ].map((item) => (
+                        <button
+                          key={item.role}
+                          onClick={() => {
+                            if (item.role === "Self-Onboard") {
+                              setIsSelfOnboarding(true);
+                              setError(null);
+                            } else {
+                              setSelectedRole(item.role as RoleType);
+                              handleRoleSelect(item.role as RoleType);
+                            }
+                          }}
+                          className={`w-full h-12 rounded-xl border border-zinc-800/80 bg-zinc-900/30 ${item.borderColor} hover:bg-zinc-900/60 shadow-xs transition-all duration-200 flex items-center justify-between px-4 group cursor-pointer active:scale-[0.98]`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center ${item.accentColor} group-hover:scale-105 transition-all shrink-0`}>
+                              {item.icon}
+                            </div>
+                            <span className="text-[11.5px] font-bold text-zinc-300 group-hover:text-white transition-colors">
+                              {item.title}
+                            </span>
+                          </div>
+                          <ArrowRight className="w-3.5 h-3.5 text-zinc-650 group-hover:translate-x-1 group-hover:text-white transition-all" />
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}
