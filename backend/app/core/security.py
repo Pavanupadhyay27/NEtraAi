@@ -29,10 +29,6 @@ def get_password_hash(password: str) -> str:
     # Hash password using bcrypt salt
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl=f"{settings.API_V1_STR}/auth/login"
-)
-
 def create_access_token(subject: Union[str, Any], role: str, expires_delta: timedelta = None) -> str:
     if expires_delta:
         expire = datetime.utcnow() + expires_delta

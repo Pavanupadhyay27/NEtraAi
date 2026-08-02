@@ -1,11 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response, UploadFile, File, Form
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel
-from typing import Optional, List
 from sqlalchemy.orm import Session
-from sqlalchemy import select, and_
 from datetime import timedelta
-from jose import jwt, JWTError
 
 from app.core.database import get_db
 from app.core import security

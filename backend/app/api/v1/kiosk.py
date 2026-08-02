@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import Optional
 import base64
 import cv2
@@ -78,8 +77,6 @@ def calculate_distance_meters(lat1: float, lon1: float, lat2: float, lon2: float
     c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
     return R * c
 
-from pydantic import BaseModel, Field, validator
-
 class KioskScanRequest(BaseModel):
     image: Optional[str] = Field(None, description="Base64 encoded image frame (JPEG/PNG data URL)")
     camera: str = Field("Main Kiosk", description="Identifier of the kiosk scanner device")
@@ -95,6 +92,18 @@ class KioskScanRequest(BaseModel):
     def validate_image_payload(cls, v):
         if v and len(v) > 20 * 1024 * 1024:  # ~15MB raw image cap
             raise ValueError("Image payload size exceeds maximum limit of 15MB")
+        return v
+
+    @validator("latitude")
+    def validate_latitude_bounds(cls, v):
+        if v is not None and (v < -90.0 or v > 90.0):
+            raise ValueError("Latitude must be between -90 and 90 degrees")
+        return v
+
+    @validator("longitude")
+    def validate_longitude_bounds(cls, v):
+        if v is not None and (v < -180.0 or v > 180.0):
+            raise ValueError("Longitude must be between -180 and 180 degrees")
         return v
 
 
