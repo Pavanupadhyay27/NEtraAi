@@ -253,7 +253,51 @@ export default function SettingsPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           
           {/* Sidebar Tabs */}
-          <div className="md:col-span-1 flex flex-col gap-2">
+          {/* Mobile Horizontal Tabs */}
+          <div className="md:hidden flex gap-2 overflow-x-auto whitespace-nowrap scrollbar-none pb-2">
+            {isSuperAdmin ? (
+              <>
+                {(["security", "saas_tiers", "ai_engine", "backups"] as const).map((tab) => {
+                  const label = tab === "security" ? "Security" : tab === "saas_tiers" ? "SaaS Tiers" : tab === "ai_engine" ? "AI Defaults" : "Backups";
+                  return (
+                    <button
+                      key={tab}
+                      onClick={() => setSuperTab(tab)}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        superTab === tab
+                          ? "bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-950 font-black shadow-sm"
+                          : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </>
+            ) : (
+              <>
+                {(["biometrics", "camera", "location", "customization"] as const).map((tab) => {
+                  const label = tab === "biometrics" ? "Biometrics" : tab === "camera" ? "Camera" : tab === "location" ? "Geofence" : "Branding";
+                  return (
+                    <button
+                      key={tab}
+                      onClick={() => setAdminTab(tab)}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        adminTab === tab
+                          ? "bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-950 font-black shadow-sm"
+                          : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </>
+            )}
+          </div>
+
+          {/* Desktop Vertical Tabs */}
+          <div className="hidden md:flex md:col-span-1 flex-col gap-2">
             {isSuperAdmin ? (
               <>
                 <button

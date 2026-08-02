@@ -676,8 +676,8 @@ export default function TicketsPage() {
                     const avatarColor = avatarColors[selectedTicket.employee?.id % avatarColors.length] || avatarColors[0];
 
                     return (
-                      <div className="p-4 border-b border-zinc-150 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-950/20 backdrop-blur-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shrink-0">
-                        <div className="flex items-center gap-3 min-w-0">
+                      <div className="p-3 border-b border-zinc-150 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-950/20 backdrop-blur-md flex flex-row items-center justify-between gap-2 shrink-0">
+                        <div className="flex items-center gap-2 min-w-0">
                           <button 
                             onClick={() => setSelectedTicket(null)}
                             className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-550 dark:text-zinc-455 cursor-pointer transition-all active:scale-90 duration-200"
@@ -713,7 +713,7 @@ export default function TicketsPage() {
                         </div>
                         
                         {/* Status & Options Action Strip */}
-                        <div className="flex items-center gap-2.5 self-end sm:self-auto pl-10 md:pl-0">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           
                           <button 
                             onClick={() => {

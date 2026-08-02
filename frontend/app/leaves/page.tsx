@@ -332,7 +332,7 @@ export default function LeavesManagementPage() {
           </div>
 
           {/* Tabs */}
-          <div className="flex bg-zinc-100 dark:bg-zinc-950 p-1 rounded-xl border border-zinc-200/60 dark:border-zinc-850">
+          <div className="flex bg-zinc-100 dark:bg-zinc-950 p-1 rounded-xl border border-zinc-200/60 dark:border-zinc-850 overflow-x-auto whitespace-nowrap scrollbar-none w-full sm:w-auto">
             {(["Pending", "Approved", "Rejected", "All"] as const).map((tab) => {
               const count = tab === "Pending" ? pendingCount : tab === "Approved" ? approvedCount : tab === "Rejected" ? rejectedCount : leaves.length;
               return (
@@ -434,7 +434,7 @@ export default function LeavesManagementPage() {
                   </div>
 
                   {/* Actions Block */}
-                  <div className="shrink-0 flex items-center gap-2 self-end md:self-auto" onClick={(e) => e.stopPropagation()}>
+                  <div className="shrink-0 flex items-center gap-2 w-full md:w-auto justify-end mt-2.5 md:mt-0" onClick={(e) => e.stopPropagation()}>
                     {leave.status === "Pending" ? (
                       <>
                         <button
