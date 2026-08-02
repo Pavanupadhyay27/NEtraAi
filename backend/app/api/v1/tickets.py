@@ -104,6 +104,20 @@ def reply_to_ticket(
             
     db_message = crud.create_ticket_message(db, ticket_id=id, msg=message, sender_id=current_user.id)
     
+    # Notify employee if admin/HR replies
+    if db_ticket.employee and db_ticket.employee.user_id and db_ticket.employee.user_id != current_user.id:
+        db_ntf = models.Notification(
+            company_id=db_ticket.company_id,
+            recipient_id=db_ticket.employee.user_id,
+            sender_id=current_user.id,
+            title="New Support Ticket Reply",
+            message=f"New message on ticket #{db_ticket.id} ('{db_ticket.title}'): \"{message.message[:60]}...\"",
+            category="HR",
+            priority="Medium"
+        )
+        db.add(db_ntf)
+        db.commit()
+    
     # Broadcast reply to SSE stream
     from app.core import event_bus
     event_payload = {
@@ -207,6 +221,20 @@ def update_ticket(
         raise HTTPException(status_code=403, detail="Only HR or administrators can resolve support tickets")
         
     updated = crud.update_ticket_status(db, ticket_id=id, status=payload.status)
+    
+    # Notify employee if ticket status is changed
+    if db_ticket.employee and db_ticket.employee.user_id:
+        db_ntf = models.Notification(
+            company_id=db_ticket.company_id,
+            recipient_id=db_ticket.employee.user_id,
+            sender_id=current_user.id,
+            title=f"Ticket #{db_ticket.id} {payload.status}",
+            message=f"Your support ticket #{db_ticket.id} ('{db_ticket.title}') has been marked as {payload.status.lower()}.",
+            category="HR",
+            priority="Medium"
+        )
+        db.add(db_ntf)
+        db.commit()
     
     crud.create_audit_log(
         db=db,

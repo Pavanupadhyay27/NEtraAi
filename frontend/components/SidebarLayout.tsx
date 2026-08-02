@@ -24,9 +24,11 @@ import {
   TrendingUp,
   Calendar,
   FileText,
-  Shield
+  Shield,
+  Bell,
+  BellRing
 } from "lucide-react";
-import { getAccessToken, getUserProfile, clearTokens } from "@/app/utils/api";
+import { getAccessToken, getUserProfile, clearTokens, fetchApi } from "@/app/utils/api";
 import CommandPalette from "@/components/CommandPalette";
 
 function NavLink({ 
@@ -78,6 +80,91 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [authorized, setAuthorized] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  function playNotificationSound() {
+    if (typeof window !== "undefined") {
+      try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        const audioCtx = new AudioContextClass();
+        if (audioCtx.state === "suspended") audioCtx.resume();
+        const now = audioCtx.currentTime;
+        
+        // Double chime
+        const osc1 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        osc1.type = "sine";
+        osc1.frequency.setValueAtTime(587.33, now); // D5
+        gain1.gain.setValueAtTime(0, now);
+        gain1.gain.linearRampToValueAtTime(0.15, now + 0.05);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        osc1.connect(gain1);
+        gain1.connect(audioCtx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.35);
+
+        const osc2 = audioCtx.createOscillator();
+        const gain2 = audioCtx.createGain();
+        osc2.type = "sine";
+        osc2.frequency.setValueAtTime(880, now + 0.1); // A5
+        gain2.gain.setValueAtTime(0, now + 0.1);
+        gain2.gain.linearRampToValueAtTime(0.15, now + 0.15);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+        osc2.connect(gain2);
+        gain2.connect(audioCtx.destination);
+        osc2.start(now + 0.1);
+        osc2.stop(now + 0.5);
+      } catch (e) {
+        console.error("Audio Context playback failed", e);
+      }
+    }
+  }
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetchApi("/notifications");
+      if (Array.isArray(res)) {
+        setNotifications(prev => {
+          // Play sound ONLY if there is a NEW unread notification compared to what we currently have
+          const hasNewUnread = res.some(newN => !newN.is_read && !prev.some(oldN => oldN.id === newN.id));
+          if (hasNewUnread && prev.length > 0) {
+            playNotificationSound();
+          }
+          return res;
+        });
+      }
+    } catch (e) {
+      console.error("Failed to fetch notifications", e);
+    }
+  };
+
+  useEffect(() => {
+    if (authorized) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 10000); // Poll every 10 seconds
+      return () => clearInterval(interval);
+    }
+  }, [authorized]);
+
+  const markAsRead = async (id: number) => {
+    try {
+      await fetchApi(`/notifications/${id}/read`, { method: "PUT" });
+      fetchNotifications();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      const unread = notifications.filter(n => !n.is_read);
+      await Promise.all(unread.map(n => fetchApi(`/notifications/${n.id}/read`, { method: "PUT" })));
+      fetchNotifications();
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
@@ -426,6 +513,85 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
           )}
         </div>
         <div className="flex items-center gap-2">
+          {/* Notification Bell with Dropdown (Mobile) */}
+          <div className="relative">
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="p-2 rounded-lg hover:bg-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all cursor-pointer relative flex items-center justify-center"
+              title="Notifications"
+            >
+              {notifications.filter(n => !n.is_read).length > 0 ? (
+                <>
+                  <BellRing className="w-5 h-5 text-cyan-500 animate-pulse" />
+                  <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500 text-[9px] font-black text-white ring-2 ring-white dark:ring-zinc-900 leading-none">
+                    {notifications.filter(n => !n.is_read).length}
+                  </span>
+                </>
+              ) : (
+                <Bell className="w-5 h-5" />
+              )}
+            </button>
+
+            {showNotifications && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setShowNotifications(false)} 
+                />
+                <div className="absolute right-0 mt-2 w-72 max-h-[300px] overflow-y-auto bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl z-50 p-3.5 animate-fadeInUp">
+                  <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2 mb-2.5">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)]">Notifications</span>
+                    {notifications.filter(n => !n.is_read).length > 0 && (
+                      <button
+                        onClick={markAllAsRead}
+                        className="text-[9px] font-bold text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer"
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {notifications.length === 0 ? (
+                      <p className="text-[11px] text-[var(--text-muted)] text-center py-6 font-medium">No new notifications</p>
+                    ) : (
+                      notifications.map((n) => (
+                        <div 
+                          key={n.id}
+                          onClick={() => {
+                            if (!n.is_read) markAsRead(n.id);
+                          }}
+                          className={`p-2.5 rounded-xl border text-[11px] transition-all cursor-pointer text-left ${
+                            n.is_read 
+                              ? "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)]" 
+                              : "bg-[var(--border-subtle)]/30 border-cyan-500/20 text-[var(--text-primary)] hover:bg-[var(--border-subtle)]/50"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-1 mb-1">
+                            <span className="font-bold tracking-tight truncate">{n.title}</span>
+                            <span className={`text-[7.5px] uppercase font-mono px-1 rounded-sm ${
+                              n.priority === "High" 
+                                ? "bg-rose-500/10 text-rose-500" 
+                                : n.priority === "Medium"
+                                  ? "bg-amber-500/10 text-amber-500"
+                                  : "bg-zinc-500/10 text-zinc-500"
+                            }`}>
+                              {n.priority}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed">{n.message}</p>
+                          <span className="text-[7.5px] font-mono text-[var(--text-muted)] block mt-1.5">
+                            {new Date(n.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
           {/* Theme Toggle Mobile */}
           <button
             onClick={toggleTheme}
@@ -526,6 +692,85 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
                 <>
                   <span className="text-[var(--border-subtle)] px-1">|</span>
                   <span className="tabular-nums font-bold text-[var(--text-primary)]">{currentTime}</span>
+                </>
+              )}
+            </div>
+
+            {/* Notification Bell with Dropdown (Desktop) */}
+            <div className="relative">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="p-2 rounded-lg hover:bg-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all cursor-pointer relative flex items-center justify-center"
+                title="Notifications"
+              >
+                {notifications.filter(n => !n.is_read).length > 0 ? (
+                  <>
+                    <BellRing className="w-5 h-5 text-cyan-500 animate-pulse" />
+                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500 text-[9px] font-black text-white ring-2 ring-white dark:ring-zinc-900 leading-none">
+                      {notifications.filter(n => !n.is_read).length}
+                    </span>
+                  </>
+                ) : (
+                  <Bell className="w-5 h-5" />
+                )}
+              </button>
+
+              {showNotifications && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setShowNotifications(false)} 
+                  />
+                  <div className="absolute right-0 mt-2 w-80 max-h-[350px] overflow-y-auto bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl z-50 p-4 animate-fadeInUp">
+                    <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2.5 mb-3">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)]">Notifications</span>
+                      {notifications.filter(n => !n.is_read).length > 0 && (
+                        <button
+                          onClick={markAllAsRead}
+                          className="text-[9px] font-bold text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer"
+                        >
+                          Mark all read
+                        </button>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-2.5">
+                      {notifications.length === 0 ? (
+                        <p className="text-[11px] text-[var(--text-muted)] text-center py-6 font-medium">No new notifications</p>
+                      ) : (
+                        notifications.map((n) => (
+                          <div 
+                            key={n.id}
+                            onClick={() => {
+                              if (!n.is_read) markAsRead(n.id);
+                            }}
+                            className={`p-2.5 rounded-xl border text-[11px] transition-all cursor-pointer text-left ${
+                              n.is_read 
+                                ? "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)]" 
+                                : "bg-[var(--border-subtle)]/30 border-cyan-500/20 text-[var(--text-primary)] hover:bg-[var(--border-subtle)]/50"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-1 mb-1">
+                              <span className="font-bold tracking-tight truncate">{n.title}</span>
+                              <span className={`text-[7.5px] uppercase font-mono px-1 rounded-sm ${
+                                n.priority === "High" 
+                                  ? "bg-rose-500/10 text-rose-500" 
+                                  : n.priority === "Medium"
+                                    ? "bg-amber-500/10 text-amber-500"
+                                    : "bg-zinc-500/10 text-zinc-500"
+                              }`}>
+                                {n.priority}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed">{n.message}</p>
+                            <span className="text-[7.5px] font-mono text-[var(--text-muted)] block mt-1.5">
+                              {new Date(n.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </>
               )}
             </div>

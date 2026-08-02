@@ -129,6 +129,20 @@ def update_leave(
     updated = crud.update_leave_status(db, id=id, status=data.status, admin_user_id=current_user.id)
     if not updated:
       raise HTTPException(status_code=404, detail="Leave request not found")
+
+    if emp.user_id:
+        db_ntf = models.Notification(
+            company_id=emp.company_id,
+            recipient_id=emp.user_id,
+            sender_id=current_user.id,
+            title=f"Leave Request {data.status}",
+            message=f"Your leave request from {db_req.start_date} to {db_req.end_date} has been {data.status.lower()} by the administrator.",
+            category="Leave",
+            priority="High"
+        )
+        db.add(db_ntf)
+        db.commit()
+
     return updated
 
 
