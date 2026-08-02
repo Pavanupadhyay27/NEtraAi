@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
+from pydantic import BaseModel
+from typing import Optional, List
 
 from app.core.database import get_db
 from app.core import security
