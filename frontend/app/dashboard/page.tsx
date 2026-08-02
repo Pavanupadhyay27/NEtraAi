@@ -844,7 +844,7 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className="lg:col-span-8 tech-card-3d p-5">
               <h3 className="text-xs font-bold text-slate-900 dark:text-zinc-200 uppercase tracking-wider mb-4 font-mono">Ledger History</h3>
-              <div className="overflow-x-auto">
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-slate-150 dark:border-zinc-800/80 text-slate-400 font-mono uppercase">
@@ -909,6 +909,67 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile View Card List */}
+              <div className="md:hidden space-y-3">
+                {loadingHistory ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 p-4 rounded-xl space-y-2">
+                      <div className="flex justify-between"><div className="skeleton h-4 w-24" /><div className="skeleton h-5 w-14 rounded" /></div>
+                      <div className="flex justify-between"><div className="skeleton h-3 w-16" /><div className="skeleton h-3 w-16" /></div>
+                    </div>
+                  ))
+                ) : history && history.length > 0 ? (
+                  history.map((record: any) => {
+                    const checkInTime = record.check_in ? new Date(record.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—";
+                    const checkOutTime = record.check_out ? new Date(record.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—";
+                    const isSelected = selectedLedgerRecord?.id === record.id;
+                    return (
+                      <div 
+                        key={record.id}
+                        onClick={() => setSelectedLedgerRecord(record)}
+                        className={`bg-white dark:bg-zinc-900 border transition-all p-4 rounded-xl space-y-2.5 cursor-pointer ${
+                          isSelected 
+                            ? "bg-slate-50/90 dark:bg-zinc-800/50 border-cyan-500/80 shadow-3xs" 
+                            : "border-zinc-100 dark:border-zinc-800/70"
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-zinc-800 dark:text-zinc-200 text-xs">
+                            {new Date(record.date).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}
+                          </span>
+                          <span className={`text-[8.5px] font-mono px-2 py-0.5 rounded border font-semibold ${
+                            record.status === "Present" ? "bg-emerald-50 border-emerald-150 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900" :
+                            record.status === "Late" ? "bg-amber-50 border-amber-150 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900" :
+                            record.status === "WFH" ? "bg-blue-50 border-blue-150 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900" :
+                            "bg-rose-50 border-rose-150 text-rose-700 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900"
+                          }`}>
+                            {record.status}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-[10.5px] text-slate-500 dark:text-zinc-400">
+                          <div className="flex items-center gap-2">
+                            <div>
+                              <span className="text-[9px] text-slate-400 dark:text-zinc-500 mr-0.5">In:</span>
+                              <span className="font-mono font-semibold">{checkInTime}</span>
+                            </div>
+                            <div className="text-zinc-300 dark:text-zinc-700">|</div>
+                            <div>
+                              <span className="text-[9px] text-slate-400 dark:text-zinc-500 mr-0.5">Out:</span>
+                              <span className="font-mono font-semibold">{checkOutTime}</span>
+                            </div>
+                          </div>
+                          <div>
+                            <span className="font-mono font-bold text-zinc-800 dark:text-zinc-300 text-xs">{(record.working_hours || 0).toFixed(1)} hrs</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="p-8 text-center text-slate-400 text-xs">No attendance logs logged yet.</div>
+                )}
               </div>
             </div>
             
@@ -1390,15 +1451,13 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
                   <span>{scanMessage}</span>
                 </div>
               )}
-            </div>
-
             {/* Quick Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="tech-card-3d p-4 flex flex-col justify-center h-[105px]">
-                <span className="text-[10px] text-slate-400 dark:text-zinc-400 font-bold uppercase tracking-wider">Today's Status</span>
-                <p className="text-base font-bold text-slate-800 dark:text-zinc-250 mt-1">
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="tech-card-3d p-3 flex flex-col justify-center h-[95px]">
+                <span className="text-[9px] sm:text-[10px] text-slate-400 dark:text-zinc-400 font-bold uppercase tracking-wider">Today's Status</span>
+                <p className="text-sm sm:text-base font-bold text-slate-800 dark:text-zinc-250 mt-1">
                   {todayRecord ? (
-                    <span className={`inline-block text-[11px] font-mono px-2 py-0.5 rounded border ${
+                    <span className={`inline-block text-[9.5px] sm:text-[11px] font-mono px-1.5 py-0.5 rounded border ${
                       todayRecord.status === "Present" 
                         ? "bg-emerald-50 border-emerald-150 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400" 
                         : todayRecord.status === "Late" 
@@ -1408,19 +1467,22 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
                       {todayRecord.status}
                     </span>
                   ) : (
-                    <span className="text-slate-450 text-xs font-semibold">Not Checked In</span>
+                    <span className="text-slate-450 text-[10px] sm:text-xs font-semibold whitespace-nowrap">Not Checked In</span>
                   )}
                 </p>
               </div>
-              <div className="tech-card-3d p-4 flex flex-col justify-center h-[105px]">
-                <span className="text-[10px] text-slate-400 dark:text-zinc-400 font-bold uppercase tracking-wider">Days Present (Month)</span>
-                <p className="text-xl font-extrabold text-slate-900 dark:text-zinc-200 mt-1">{thisMonthPresent} Days</p>
+              <div className="tech-card-3d p-3 flex flex-col justify-center h-[95px]">
+                <span className="text-[9px] sm:text-[10px] text-slate-400 dark:text-zinc-400 font-bold uppercase tracking-wider block sm:hidden">Days Present</span>
+                <span className="text-[9px] sm:text-[10px] text-slate-400 dark:text-zinc-400 font-bold uppercase tracking-wider hidden sm:block">Days Present (Month)</span>
+                <p className="text-base sm:text-xl font-extrabold text-slate-900 dark:text-zinc-200 mt-1">{thisMonthPresent} Days</p>
               </div>
-              <div className="tech-card-3d p-4 flex flex-col justify-center h-[105px]">
-                <span className="text-[10px] text-slate-400 dark:text-zinc-400 font-bold uppercase tracking-wider">Hours Logged (Month)</span>
-                <p className="text-xl font-extrabold text-slate-900 dark:text-zinc-200 mt-1">{thisMonthHours} hrs</p>
+              <div className="tech-card-3d p-3 flex flex-col justify-center h-[95px]">
+                <span className="text-[9px] sm:text-[10px] text-slate-400 dark:text-zinc-400 font-bold uppercase tracking-wider block sm:hidden">Hours Logged</span>
+                <span className="text-[9px] sm:text-[10px] text-slate-400 dark:text-zinc-400 font-bold uppercase tracking-wider hidden sm:block">Hours Logged (Month)</span>
+                <p className="text-base sm:text-xl font-extrabold text-slate-900 dark:text-zinc-200 mt-1 font-mono">{thisMonthHours} hrs</p>
               </div>
             </div>
+          </div>
           </div>
 
           <div className="lg:col-span-5 space-y-6">
@@ -1738,7 +1800,7 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
                       onClick={() => setLeaveType(type)}
                       className={`py-2 text-[10px] font-bold uppercase border rounded-lg transition-all cursor-pointer ${
                         leaveType === type
-                          ? "bg-slate-950 border-slate-950 dark:bg-zinc-150 dark:border-zinc-150 text-white dark:text-zinc-955"
+                          ? "bg-slate-950 border-slate-950 dark:bg-zinc-200 dark:border-zinc-200 text-white dark:text-zinc-950"
                           : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-650 dark:text-zinc-400 hover:bg-zinc-55/15"
                       }`}
                     >
@@ -1903,7 +1965,7 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
                       onClick={() => setSession(sess)}
                       className={`py-1.5 text-[9px] font-bold uppercase rounded border transition-all cursor-pointer ${
                         session === sess
-                          ? "bg-slate-900 text-white border-slate-900 dark:bg-zinc-150 dark:text-zinc-950 dark:border-zinc-150"
+                          ? "bg-slate-900 text-white border-slate-900 dark:bg-zinc-200 dark:text-zinc-900 dark:border-zinc-200"
                           : "bg-white dark:bg-zinc-900 text-zinc-650 dark:text-zinc-400 border-zinc-200 dark:border-zinc-850 hover:bg-zinc-55"
                       }`}
                     >
@@ -1983,7 +2045,7 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
                 <button
                   type="submit"
                   disabled={submittingLeave}
-                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-zinc-150 dark:hover:bg-white text-white dark:text-zinc-950 font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-zinc-200 dark:hover:bg-white text-white dark:text-zinc-900 font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
                 >
                   {submittingLeave && <span className="animate-spin text-white">⌛</span>}
                   Apply
