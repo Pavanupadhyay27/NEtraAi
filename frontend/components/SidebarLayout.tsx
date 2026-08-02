@@ -451,8 +451,8 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
         onClick={() => setSidebarOpen(false)}
       >
         <aside
-          className={`fixed top-0 left-0 w-[280px] h-full bg-[var(--bg-surface)] shadow-2xl border-r border-[var(--border-subtle)] flex flex-col z-50 transform transition-transform duration-300 ease-out ${
-            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          className={`fixed top-0 right-0 w-[280px] h-full bg-[var(--bg-surface)] shadow-2xl border-l border-[var(--border-subtle)] flex flex-col z-50 transform transition-transform duration-300 ease-out ${
+            sidebarOpen ? "translate-x-0" : "translate-x-full"
           }`}
           onClick={(e) => e.stopPropagation()}
         >
