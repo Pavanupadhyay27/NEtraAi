@@ -2512,7 +2512,7 @@ function AdminDashboardView({ profile }: { profile: any }) {
         {dashboardView === "operations" ? (
           <div className="space-y-6 animate-fadeInPage">
             {/* Operations center telemetry grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white border border-zinc-100 rounded-xl p-4 flex flex-col justify-between h-[110px]">
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Device Health Status</p>
                 <div className="flex items-center justify-between mt-auto">
@@ -2849,7 +2849,7 @@ function AdminDashboardView({ profile }: { profile: any }) {
           
           <div className="min-h-36">
             {loadingDept ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="skeleton h-32 w-full rounded-2xl" />
                 ))}
@@ -3135,7 +3135,7 @@ function SuperAdminDashboardView({ profile }: { profile: any }) {
         </div>
 
         {/* Platform Stat Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="tech-card-3d p-4 space-y-1">
             <div className="flex justify-between items-center text-zinc-400 dark:text-zinc-500">
               <span className="text-[10px] font-bold uppercase tracking-wider">Total Organizations</span>
