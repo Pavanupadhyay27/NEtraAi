@@ -1,4 +1,4 @@
-const DEFAULT_BACKEND_URL = "https://netraai07-netra.hf.space/api/v1";
+const DEFAULT_BACKEND_URL = "http://192.168.1.10:8000/api/v1";
 
 // Request timeout in milliseconds (45 seconds default, 90 seconds for AI heavy endpoints)
 const DEFAULT_REQUEST_TIMEOUT_MS = 45_000;
