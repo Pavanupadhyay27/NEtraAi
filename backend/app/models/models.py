@@ -378,3 +378,14 @@ class ActivityTimeline(Base):
 
     company = relationship("Company")
     actor = relationship("User")
+
+
+class PushSubscription(Base):
+    __tablename__ = "push_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    subscription_json = Column(Text, nullable=False)  # JSON string of subscription credentials
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", backref="push_subscriptions")

@@ -139,10 +139,79 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
     }
   };
 
+  // Helper to convert base64 VAPID key to Uint8Array
+  function urlB64ToUint8Array(base64String: string) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding)
+      .replace(/\-/g, '+')
+      .replace(/_/g, '/');
+
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
+
+  const registerPushSubscription = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.warn("Push notifications are not supported in this browser.");
+      return;
+    }
+
+    try {
+      const res = await fetchApi("/push/vapid-public-key");
+      if (!res || !res.publicKey) return;
+
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array(res.publicKey)
+      });
+
+      await fetchApi("/push/subscribe", {
+        method: "POST",
+        body: JSON.stringify({ subscription })
+      });
+      console.info("PWA push subscription registered successfully.");
+    } catch (err) {
+      console.error("Failed to register PWA push subscription:", err);
+    }
+  };
+
+  // Register Service Worker for PWA
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => {
+          console.info('Service Worker registered scope:', reg.scope);
+        })
+        .catch((err) => {
+          console.error('Service worker registration failed:', err);
+        });
+    }
+  }, []);
+
   useEffect(() => {
     if (authorized) {
       fetchNotifications();
       const interval = setInterval(fetchNotifications, 10000); // Poll every 10 seconds
+      
+      // Request notification permission and register subscription
+      if (typeof window !== "undefined" && 'Notification' in window) {
+        if (Notification.permission === 'default') {
+          Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+              registerPushSubscription();
+            }
+          });
+        } else if (Notification.permission === 'granted') {
+          registerPushSubscription();
+        }
+      }
+
       return () => clearInterval(interval);
     }
   }, [authorized]);

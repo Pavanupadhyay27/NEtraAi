@@ -143,6 +143,19 @@ def update_leave(
         db.add(db_ntf)
         db.commit()
 
+        # Trigger Web Push notification in the background
+        from app.core.webpush_service import send_notification_to_user
+        try:
+            send_notification_to_user(
+                db=db,
+                user_id=emp.user_id,
+                title=f"Leave Request {data.status}",
+                message=f"Your leave request from {db_req.start_date} to {db_req.end_date} has been {data.status.lower()}.",
+                url="/leaves"
+            )
+        except Exception:
+            pass
+
     return updated
 
 

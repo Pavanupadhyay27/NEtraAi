@@ -117,6 +117,19 @@ def reply_to_ticket(
         )
         db.add(db_ntf)
         db.commit()
+
+        # Trigger Web Push notification in the background
+        from app.core.webpush_service import send_notification_to_user
+        try:
+            send_notification_to_user(
+                db=db,
+                user_id=db_ticket.employee.user_id,
+                title=f"Support Ticket #{db_ticket.id}",
+                message=f"New reply: \"{message.message[:50]}...\"",
+                url="/tickets"
+            )
+        except Exception:
+            pass
     
     # Broadcast reply to SSE stream
     from app.core import event_bus

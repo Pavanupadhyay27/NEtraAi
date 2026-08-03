@@ -23,7 +23,7 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.init_db import init_db
 from app.models import models
-from app.api.v1 import auth, employees, departments, enrollment, kiosk, attendance, reports, analytics, settings as settings_api, audit, companies, tickets, devices, notifications, timeline, policy
+from app.api.v1 import auth, employees, departments, enrollment, kiosk, attendance, reports, analytics, settings as settings_api, audit, companies, tickets, devices, notifications, timeline, policy, push
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -239,5 +239,6 @@ app.include_router(devices.router, prefix=f"{settings.API_V1_STR}/devices", tags
 app.include_router(notifications.router, prefix=f"{settings.API_V1_STR}/notifications", tags=["In-App Notifications"])
 app.include_router(timeline.router, prefix=f"{settings.API_V1_STR}/timeline", tags=["Activity History Timeline"])
 app.include_router(policy.router, prefix=f"{settings.API_V1_STR}/policy", tags=["Attendance Rules Policy Engine"])
+app.include_router(push.router, prefix=f"{settings.API_V1_STR}/push", tags=["Web Push Notifications"])
 # Trigger reload - reload 2
 
