@@ -369,6 +369,8 @@ class TicketMessageOut(TicketMessageBase):
     sender_id: int
     sender: UserEmailOut
     timestamp: datetime
+    is_delivered: bool = True
+    is_read: bool = False
     model_config = ConfigDict(from_attributes=True)
 
 # Ticket Schemas

@@ -312,6 +312,8 @@ class TicketMessage(Base):
     sender_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     message = Column(Text, nullable=False)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    is_delivered = Column(Boolean, default=True)
+    is_read = Column(Boolean, default=False)
 
     ticket = relationship("Ticket", back_populates="messages")
     sender = relationship("User")

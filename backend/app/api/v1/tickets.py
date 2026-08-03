@@ -141,11 +141,41 @@ def reply_to_ticket(
             "email": db_message.sender.email if db_message.sender else current_user.email
         },
         "message": db_message.message,
-        "timestamp": db_message.timestamp.isoformat()
+        "timestamp": db_message.timestamp.isoformat(),
+        "is_delivered": True,
+        "is_read": False
     }
     event_bus.publish_ticket_message(event_payload)
     
     return db_message
+
+
+@router.post("/{id}/read")
+def mark_ticket_read(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    db_ticket = crud.get_ticket_by_id(db, ticket_id=id)
+    if not db_ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+        
+    db.query(models.TicketMessage).filter(
+        models.TicketMessage.ticket_id == id,
+        models.TicketMessage.sender_id != current_user.id
+    ).update({"is_read": True, "is_delivered": True})
+    db.commit()
+    
+    # Broadcast read status update to SSE stream
+    from app.core import event_bus
+    event_bus.publish_ticket_message({
+        "ticket_id": id,
+        "type": "read_receipt",
+        "reader_id": current_user.id
+    })
+    
+    return {"status": "ok"}
+
 
 @router.post("/{id}/typing")
 def send_typing_status(
@@ -313,7 +343,9 @@ def upload_attachment(
             "email": db_message.sender.email if db_message.sender else current_user.email
         },
         "message": db_message.message,
-        "timestamp": db_message.timestamp.isoformat()
+        "timestamp": db_message.timestamp.isoformat(),
+        "is_delivered": True,
+        "is_read": False
     }
     event_bus.publish_ticket_message(event_payload)
     

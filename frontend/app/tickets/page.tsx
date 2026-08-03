@@ -231,6 +231,14 @@ export default function TicketsPage() {
     }
   }, [tickets, selectedTicket?.id]);
 
+  // Mark chat as read when opening a ticket
+  useEffect(() => {
+    if (selectedTicket?.id) {
+      fetchApi(`/tickets/${selectedTicket.id}/read`, { method: "POST" })
+        .catch(err => console.error("Error marking ticket read:", err));
+    }
+  }, [selectedTicket?.id]);
+
   // Live SSE real-time messaging stream subscription
   useEffect(() => {
     if (!selectedTicket?.id) {
@@ -249,13 +257,36 @@ export default function TicketsPage() {
       setSseConnected(true);
     };
 
+    const markChatAsRead = async (ticketId: number) => {
+      try {
+        await fetchApi(`/tickets/${ticketId}/read`, { method: "POST" });
+      } catch (e) {
+        console.error("Failed to mark ticket as read:", e);
+      }
+    };
+
     eventSource.onmessage = (event) => {
       try {
         setSseConnected(true);
         const data = JSON.parse(event.data);
+        const usr = getUserProfile();
         
+        if (data.type === "read_receipt") {
+          if (data.reader_id !== usr?.id) {
+            setSelectedTicket((prev: any) => {
+              if (!prev || prev.id !== data.ticket_id) return prev;
+              return {
+                ...prev,
+                messages: (prev.messages || []).map((m: any) => 
+                  m.sender_id === usr?.id ? { ...m, is_read: true, is_delivered: true } : m
+                )
+              };
+            });
+          }
+          return;
+        }
+
         if (data.type === "typing") {
-          const usr = getUserProfile();
           if (data.sender_id !== usr?.id) {
             setIsTyping(true);
             const globalObj = window as any;
@@ -269,6 +300,10 @@ export default function TicketsPage() {
 
         setIsTyping(false);
         const newMsg = data;
+
+        if (newMsg.sender_id !== usr?.id) {
+          markChatAsRead(newMsg.ticket_id);
+        }
 
         setSelectedTicket((prev: any) => {
           if (!prev || prev.id !== newMsg.ticket_id) return prev;
@@ -434,13 +469,13 @@ export default function TicketsPage() {
     }
   };
 
-  const renderMessageTicks = (senderId: number) => {
-    const isMe = senderId === profile?.id;
+  const renderMessageTicks = (m: any) => {
+    const isMe = m.sender_id === profile?.id;
     if (!isMe) return null;
 
-    if (selectedTicket?.status === "Closed") {
+    if (m.is_read) {
       return <CheckCheck className="w-3.5 h-3.5 text-sky-500 stroke-[2.5]" />;
-    } else if (selectedTicket?.status === "In Progress") {
+    } else if (m.is_delivered) {
       return <CheckCheck className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 stroke-[2]" />;
     } else {
       return <Check className="w-3.5 h-3.5 text-zinc-400 stroke-[2]" />;
@@ -913,7 +948,7 @@ export default function TicketsPage() {
                               
                               <div className={`flex items-center gap-1 mt-0.5 text-[8.5px] text-zinc-405 font-mono ${isMe ? "justify-end" : "justify-start"}`}>
                                 <span>{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                {renderMessageTicks(m.sender_id)}
+                                {renderMessageTicks(m)}
                               </div>
                             </div>
                           </div>
