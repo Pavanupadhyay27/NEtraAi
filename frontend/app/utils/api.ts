@@ -216,7 +216,10 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}): Pro
 
 export function parseDateTime(dateStr: string | null | undefined): Date | null {
   if (!dateStr) return null;
-  const formattedStr = dateStr.replace(" ", "T");
+  let formattedStr = dateStr.replace(" ", "T");
+  if (!formattedStr.includes("Z") && !formattedStr.includes("+") && !formattedStr.includes("-", 10)) {
+    formattedStr = formattedStr + "Z";
+  }
   return new Date(formattedStr);
 }
 

@@ -7,10 +7,13 @@ logger = logging.getLogger(__name__)
 
 VAPID_FILE = "vapid_keys.json"
 
+STATIC_PUBLIC_KEY = "BERCOf8jy0h2uFund_WMLVClCm5T264hpuIF5lfutNfWCvljGfeDtJOszHaQh8N6cj3y8eJi8X2V_MLene7lsIQ"
+STATIC_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgd98TRydLeHCpu8Ee\nb6RZGbTO7vTLUaC+eCaHp2ER6d2hRANCAAREQjn/I8tIdrhbp3f1jC1QpQpuU9uu\nIabiBeZX7rTX1gr5Yxn3g7STrMx2kIfDenI98vHiYvF9lfzC3p3u5bCE\n-----END PRIVATE KEY-----\n"
+
 def get_vapid_keys():
     """
     Returns (public_key, private_key) as string.
-    Generates them dynamically if they are not defined in the environment.
+    Checks environment, local file, and falls back to persistent static keypair.
     """
     pub = os.getenv("VAPID_PUBLIC_KEY")
     priv = os.getenv("VAPID_PRIVATE_KEY")
@@ -25,36 +28,7 @@ def get_vapid_keys():
         except Exception as e:
             logger.error(f"Error reading VAPID file: {str(e)}")
 
-    # Generate EC VAPID keys on the fly using standard cryptography library
-    try:
-        from cryptography.hazmat.primitives.asymmetric import ec
-        from cryptography.hazmat.primitives import serialization
-        import base64
-
-        private_key = ec.generate_private_key(ec.SECP256R1())
-        
-        # Uncompressed point format public key
-        pub_bytes = private_key.public_key().public_bytes(
-            encoding=serialization.Encoding.X962,
-            format=serialization.PublicFormat.UncompressedPoint
-        )
-        b64_public_key = base64.urlsafe_b64encode(pub_bytes).decode('utf-8').rstrip('=')
-
-        pem_private_key = private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption()
-        ).decode('utf-8')
-
-        with open(VAPID_FILE, "w") as f:
-            json.dump({"public_key": b64_public_key, "private_key": pem_private_key}, f)
-
-        logger.info("Successfully generated new VAPID keys.")
-        return b64_public_key, pem_private_key
-    except Exception as e:
-        logger.error(f"Failed to generate VAPID keys dynamically: {str(e)}")
-        # Ultimate mock fallback to prevent app crashes if cryptography is unavailable
-        return "BEl42c...", "-----BEGIN PRIVATE KEY-----..."
+    return STATIC_PUBLIC_KEY, STATIC_PRIVATE_KEY
 
 def send_web_push(subscription_info: dict, title: str, message: str, url: str = "/"):
     """

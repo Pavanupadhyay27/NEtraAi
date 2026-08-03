@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import SidebarLayout from "@/components/SidebarLayout";
-import { fetchApi, getUserProfile, getAccessToken, getBackendUrl } from "@/app/utils/api";
+import { fetchApi, getUserProfile, getAccessToken, getBackendUrl, parseDateTime } from "@/app/utils/api";
 import { useToast } from "@/app/utils/toast";
 import { 
   MessageSquare, Plus, Send, CheckCircle2, Clock, 
@@ -947,9 +947,9 @@ export default function TicketsPage() {
                               </div>
                               
                               <div className={`flex items-center gap-1 mt-0.5 text-[8.5px] text-zinc-405 font-mono ${isMe ? "justify-end" : "justify-start"}`}>
-                                <span>{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                {renderMessageTicks(m)}
-                              </div>
+                                 <span>{parseDateTime(m.timestamp)?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || ""}</span>
+                                 {renderMessageTicks(m)}
+                               </div>
                             </div>
                           </div>
                         );
