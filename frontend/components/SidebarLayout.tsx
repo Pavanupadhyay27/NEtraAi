@@ -84,6 +84,7 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [appClosed, setAppClosed] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined" || pathname !== "/dashboard") return;
@@ -925,12 +926,45 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
                   setShowExitConfirm(false);
                   if (typeof window !== "undefined") {
                     window.close();
-                    window.location.href = "about:blank";
+                    try {
+                      window.open('', '_self', '')?.close();
+                    } catch (e) {}
+                    setAppClosed(true);
                   }
                 }}
                 className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl cursor-pointer active:scale-95 transition-all shadow-md shadow-rose-600/10 font-sans"
               >
                 Exit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Branded Goodbye Overlay Fallback */}
+      {appClosed && (
+        <div className="fixed inset-0 z-[1000] flex flex-col items-center justify-center bg-zinc-950 px-6 text-center select-none animate-fadeIn">
+          <div className="space-y-6 max-w-sm">
+            <div className="w-20 h-20 rounded-3xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mx-auto border border-cyan-500/20 animate-pulse">
+              <Shield className="w-10 h-10 stroke-[1.5]" />
+            </div>
+            
+            <div className="space-y-2">
+              <h2 className="text-lg font-black uppercase tracking-wider text-zinc-100 font-mono">NetraID Closed</h2>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                The session has been terminated safely. You can now close this browser tab or swipe away the application window.
+              </p>
+            </div>
+
+            <div className="pt-4">
+              <button 
+                onClick={() => {
+                  setAppClosed(false);
+                  router.push("/dashboard");
+                }}
+                className="px-6 py-2.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-350 font-bold text-xs rounded-xl cursor-pointer active:scale-95 transition-all font-sans"
+              >
+                Return to Dashboard
               </button>
             </div>
           </div>
