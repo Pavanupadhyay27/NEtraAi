@@ -26,7 +26,8 @@ import {
   FileText,
   Shield,
   Bell,
-  BellRing
+  BellRing,
+  HelpCircle
 } from "lucide-react";
 import { getAccessToken, getUserProfile, clearTokens, fetchApi } from "@/app/utils/api";
 import CommandPalette from "@/components/CommandPalette";
@@ -82,6 +83,31 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
   const [authorized, setAuthorized] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Push dummy state to capture back button
+    window.history.pushState(null, "", window.location.href);
+
+    const handlePopState = () => {
+      // Re-push to prevent browser from leaving
+      window.history.pushState(null, "", window.location.href);
+
+      const path = window.location.pathname;
+      if (path !== "/dashboard") {
+        router.push("/dashboard");
+      } else {
+        setShowExitConfirm(true);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [router]);
 
   function playNotificationSound() {
     if (typeof window !== "undefined") {
@@ -879,6 +905,43 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
           {children}
         </div>
       </main>
+
+      {/* Exit App Confirmation Modal */}
+      {showExitConfirm && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-xs px-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 max-w-sm w-full border border-zinc-200/50 dark:border-zinc-800 shadow-2xl space-y-4 animate-scaleUp">
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center mx-auto border border-rose-500/20">
+                <HelpCircle className="w-6 h-6" />
+              </div>
+              <h3 className="text-sm font-black uppercase tracking-wider text-zinc-900 dark:text-zinc-200 font-mono">Exit Application?</h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Are you sure you want to close the NetraID application?
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowExitConfirm(false)}
+                className="flex-1 py-2.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs rounded-xl cursor-pointer active:scale-95 transition-all font-sans"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowExitConfirm(false);
+                  if (typeof window !== "undefined") {
+                    window.close();
+                    window.location.href = "about:blank";
+                  }
+                }}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl cursor-pointer active:scale-95 transition-all shadow-md shadow-rose-600/10 font-sans"
+              >
+                Exit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
