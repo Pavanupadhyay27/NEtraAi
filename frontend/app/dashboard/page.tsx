@@ -67,25 +67,30 @@ function StatCard({
 }: {
   label: string; value: string | number; icon: any;
   color: "blue" | "emerald" | "amber" | "rose" | "indigo";
-  loading?: boolean; sublabel?: string; sparkData: number[];
+  loading?: boolean; sublabel?: string; sparkData?: number[];
 }) {
   return (
-    <div className="tech-card-3d p-4 flex flex-col justify-between h-[125px]">
+    <div className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 p-4 flex flex-col justify-between h-[90px] rounded-2xl transition-all">
       <div className="flex items-center justify-between">
-        <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{label}</p>
-        <Icon className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
+        <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-wider font-mono">{label}</p>
+        <div className={`p-1.5 rounded-lg ${
+          color === "blue" ? "bg-blue-500/10 text-blue-500" :
+          color === "emerald" ? "bg-emerald-500/10 text-emerald-500" :
+          color === "amber" ? "bg-amber-500/10 text-amber-500" :
+          color === "rose" ? "bg-rose-500/10 text-rose-500" :
+          "bg-indigo-500/10 text-indigo-500"
+        }`}>
+          <Icon className="w-3.5 h-3.5" />
+        </div>
       </div>
       
-      <div className="flex items-end justify-between mt-auto">
-        <div className="space-y-0.5">
-          {loading ? (
-            <div className="skeleton h-7 w-16" />
-          ) : (
-            <p className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">{value}</p>
-          )}
-          {sublabel && <p className="text-[9px] text-zinc-400 dark:text-zinc-500 font-mono">{sublabel}</p>}
-        </div>
-        {!loading && <Sparkline color={color} data={sparkData} />}
+      <div className="flex items-baseline justify-between mt-auto">
+        {loading ? (
+          <div className="skeleton h-6 w-12" />
+        ) : (
+          <p className="text-xl font-black text-slate-900 dark:text-zinc-50 leading-none">{value}</p>
+        )}
+        {sublabel && <p className="text-[9px] text-zinc-400 dark:text-zinc-500 font-mono">{sublabel}</p>}
       </div>
     </div>
   );
@@ -1113,15 +1118,15 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
           {/* Mobile details Modal (lg:hidden) */}
           {selectedLedgerRecord && (
             <div 
-              className="lg:hidden fixed inset-0 z-[100] flex items-end justify-center bg-black/50 backdrop-blur-xs p-4 animate-fadeIn"
+              className="lg:hidden fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-xs px-3 pb-0 animate-fadeIn"
               onClick={() => setSelectedLedgerRecord(null)}
             >
               <div 
-                className="bg-white dark:bg-zinc-900 w-full max-h-[80vh] rounded-t-3xl rounded-b-xl shadow-2xl p-5 overflow-y-auto space-y-5 animate-slideUp text-left"
+                className="bg-white dark:bg-zinc-900 w-full max-h-[85vh] rounded-t-3xl rounded-b-none shadow-2xl flex flex-col text-left"
                 onClick={(e) => e.stopPropagation()}
               >
-                {/* Header */}
-                <div className="flex items-center justify-between border-b border-zinc-150 dark:border-zinc-800 pb-3">
+                {/* Header - Fixed at Top */}
+                <div className="flex items-center justify-between border-b border-zinc-150 dark:border-zinc-800 p-5 pb-3.5 shrink-0">
                   <div>
                     <h3 className="text-xs font-black uppercase text-zinc-900 dark:text-zinc-200 font-mono tracking-wider">Attendance Detail</h3>
                     <p className="text-[10px] text-zinc-400 mt-1 font-mono">
@@ -1136,95 +1141,98 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
                   </button>
                 </div>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-950/50 border border-slate-100 dark:border-zinc-800/80 flex items-center gap-2">
-                    <LogIn className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-[8px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider leading-none">Punch In</p>
-                      <p className="font-extrabold text-slate-800 dark:text-zinc-200 mt-1 font-mono text-xs">
-                        {selectedLedgerRecord.check_in ? new Date(selectedLedgerRecord.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
-                      </p>
+                {/* Scrollable Content Area */}
+                <div className="flex-1 overflow-y-auto p-5 pt-3.5 pb-6 space-y-5">
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-950/50 border border-slate-100 dark:border-zinc-800/80 flex items-center gap-2">
+                      <LogIn className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[8px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider leading-none">Punch In</p>
+                        <p className="font-extrabold text-slate-800 dark:text-zinc-200 mt-1 font-mono text-xs">
+                          {selectedLedgerRecord.check_in ? new Date(selectedLedgerRecord.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-55 dark:bg-zinc-950/50 border border-slate-100 dark:border-zinc-800/80 flex items-center gap-2">
+                      <LogOut className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[8px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider leading-none">Punch Out</p>
+                        <p className="font-extrabold text-slate-800 dark:text-zinc-200 mt-1 font-mono text-xs">
+                          {selectedLedgerRecord.check_out ? new Date(selectedLedgerRecord.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-55 dark:bg-zinc-950/50 border border-slate-100 dark:border-zinc-800/80 flex items-center gap-2">
+                      <Clock className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[8px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider leading-none">Worked</p>
+                        <p className="font-extrabold text-slate-800 dark:text-zinc-200 mt-1 font-mono text-xs">
+                          {(selectedLedgerRecord.working_hours || 0).toFixed(1)} hrs
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-55 dark:bg-zinc-950/50 border border-slate-100 dark:border-zinc-800/80 flex items-center gap-2">
+                      <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[8px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider leading-none">Geofence</p>
+                        <p className="font-bold text-slate-800 dark:text-zinc-200 mt-1 text-[10px] truncate" title={selectedLedgerRecord.geofence_result || "Verified"}>
+                          {selectedLedgerRecord.geofence_result || "Verified"}
+                        </p>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="p-2.5 rounded-xl bg-slate-55 dark:bg-zinc-950/50 border border-slate-100 dark:border-zinc-800/80 flex items-center gap-2">
-                    <LogOut className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-[8px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider leading-none">Punch Out</p>
-                      <p className="font-extrabold text-slate-800 dark:text-zinc-200 mt-1 font-mono text-xs">
-                        {selectedLedgerRecord.check_out ? new Date(selectedLedgerRecord.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
-                      </p>
+                  {/* Biometric Kiosk Scans */}
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-2">
+                      <div className="flex items-center gap-1.5">
+                        <Activity className="w-4 h-4 text-cyan-500" />
+                        <h4 className="text-[10px] font-black text-slate-900 dark:text-zinc-200 uppercase tracking-wider font-mono">
+                          Biometric Kiosk Scans
+                        </h4>
+                      </div>
+                      <span className="text-[8px] font-mono font-bold px-1.5 py-0.25 bg-cyan-50 dark:bg-cyan-950/20 text-cyan-600 rounded">
+                        {rawLogs.length} Scans
+                      </span>
                     </div>
-                  </div>
 
-                  <div className="p-2.5 rounded-xl bg-slate-55 dark:bg-zinc-950/50 border border-slate-100 dark:border-zinc-800/80 flex items-center gap-2">
-                    <Clock className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-[8px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider leading-none">Worked</p>
-                      <p className="font-extrabold text-slate-800 dark:text-zinc-200 mt-1 font-mono text-xs">
-                        {(selectedLedgerRecord.working_hours || 0).toFixed(1)} hrs
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 rounded-xl bg-slate-55 dark:bg-zinc-950/50 border border-slate-100 dark:border-zinc-800/80 flex items-center gap-2">
-                    <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-[8px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider leading-none">Geofence</p>
-                      <p className="font-bold text-slate-800 dark:text-zinc-200 mt-1 text-[10px] truncate" title={selectedLedgerRecord.geofence_result || "Verified"}>
-                        {selectedLedgerRecord.geofence_result || "Verified"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Biometric Kiosk Scans */}
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-2">
-                    <div className="flex items-center gap-1.5">
-                      <Activity className="w-4 h-4 text-cyan-500" />
-                      <h4 className="text-[10px] font-black text-slate-900 dark:text-zinc-200 uppercase tracking-wider font-mono">
-                        Biometric Kiosk Scans
-                      </h4>
-                    </div>
-                    <span className="text-[8px] font-mono font-bold px-1.5 py-0.25 bg-cyan-50 dark:bg-cyan-950/20 text-cyan-600 rounded">
-                      {rawLogs.length} Scans
-                    </span>
-                  </div>
-
-                  <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
-                    {loadingLogs ? (
-                      <div className="text-center py-6"><Loader2 className="w-4 h-4 animate-spin mx-auto text-slate-400" /></div>
-                    ) : rawLogs.length > 0 ? (
-                      rawLogs.map((log: any) => {
-                        const timeStr = log.timestamp 
-                          ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-                          : "—";
-                        const isSpoof = log.is_spoof;
-                        return (
-                          <div key={log.id} className="p-2 rounded-lg border border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/20 flex items-center justify-between text-[11px] gap-2">
-                            <div className="min-w-0">
-                              <span className="font-bold text-slate-800 dark:text-zinc-200">{timeStr}</span>
-                              <p className="text-[9px] text-slate-400 dark:text-zinc-500 truncate font-mono">{log.camera || "Entrance"}</p>
+                    <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+                      {loadingLogs ? (
+                        <div className="text-center py-6"><Loader2 className="w-4 h-4 animate-spin mx-auto text-slate-400" /></div>
+                      ) : rawLogs.length > 0 ? (
+                        rawLogs.map((log: any) => {
+                          const timeStr = log.timestamp 
+                            ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+                            : "—";
+                          const isSpoof = log.is_spoof;
+                          return (
+                            <div key={log.id} className="p-2 rounded-lg border border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/20 flex items-center justify-between text-[11px] gap-2">
+                              <div className="min-w-0">
+                                <span className="font-bold text-slate-800 dark:text-zinc-200">{timeStr}</span>
+                                <p className="text-[9px] text-slate-400 dark:text-zinc-500 truncate font-mono">{log.camera || "Entrance"}</p>
+                              </div>
+                              <div className="shrink-0">
+                                <span className={`text-[8px] font-mono font-bold px-1 py-0.25 rounded border inline-block ${
+                                  isSpoof 
+                                    ? "bg-rose-50 border-rose-200 text-rose-600" 
+                                    : log.status && log.status.includes("Success") 
+                                      ? "bg-emerald-50 border-emerald-200 text-emerald-600" 
+                                      : "bg-slate-50 border-slate-200 text-slate-600"
+                                }`}>
+                                  {isSpoof ? "SPOOF" : log.status || "Swiped"}
+                                </span>
+                              </div>
                             </div>
-                            <div className="shrink-0">
-                              <span className={`text-[8px] font-mono font-bold px-1 py-0.25 rounded border inline-block ${
-                                isSpoof 
-                                  ? "bg-rose-50 border-rose-200 text-rose-600" 
-                                  : log.status && log.status.includes("Success") 
-                                    ? "bg-emerald-50 border-emerald-200 text-emerald-600" 
-                                    : "bg-slate-50 border-slate-200 text-slate-600"
-                              }`}>
-                                {isSpoof ? "SPOOF" : log.status || "Swiped"}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <p className="text-[10px] text-slate-400 text-center py-4 italic">No scans recorded on kiosk terminal.</p>
-                    )}
+                          );
+                        })
+                      ) : (
+                        <p className="text-[10px] text-slate-400 text-center py-4 italic">No scans recorded on kiosk terminal.</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
