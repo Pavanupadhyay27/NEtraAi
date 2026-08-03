@@ -86,7 +86,7 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || pathname !== "/dashboard") return;
 
     // Push dummy state to capture back button
     window.history.pushState(null, "", window.location.href);
@@ -94,20 +94,14 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
     const handlePopState = () => {
       // Re-push to prevent browser from leaving
       window.history.pushState(null, "", window.location.href);
-
-      const path = window.location.pathname;
-      if (path !== "/dashboard") {
-        router.push("/dashboard");
-      } else {
-        setShowExitConfirm(true);
-      }
+      setShowExitConfirm(true);
     };
 
     window.addEventListener("popstate", handlePopState);
     return () => {
       window.removeEventListener("popstate", handlePopState);
     };
-  }, [router]);
+  }, [pathname]);
 
   function playNotificationSound() {
     if (typeof window !== "undefined") {

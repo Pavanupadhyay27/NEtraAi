@@ -1,4 +1,4 @@
-from sqlalchemy import select, or_, and_, func
+from sqlalchemy import select, or_, and_, func, delete
 from sqlalchemy.orm import Session
 from datetime import date, datetime, timedelta, time
 from typing import Optional, List
