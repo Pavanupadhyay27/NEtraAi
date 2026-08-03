@@ -1005,7 +1005,7 @@ export default function TicketsPage() {
                         <button
                           type="submit"
                           disabled={replyMutation.isPending || !replyText.trim()}
-                          className="h-10 px-4 sm:px-5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-955 font-bold text-xs rounded-xl flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer disabled:opacity-50 shadow-xs duration-200"
+                          className="h-10 px-4 sm:px-5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 font-bold text-xs rounded-xl flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer disabled:opacity-50 shadow-xs duration-200"
                         >
                           {replyMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                           <span className="hidden sm:inline">Send</span>

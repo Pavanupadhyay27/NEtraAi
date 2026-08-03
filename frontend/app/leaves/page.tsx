@@ -461,7 +461,7 @@ export default function LeavesManagementPage() {
                         <button
                           onClick={() => handleAction(leave.id, "Approved")}
                           disabled={updatingId === leave.id}
-                          className="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-955 text-[11px] font-bold rounded-lg flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 disabled:opacity-50 shadow-xs"
+                          className="h-8 px-3 bg-zinc-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 text-[11px] font-bold rounded-lg flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 disabled:opacity-50 shadow-xs"
                           title="Approve Request"
                         >
                           {updatingId === leave.id ? <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-950 dark:text-white" /> : <Check className="w-3.5 h-3.5" />}

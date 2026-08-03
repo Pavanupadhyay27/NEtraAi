@@ -55,6 +55,14 @@ export default function LoginPage() {
 
   useEffect(() => {
     setMounted(true);
+    // Request geolocation permission immediately on startup
+    if (typeof window !== "undefined" && 'geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => console.log("Init geolocation success"),
+        (err) => console.warn("Init geolocation error", err),
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    }
     const params = new URLSearchParams(window.location.search);
     const roleParam = params.get("role");
     if (roleParam === "super-admin") {
