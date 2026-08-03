@@ -474,3 +474,47 @@ async def upload_avatar(
     
     return {"message": "Avatar uploaded successfully"}
 
+
+from fastapi.responses import FileResponse
+import os
+import shutil
+
+@router.post("/leaves/attachment", status_code=status.HTTP_201_CREATED)
+def upload_leave_attachment(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    # Upload to Cloudinary with local fallback
+    content = file.file.read()
+    
+    from app.core.cloudinary import upload_to_cloudinary
+    cloudinary_url = upload_to_cloudinary(content, file.filename)
+    
+    if cloudinary_url:
+        return {"filename": file.filename, "url": cloudinary_url}
+        
+    # Local fallback
+    upload_dir = "uploads/leaves"
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    import time
+    clean_name = f"{int(time.time())}_{file.filename}"
+    file_path = os.path.join(upload_dir, clean_name)
+    
+    # Save file
+    file.file.seek(0)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    local_url = f"/api/v1/employees/leaves/attachments/{clean_name}"
+    return {"filename": file.filename, "url": local_url}
+
+@router.get("/leaves/attachments/{filename}")
+def get_leave_attachment(filename: str):
+    clean_filename = os.path.basename(filename.replace("..", "").replace("/", "").replace("\\", ""))
+    file_path = f"uploads/leaves/{clean_filename}"
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    return FileResponse(file_path)
+

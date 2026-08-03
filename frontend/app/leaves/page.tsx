@@ -126,21 +126,34 @@ export default function LeavesManagementPage() {
   // Helper to parse Emergency Contact & Documents from reason text block
   const parseReasonText = (reasonStr: string = "") => {
     const contactMatch = reasonStr.match(/\(Emergency Contact:\s*([^\)]+)\)/);
+    
+    // Check for new real attachment format first
+    const realCertMatch = reasonStr.match(/\[ATTACHMENT:(.*?)\|(.*?)\]/);
     const certMatch = reasonStr.match(/\(Attached Certificate:\s*([^\)]+)\)/);
     const halfDayMatch = reasonStr.match(/\(Half-Day:\s*([^\)]+)\)/);
     
-    const cleanReason = reasonStr.split(" (")[0];
+    // Clean reason string of attachment tags
+    let cleanReason = reasonStr.split(" (")[0].split(" [ATTACHMENT")[0];
     
     return {
       cleanReason: cleanReason || reasonStr,
       contact: contactMatch ? contactMatch[1] : null,
-      certificate: certMatch ? certMatch[1] : null,
+      certificate: realCertMatch ? realCertMatch[2] : (certMatch ? certMatch[1] : null),
+      certificateName: realCertMatch ? realCertMatch[1] : (certMatch ? certMatch[1] : null),
+      isRealCert: !!realCertMatch,
       halfDay: halfDayMatch ? halfDayMatch[1] : null
     };
   };
 
-  // Handle Mock File Download
-  const handleDownloadDoc = (fileName: string) => {
+  // Handle Mock or Real File Download
+  const handleDownloadDoc = (fileName: string, fileUrl?: string, isReal?: boolean) => {
+    if (isReal && fileUrl) {
+      const baseUrl = getBackendUrl().replace("/api/v1", "");
+      const fullUrl = fileUrl.startsWith("http") ? fileUrl : `${baseUrl}${fileUrl}`;
+      window.open(fullUrl, "_blank");
+      return;
+    }
+
     const isImage = fileName.toLowerCase().endsWith(".png") || 
                     fileName.toLowerCase().endsWith(".jpg") || 
                     fileName.toLowerCase().endsWith(".jpeg");
@@ -587,7 +600,7 @@ export default function LeavesManagementPage() {
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           type="button"
-                          onClick={() => handleDownloadDoc(parsed.certificate!)}
+                          onClick={() => handleDownloadDoc(parsed.certificateName || parsed.certificate!, parsed.certificate!, parsed.isRealCert)}
                           className="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-lg text-[10px] flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-2xs shadow-rose-500/10"
                         >
                           <FileDown className="w-3.5 h-3.5" />

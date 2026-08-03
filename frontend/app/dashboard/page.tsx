@@ -393,6 +393,7 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
   const [submittingLeave, setSubmittingLeave] = React.useState(false);
   const [leaveError, setLeaveError] = React.useState<string | null>(null);
   const [attachedFileName, setAttachedFileName] = React.useState("");
+  const [attachedFile, setAttachedFile] = React.useState<File | null>(null);
   const [isHalfDay, setIsHalfDay] = React.useState(false);
   const [session, setSession] = React.useState("First Half");
   const [leaveContact, setLeaveContact] = React.useState("");
@@ -712,7 +713,26 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
       if (leaveContact) {
         richReason += ` (Emergency Contact: ${leaveContact})`;
       }
-      if (leaveType === "Sick" && attachedFileName) {
+      
+      // Upload certificate if file is selected
+      if (leaveType === "Sick" && attachedFile) {
+        try {
+          const formData = new FormData();
+          formData.append("file", attachedFile);
+          
+          const uploadRes = await fetchApi("/employees/leaves/attachment", {
+            method: "POST",
+            body: formData
+          });
+          if (uploadRes && uploadRes.url) {
+            richReason += ` [ATTACHMENT:${uploadRes.filename}|${uploadRes.url}]`;
+          }
+        } catch (uploadErr) {
+          console.error("Failed to upload leave certificate", uploadErr);
+          // Fallback to text attachment name
+          richReason += ` (Attached Certificate: ${attachedFileName})`;
+        }
+      } else if (leaveType === "Sick" && attachedFileName) {
         richReason += ` (Attached Certificate: ${attachedFileName})`;
       }
 
@@ -731,6 +751,7 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
       setLeaveEndDate("");
       setLeaveReason("");
       setAttachedFileName("");
+      setAttachedFile(null);
       setIsHalfDay(false);
       setLeaveContact("");
       refetchLeaves();
@@ -2132,6 +2153,7 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         setAttachedFileName(file ? file.name : "");
+                        setAttachedFile(file || null);
                       }}
                       className="text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[9px] file:font-bold file:bg-zinc-100 file:text-zinc-700 dark:file:bg-zinc-800 dark:file:text-zinc-300 file:cursor-pointer cursor-pointer"
                     />

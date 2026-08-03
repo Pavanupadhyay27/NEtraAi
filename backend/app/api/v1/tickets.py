@@ -266,17 +266,25 @@ def upload_attachment(
     if current_user.company_id is not None and db_ticket.company_id != current_user.company_id:
         raise HTTPException(status_code=403, detail="Not authorized to access this resource")
         
-    # Create upload directory
-    upload_dir = f"uploads/tickets/{id}"
-    os.makedirs(upload_dir, exist_ok=True)
+    # Read file bytes
+    content = file.file.read()
     
-    # Save file
-    file_path = os.path.join(upload_dir, file.filename)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    # Try Cloudinary upload
+    from app.core.cloudinary import upload_to_cloudinary
+    cloudinary_url = upload_to_cloudinary(content, file.filename)
+    
+    if cloudinary_url:
+        attachment_url = cloudinary_url
+    else:
+        # Create upload directory and fallback to local disk
+        upload_dir = f"uploads/tickets/{id}"
+        os.makedirs(upload_dir, exist_ok=True)
+        file_path = os.path.join(upload_dir, file.filename)
+        file.file.seek(0)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        attachment_url = f"/api/v1/tickets/attachments/{id}/{file.filename}"
         
-    # Create attachment message in DB
-    attachment_url = f"/api/v1/tickets/attachments/{id}/{file.filename}"
     message_text = f"[ATTACHMENT:{file.filename}|{attachment_url}]"
     
     msg_schema = schemas.TicketMessageCreate(message=message_text)
