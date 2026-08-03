@@ -194,6 +194,21 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
     }
   }, []);
 
+  // Request location permission on startup/login
+  const requestLocationPermission = () => {
+    if (typeof window !== "undefined" && 'geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          console.info("Location permission granted on startup:", pos.coords.latitude, pos.coords.longitude);
+        },
+        (err) => {
+          console.warn("Location permission denied on startup:", err.message);
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+    }
+  };
+
   useEffect(() => {
     if (authorized) {
       fetchNotifications();
@@ -211,6 +226,9 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
           registerPushSubscription();
         }
       }
+
+      // Request location permission
+      requestLocationPermission();
 
       return () => clearInterval(interval);
     }
