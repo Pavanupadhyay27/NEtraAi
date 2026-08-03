@@ -398,48 +398,48 @@ export default function LeavesManagementPage() {
                 <div 
                   key={leave.id}
                   onClick={() => setSelectedLeave(leave)}
-                  className="p-4.5 flex flex-col md:flex-row md:items-center justify-between gap-4 group cursor-pointer hover:bg-zinc-50/50 dark:hover:bg-zinc-950/20 transition-all"
+                  className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 group cursor-pointer hover:bg-zinc-50/40 dark:hover:bg-zinc-950/10 border-b border-zinc-100 dark:border-zinc-800/60 transition-all"
                 >
-                  <div className="flex items-start gap-3.5 min-w-0">
+                  <div className="flex items-start gap-3 min-w-0">
                     {/* Avatar */}
                     <div className="shrink-0">
                       <EmployeeAvatar employee={leave.employee} baseUrl={baseUrl} avatarColor={avatarColor} size="md" />
                     </div>
 
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <span className="text-xs font-bold text-slate-900 dark:text-zinc-100">{leave.employee?.name}</span>
-                        <span className="text-[10px] text-slate-450 dark:text-zinc-400 font-mono">({leave.employee?.designation || "Staff"})</span>
-                        <span className={`text-[8.5px] font-mono font-bold uppercase px-2 py-0.25 rounded-md border ${
-                          leave.leave_type === "Sick" ? "bg-rose-500/10 border-rose-500/25 text-rose-600 dark:text-rose-455" :
-                          leave.leave_type === "Casual" ? "bg-amber-500/10 border-amber-500/25 text-amber-600 dark:text-amber-455" :
-                          leave.leave_type === "Annual" ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-600 dark:text-emerald-455" :
-                          "bg-zinc-500/10 border-zinc-500/25 text-zinc-650 dark:text-zinc-450"
+                        <span className="text-[9.5px] text-slate-400 dark:text-zinc-500 font-mono">({leave.employee?.designation || "Staff"})</span>
+                        <span className={`text-[8.5px] font-mono font-bold uppercase px-1.5 py-0.25 rounded border ${
+                          leave.leave_type === "Sick" ? "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400" :
+                          leave.leave_type === "Casual" ? "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400" :
+                          leave.leave_type === "Annual" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-450" :
+                          "bg-zinc-500/10 border-zinc-500/20 text-zinc-500 dark:text-zinc-400"
                         }`}>
                           {leave.leave_type}
                         </span>
                       </div>
                       
-                      <div className="flex items-center gap-1.5 text-[10.5px] text-slate-500 dark:text-zinc-400">
-                        <span className="font-semibold text-slate-800 dark:text-zinc-200">
+                      <div className="flex flex-wrap items-center gap-1.5 text-[10.5px] text-slate-550 dark:text-zinc-400">
+                        <span className="font-semibold text-slate-700 dark:text-zinc-300">
                           {formatDateDMY(leave.start_date)}
                         </span>
-                        <ArrowRight className="w-3 h-3 text-zinc-400" />
-                        <span className="font-semibold text-slate-800 dark:text-zinc-200">
+                        <ArrowRight className="w-3 h-3 text-zinc-400 shrink-0" />
+                        <span className="font-semibold text-slate-700 dark:text-zinc-300">
                           {formatDateDMY(leave.end_date)}
                         </span>
-                        <span className="text-[9px] font-bold text-cyan-600 dark:text-cyan-400 font-mono bg-cyan-50 dark:bg-cyan-950/20 px-1.5 py-0.25 rounded border border-cyan-150 dark:border-cyan-900/30">
+                        <span className="text-[9px] font-bold text-cyan-600 dark:text-cyan-400 font-mono bg-cyan-50 dark:bg-cyan-950/20 px-1 py-0.25 rounded border border-cyan-150/40 dark:border-cyan-900/30">
                           {days} Day{days !== 1 ? "s" : ""}
                         </span>
                         {parsed.certificate && (
-                          <span className="text-[8.5px] text-rose-500 bg-rose-500/10 px-1.5 py-0.25 rounded-md border border-rose-500/25 font-bold uppercase tracking-wider flex items-center gap-0.5 shrink-0">
+                          <span className="text-[8.5px] text-rose-500 bg-rose-500/10 px-1 py-0.25 rounded border border-rose-500/20 font-bold uppercase tracking-wider flex items-center gap-0.5 shrink-0">
                             📎 Cert
                           </span>
                         )}
                       </div>
 
                       {parsed.cleanReason && (
-                        <p className="text-[10.5px] text-zinc-500 dark:text-zinc-400 mt-1.5 leading-normal max-w-2xl bg-zinc-50/50 dark:bg-zinc-950/30 border border-zinc-200/30 dark:border-zinc-850 p-2 rounded-xl italic">
+                        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1 leading-normal bg-zinc-50/50 dark:bg-zinc-950/30 border border-zinc-150/30 dark:border-zinc-800/40 p-2 rounded-xl italic">
                           " {parsed.cleanReason} "
                         </p>
                       )}
@@ -447,13 +447,13 @@ export default function LeavesManagementPage() {
                   </div>
 
                   {/* Actions Block */}
-                  <div className="shrink-0 flex items-center gap-2 w-full md:w-auto justify-end mt-2.5 md:mt-0" onClick={(e) => e.stopPropagation()}>
+                  <div className="shrink-0 flex items-center gap-1.5 justify-end mt-1 md:mt-0" onClick={(e) => e.stopPropagation()}>
                     {leave.status === "Pending" ? (
-                      <>
+                      <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => handleAction(leave.id, "Rejected")}
                           disabled={updatingId === leave.id}
-                          className="p-2 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-500 hover:text-white dark:hover:bg-rose-950/25 text-rose-600 rounded-xl cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+                          className="w-8 h-8 flex items-center justify-center border border-rose-100 hover:border-rose-200 dark:border-rose-950 dark:hover:border-rose-900 hover:bg-rose-500/10 text-rose-600 rounded-lg cursor-pointer transition-all active:scale-95 disabled:opacity-50"
                           title="Reject Request"
                         >
                           {updatingId === leave.id ? <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-600" /> : <X className="w-3.5 h-3.5" />}
@@ -461,18 +461,18 @@ export default function LeavesManagementPage() {
                         <button
                           onClick={() => handleAction(leave.id, "Approved")}
                           disabled={updatingId === leave.id}
-                          className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-955 text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 disabled:opacity-50 shadow-xs"
+                          className="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-955 text-[11px] font-bold rounded-lg flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 disabled:opacity-50 shadow-xs"
                           title="Approve Request"
                         >
                           {updatingId === leave.id ? <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-950 dark:text-white" /> : <Check className="w-3.5 h-3.5" />}
                           <span>Approve</span>
                         </button>
-                      </>
+                      </div>
                     ) : (
-                      <span className={`text-[9.5px] font-mono font-bold uppercase px-3 py-1 rounded-xl border ${
+                      <span className={`text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded border ${
                         leave.status === "Approved" 
-                          ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-455" 
-                          : "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-455"
+                          ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400" 
+                          : "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400"
                       }`}>
                         {leave.status}
                       </span>
@@ -492,8 +492,8 @@ export default function LeavesManagementPage() {
 
       {/* Details & Attachment Modal (Portaled) */}
       {selectedLeave && typeof document !== "undefined" && createPortal(
-        <div className="modal-backdrop z-[999] bg-black/40 backdrop-blur-xs fixed inset-0 flex items-center justify-center p-4">
-          <div className="modal-content max-w-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-900 dark:text-zinc-100 shadow-2xl p-6 rounded-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="modal-backdrop z-[999] bg-black/50 backdrop-blur-xs fixed inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="modal-content w-full sm:max-w-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-900 dark:text-zinc-100 shadow-2xl p-5 sm:p-6 rounded-t-3xl rounded-b-none sm:rounded-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
             
             {/* Modal Header */}
             <div className="flex items-center justify-between mb-5 pb-3 border-b border-slate-100 dark:border-zinc-800">

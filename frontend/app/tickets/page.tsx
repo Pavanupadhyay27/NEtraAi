@@ -676,71 +676,97 @@ export default function TicketsPage() {
                     const avatarColor = avatarColors[selectedTicket.employee?.id % avatarColors.length] || avatarColors[0];
 
                     return (
-                      <div className="p-3 border-b border-zinc-150 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-950/20 backdrop-blur-md flex flex-row items-center justify-between gap-2 shrink-0">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <button 
-                            onClick={() => setSelectedTicket(null)}
-                            className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-550 dark:text-zinc-455 cursor-pointer transition-all active:scale-90 duration-200"
-                            title="Close Chat / Go Back"
-                          >
-                            <ArrowLeft className="w-4 h-4 text-zinc-700 dark:text-zinc-300" />
-                          </button>
+                      <div className="p-3 border-b border-zinc-150 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-950/20 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-2 shrink-0">
+                        {/* Top Section / Row 1 (Mobile-friendly) */}
+                        <div className="flex items-center justify-between sm:justify-start gap-2 min-w-0 w-full sm:w-auto">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <button 
+                              onClick={() => setSelectedTicket(null)}
+                              className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-550 dark:text-zinc-455 cursor-pointer transition-all active:scale-90 duration-200"
+                              title="Close Chat / Go Back"
+                            >
+                              <ArrowLeft className="w-4 h-4 text-zinc-700 dark:text-zinc-300" />
+                            </button>
 
-                          {/* Stateful Avatar Fallback */}
-                          <div className="shrink-0">
-                            <EmployeeAvatar 
-                                employee={selectedTicket.employee} 
-                                baseUrl={baseUrl} 
-                                avatarColor={avatarColor} 
-                                size="md" 
-                            />
+                            <div className="shrink-0">
+                              <EmployeeAvatar 
+                                  employee={selectedTicket.employee} 
+                                  baseUrl={baseUrl} 
+                                  avatarColor={avatarColor} 
+                                  size="md" 
+                              />
+                            </div>
+
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[9px] font-mono font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/30 px-1.5 py-0.25 rounded border border-cyan-150 dark:border-cyan-900/30">
+                                  #TK-{selectedTicket.id}
+                                </span>
+                                <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-mono">
+                                  {selectedTicket.category}
+                                </span>
+                                {getPriorityBadge(selectedTicket.priority)}
+                              </div>
+                              <h2 className="text-xs font-black text-slate-900 dark:text-zinc-100 truncate max-w-[150px] sm:max-w-xs mt-0.5" title={selectedTicket.title}>
+                                {selectedTicket.title.split("] ").pop()}
+                              </h2>
+                            </div>
                           </div>
 
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[9px] font-mono font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/30 px-2 py-0.5 rounded border border-cyan-150 dark:border-cyan-900/30">
-                                #TK-{selectedTicket.id}
-                              </span>
-                              <span className="text-[10px] font-bold text-zinc-405 dark:text-zinc-500 uppercase tracking-wider font-mono">
-                                {selectedTicket.category} Support
-                              </span>
-                              {getPriorityBadge(selectedTicket.priority)}
-                            </div>
-                            <h2 className="text-xs font-black text-slate-900 dark:text-zinc-100 truncate max-w-[180px] md:max-w-xs mt-0.5" title={selectedTicket.title}>
-                              {selectedTicket.title.split("] ").pop()}
-                            </h2>
+                          {/* Mobile Actions (Search & Details Info) */}
+                          <div className="flex sm:hidden items-center gap-1">
+                            <button 
+                              onClick={() => {
+                                setShowChatSearch(!showChatSearch);
+                                if (showChatSearch) setChatSearchQuery("");
+                              }}
+                              className={`p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all active:scale-95 duration-200 cursor-pointer ${showChatSearch ? "text-cyan-500 bg-cyan-500/10" : "text-zinc-500"}`}
+                              title="Search messages"
+                            >
+                              <Search className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button 
+                              onClick={() => setIsRightPanelOpen(!isRightPanelOpen)}
+                              className={`p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all active:scale-95 duration-200 cursor-pointer ${isRightPanelOpen ? "text-cyan-500 bg-cyan-500/10" : "text-zinc-500"}`}
+                              title="Ticket Details"
+                            >
+                              <Info className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </div>
                         
-                        {/* Status & Options Action Strip */}
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          
-                          <button 
-                            onClick={() => {
-                              setShowChatSearch(!showChatSearch);
-                              if (showChatSearch) setChatSearchQuery("");
-                            }}
-                            className={`p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all active:scale-95 duration-200 cursor-pointer ${showChatSearch ? "text-cyan-500 bg-cyan-500/10" : "text-zinc-500"}`}
-                            title="Search messages"
-                          >
-                            <Search className="w-4 h-4" />
-                          </button>
+                        {/* Row 2 / Desktop Right: Status & Actions */}
+                        <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto pt-1.5 sm:pt-0 border-t border-zinc-100 dark:border-zinc-800/40 sm:border-t-0">
+                          {/* Desktop-only action buttons, hidden on mobile since they are in Row 1 */}
+                          <div className="hidden sm:flex items-center gap-1">
+                            <button 
+                              onClick={() => {
+                                setShowChatSearch(!showChatSearch);
+                                if (showChatSearch) setChatSearchQuery("");
+                              }}
+                              className={`p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all active:scale-95 duration-200 cursor-pointer ${showChatSearch ? "text-cyan-500 bg-cyan-500/10" : "text-zinc-500"}`}
+                              title="Search messages"
+                            >
+                              <Search className="w-4 h-4" />
+                            </button>
 
-                          <button 
-                            onClick={() => setIsRightPanelOpen(!isRightPanelOpen)}
-                            className={`p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all active:scale-95 duration-200 cursor-pointer ${isRightPanelOpen ? "text-cyan-500 bg-cyan-500/10" : "text-zinc-500"}`}
-                            title="Ticket Details"
-                          >
-                            <Info className="w-4 h-4" />
-                          </button>
+                            <button 
+                              onClick={() => setIsRightPanelOpen(!isRightPanelOpen)}
+                              className={`p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all active:scale-95 duration-200 cursor-pointer ${isRightPanelOpen ? "text-cyan-500 bg-cyan-500/10" : "text-zinc-500"}`}
+                              title="Ticket Details"
+                            >
+                              <Info className="w-4 h-4" />
+                            </button>
+                          </div>
 
-                          <div className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-850 px-2 py-0.5 rounded-xl border border-zinc-200 dark:border-zinc-700/60">
-                            <span className="text-[10px] font-bold text-zinc-405 px-0.5 uppercase">Status:</span>
+                          <div className="flex items-center gap-1.5 bg-zinc-50 dark:bg-zinc-850 px-2 py-0.5 rounded-xl border border-zinc-200 dark:border-zinc-700/60 w-full sm:w-auto justify-between sm:justify-start">
+                            <span className="text-[9.5px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-mono">Status:</span>
                             {isHR ? (
                               <select
                                 value={selectedTicket.status}
                                 onChange={(e) => updateStatusMutation.mutate({ ticketId: selectedTicket.id, status: e.target.value })}
-                                className="text-[10px] font-bold h-6.5 border border-zinc-300 dark:border-zinc-650 rounded-lg bg-white dark:bg-zinc-900 px-1 text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                className="text-[10px] font-bold h-6 border-0 bg-transparent text-zinc-850 dark:text-zinc-200 focus:outline-none cursor-pointer py-0 pr-6 pl-1"
                               >
                                 <option value="Open">Open</option>
                                 <option value="In Progress">In Progress</option>
@@ -750,7 +776,6 @@ export default function TicketsPage() {
                               getStatusBadge(selectedTicket.status)
                             )}
                           </div>
-
                         </div>
                       </div>
                     );
@@ -980,10 +1005,10 @@ export default function TicketsPage() {
                         <button
                           type="submit"
                           disabled={replyMutation.isPending || !replyText.trim()}
-                          className="h-10 px-5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-950 font-bold text-xs rounded-xl flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer disabled:opacity-50 shadow-xs duration-200"
+                          className="h-10 px-4 sm:px-5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-955 font-bold text-xs rounded-xl flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer disabled:opacity-50 shadow-xs duration-200"
                         >
                           {replyMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                          <span>Send</span>
+                          <span className="hidden sm:inline">Send</span>
                         </button>
                       </form>
 
