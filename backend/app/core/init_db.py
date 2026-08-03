@@ -155,6 +155,23 @@ def init_db(db: Session):
             db.execute(text(f"ALTER TABLE attendance ADD COLUMN {col_name} {col_def}"))
             db.commit()
 
+    # Ensure ticket_messages is_delivered and is_read columns exist for PostgreSQL/SQLite compatibility
+    try:
+        db.execute(text("SELECT is_delivered FROM ticket_messages LIMIT 1"))
+    except Exception:
+        db.rollback()
+        logger.info("Adding is_delivered column to ticket_messages table...")
+        db.execute(text("ALTER TABLE ticket_messages ADD COLUMN is_delivered BOOLEAN DEFAULT TRUE"))
+        db.commit()
+
+    try:
+        db.execute(text("SELECT is_read FROM ticket_messages LIMIT 1"))
+    except Exception:
+        db.rollback()
+        logger.info("Adding is_read column to ticket_messages table...")
+        db.execute(text("ALTER TABLE ticket_messages ADD COLUMN is_read BOOLEAN DEFAULT FALSE"))
+        db.commit()
+
     # Seed Default Company
     default_company = db.execute(select(models.Company).where(models.Company.name == "NetraID Base")).scalar_one_or_none()
     if not default_company:
