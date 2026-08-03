@@ -1137,16 +1137,16 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
           </div>
 
           {/* Mobile details Modal (lg:hidden) */}
-          {selectedLedgerRecord && (
+          {selectedLedgerRecord && typeof document !== "undefined" && createPortal(
             <>
               {/* Backdrop */}
               <div 
-                className="lg:hidden fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs animate-fadeIn"
+                className="lg:hidden fixed inset-0 z-[999] bg-black/60 backdrop-blur-xs animate-fadeIn"
                 onClick={() => setSelectedLedgerRecord(null)}
               />
               {/* Bottom Sheet Drawer */}
               <div 
-                className="lg:hidden fixed inset-x-0 bottom-0 z-[110] bg-white dark:bg-zinc-900 rounded-t-3xl shadow-2xl flex flex-col max-h-[85vh] text-left animate-slideUp"
+                className="lg:hidden fixed inset-x-0 bottom-0 z-[1000] bg-white dark:bg-zinc-900 rounded-t-3xl shadow-2xl flex flex-col max-h-[85vh] text-left animate-slideUp"
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Header - Fixed at Top */}
@@ -1260,7 +1260,8 @@ function EmployeeDashboardView({ profile }: { profile: any }) {
                   </div>
                 </div>
               </div>
-            </>
+            </>,
+            document.body
           )}
         </div>
       )}
